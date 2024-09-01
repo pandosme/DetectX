@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Object Tracker</title>
+<link rel="stylesheet" href="css/bootstrap.min.css">
+<link rel="stylesheet" href="css/app.css">
+<script src="js/jquery.min.js"></script>
+<script src="js/bootstrap.min.js"></script>
+
+</head>
+
+<body>
+
+<div id="wrapper">
+	<div id="sidebar-wrapper">
+		<ul class="sidebar-nav" style="width:150px">
+			<li class="sidebar-brand" style="width:150px; color:yellow"><b>Object Tracker</b></li>
+			<li>
+				<a href="index.html">Settings</a>
+				<a href="mqtt.html" style="color:white"><b>MQTT</b></a>
+			</li>
+		</ul>
+	</div>
+
+	<div class="card bg-secondary text-white">
+		<h2>&nbsp;MQTT</h2>
+	</div>
+
+	<div id="page-content-wrapper">
+		<div class="container-fluid">
+			<div class="card col-lg-10 bg-white text-black">
+				<div class="card-body">
+					<h5 class="card-title">Client settings</h5>
+					<div class="form-group row">
+						<label for="mqtt_status" class="col-lg-1 col-form-label">Status</label>
+						<div class="col-lg-6 col-sm-10">
+							<input id="mqtt_status" type="text" readonly class="form-control-plaintext" value="Status">
+						</div>
+					</div>
+					<div class="form-group row">
+						<label for="mqtt_address" class="col-lg-1 col-sm-2 col-form-label">Address</label>
+						<div class="col-lg-4 col-sm-8">
+							<input id="mqtt_address" type="text" class="form-control">
+						</div>
+					</div>
+					<div class="form-group row">
+						<label for="mqtt_port" class="col-lg-1 col-sm-2 col-form-label">Port</label>
+						<div class="col-sm-2">
+							<input id="mqtt_port" type="text" class="form-control">
+						</div>
+					</div>
+					<div class="form-group row">
+						<label for="mqtt_tls" class="col-lg-1 col-sm-2 col-form-label">TLS</label>
+						<div class="form-group col-lg-2 col-sm-4">
+							<select id="mqtt_tls" class="form-control">
+								<option value="none">No TLS</option>
+								<option value="verify">Verify certificate</option>
+								<option value="noverify">Trust certificate</option>
+							</select>
+						</div>				
+						<div class="col-lg-7 col-sm-6">
+							<a href="certificate.html"  class="btn btn-secondary">Set client certificate</a>
+						</div>
+					</div>
+					<div class="form-group row">
+						<label for="mqtt_user" class="col-lg-1 col-sm-2 col-form-label">User</label>
+						<div class="col-sm-3">
+							<input type="text" class="form-control" id="mqtt_user">
+						</div>
+					</div>
+					<div class="form-group row">
+						<label for="mqtt_password" class="col-lg-1 col-sm-2 col-form-label">Password</label>
+						<div class="col-sm-3">
+							<input type="password" class="form-control" id="mqtt_password" placeholder="">
+						</div>
+					</div>
+					<div class="form-group row">
+						<label for="mqtt_preTopic" class="col-lg-1 col-sm-2 col-form-label">Pre-topic</label>
+						<div class="col-lg-2 col-sm-8">
+							<input id="mqtt_preTopic" type="text" class="form-control">
+						</div>
+					</div>
+					<div class="form-group row">
+						<div class="col-sm-10">
+							<button id="connect" class="btn btn-lg btn-primary">&nbsp;&nbsp;&nbsp; Connect &nbsp;&nbsp;&nbsp; </button>
+						</div>
+					</div>
+				</div>
+			</div>
+			<br/>
+			<div class="card col-lg-10 bg-white text-black">
+				<div class="card-body">
+					<h5 class="card-title">Optional information added to payload</h5>
+					<div class="form-group row">
+						<label for="settings_name" class="col-lg-1 col-md-12 col-sm-12 col-form-label">name</label>
+						<div class="col-lg-2">
+							<input id="settings_name" type="text" class="setting form-control">
+						</div>
+					</div>
+					<div class="form-group row">
+						<label for="settings_data" class="col-lg-1 col-md-12 col-sm-12 col-form-label">info</label>
+						<div class="col-lg-11">
+							<input id="settings_data" type="text" class="setting form-control">
+						</div>
+					</div>
+					<div class="col-lg-5 form-group">
+						<button id="save" class="btn btn-lg btn-primary">&nbsp;&nbsp;&nbsp; Save &nbsp;&nbsp;&nbsp;</button>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<script>
+var App = 0;
+var status = null;
+var settings = null;
+
+$("#connect").click( function(e) {
+	App.mqtt.address = $("#mqtt_address").val();
+	App.mqtt.port = $("#mqtt_port").val();
+	App.mqtt.user = $("#mqtt_user").val();
+	App.mqtt.password = $("#mqtt_password").val();
+	App.mqtt.preTopic = $("#mqtt_preTopic").val();
+	App.mqtt.tls = false,
+	App.mqtt.verify = false;
+	var tlsMode = $("#mqtt_tls").val();
+	if( tlsMode === "verify" ) {
+		App.mqtt.tls = true;
+		App.mqtt.verify = true;
+	}
+	
+	if(tlsMode === "noverify" ) {
+		App.mqtt.tls = true;
+		App.mqtt.verify = false;
+	}
+	var url = "mqtt?set=" + encodeURIComponent( JSON.stringify(App.mqtt) );
+	statusMessage("blue","Connecting");
+	$.ajax({type: "GET",url: url,dataType: 'text',cache: false,
+		success: function( data ) {
+			statusMessage("green",data);
+		},
+		error: function( response ) {
+			statusMessage("red",response.responseText);
+		}
+	});
+});
+
+$("#save").click( function(e) {
+	App.settings.name = $("#settings_name").val();
+	App.settings.data = $("#settings_data").val();	
+	var url = "settings?set=" + encodeURIComponent( JSON.stringify(App.settings) );
+	$.ajax({type: "GET",url: url,dataType: 'text',cache: false,
+		success: function( response) {
+		},
+		error: function( response ) {
+			statusMessage("red",response.responseText);
+		}
+	});
+});
+
+
+function statusMessage( color, message ) {
+	$("#mqtt_status").css('color', color);
+	$("#mqtt_status").val(message);
+};
+
+function CheckStatus() {
+	$.ajax({
+		type: "GET",
+		url: 'status',
+		dataType: 'json',
+		cache: false,
+		success: function( data ) {
+			$("#menu-acap").css('color', 'green');
+			if( data.mqtt.connecting ) {
+				$("#subscription").hide();
+				statusMessage("blue",data.mqtt.status);
+				$("#menu-mqtt").css('color', 'blue');
+				return;
+			}
+			
+			if( data.mqtt.connected ) {
+				$("#menu-mqtt").css('color', 'green');
+				$("#subscription").show();
+				statusMessage("green",data.mqtt.status);
+			} else {
+				$("#subscription").hide();
+				$("#menu-mqtt").css('color', 'red');
+				statusMessage("red",data.mqtt.status);
+			}
+		},
+		error: function( response ){
+			$("#subscription").hide();
+			$("#menu-acap").css('color', 'red');
+			statusMessage("red","Check if application is running");
+		}
+	});
+}
+
+$("input").change(function(){
+	$(this).blur();
+});
+
+$(document).ready( function() {
+	$("#subscription").hide();
+	statusMessage("blue","Initializing");
+	$.ajax({type: "GET",url: 'app',dataType: 'json',cache: false,
+		error: function( response) {
+			statusMessage("red",response.statusText);
+		},
+		success: function( data ) {
+			App = data;
+
+			$("#settings_name").val(App.settings.name);
+			$("#settings_data").val(App.settings.data);
+			
+			$("#mqtt_address").val(App.mqtt.address);
+			$("#mqtt_port").val(App.mqtt.port);
+			$("#mqtt_user").val(App.mqtt.user);
+			$("#mqtt_password").val(App.mqtt.password);
+			$("#mqtt_preTopic").val(App.mqtt.preTopic);
+			if( App.mqtt.tls === false ) {
+				$("#mqtt_tls").val("none");
+				return;
+			}
+			if( App.mqtt.validate )
+				$("#mqtt_tls").val("verify");
+			else
+				$("#mqtt_tls").val("noverify");
+				
+		}
+	});
+	
+	CheckStatus();
+	setInterval(CheckStatus, 1000);
+});
+
+</script>
+</body>  
+
+</html>

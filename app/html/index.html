@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title class="acapName"></title>
+<link rel="stylesheet" href="css/bootstrap.min.css">
+<link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/imgareaselect-default.css">
+
+<script src="js/jquery.min.js"></script>
+<script src="js/bootstrap.min.js"></script>
+<script src="js/jquery.imgareaselect.js"></script>
+<script src="js/media-stream-player.min.js"></script>
+
+<style>
+td.value  {color: blue;}
+</style>
+
+</head>
+
+<body>
+
+<div class="card bg-secondary text-white">
+	<h2 class="acapName"></h2>
+</div>
+
+<div id="page-content-wrapper col-xl-4 col-lg-12 col-md-12 col-sm-12">
+	<div class="container-fluid">
+	
+		<div class="row">
+			<div id="view" style="width:800px; height:450px;">
+				<div id="canvas" style="width:100%; height:100%; position:relative">
+					<img id="snapshot" class="card-img-top" src="" alt="Image" style="width:100%; height:100%; position:absolute; top:0px; left:0px;">
+					<div id="video" style="width:100%; height:100%; position:absolute; top:0px; left:0px;"></div>
+					<canvas id="trackers" width="1920" height="1080" style="width:100%; height:100%; position:absolute; top:0px; left:0px;"></canvas>
+				</div>
+			</div>
+			<div class="card col-lg-4 bg-white text-black">
+				<div class="card bg-white text-black">
+					<div class="card-body">
+						<div class="form-group row">
+							<label for="settings_confidence" class="col-lg-4 col-md-12 col-sm-12 col-form-label">Confidence</label>
+							<div class="col-lg-4 col-md-12 col-sm-12 ">
+								<select id="settings_confidence" class="setting form-control">
+									<option value="10">10</option>
+									<option value="20">20</option>
+									<option value="30">30</option>
+									<option value="40">40</option>
+									<option value="50">50</option>
+									<option value="60">60</option>
+									<option value="70">70</option>
+									<option value="80">80</option>
+									<option value="90">90</option>
+									<option value="100">100</option>
+								</select>
+							</div>
+							<script>
+							$("#settings_confidence").change(function() {
+								$("#detections").empty();
+								App.model.confidence = parseInt( $("#settings_confidence").val() );
+								var setting = {
+									confidence: App.model.confidence
+								}
+								var url = "model?json=" + encodeURIComponent( JSON.stringify(setting) );
+								$.ajax({ type: "GET", url: url, dataType: 'text',  cache: false,
+									error: function( response) {
+										alert(response.statusText);
+									}
+								});
+							});
+							</script>
+						</div>
+					</div>
+				</div>
+				<div class="card-body">
+					<div class="form-group row">
+						<label for="model_status" class="col-lg-2 col-form-label">Status</label>
+						<div class="col-lg-6 col-sm-10">
+							<input id="model_status" type="text" readonly class="form-control-plaintext" value="">
+						</div>
+					</div>
+					<div class="form-group row">
+						<label for="model_labels" class="col-lg-2 col-form-label">Labels</label>
+						<div class="col-lg-6 col-sm-10">
+							<input id="model_labels" type="text" readonly class="form-control-plaintext" value="">
+						</div>
+					</div>
+					
+					<div class="form-group row">
+						<label for="inference_duration" class="col-lg-2 col-form-label">Inference time</label>
+						<div class="col-lg-6 col-sm-10">
+							<input id="inference_duration" type="text" readonly class="form-control-plaintext" value="">
+						</div>
+					</div>
+					</br>
+					</br>					
+					<table style="width:100%">
+						<thead>
+							<tr><th>Label</th><th>Score</th></tr>
+						</thead>					
+						<tbody id="detections"></tbody>
+					</script>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<script>
+
+var App = 0;
+var imageWidth = 800;
+var imageHeight = 450;
+var videoWidth = 640;
+var videoHeight = 360;
+var viewWidth = 800;
+var viewHeight = 450;
+var inferenceTimer = 0;
+
+function inference() {
+	if( App.status.model.state ) {
+		$.ajax({ type: "GET", url: 'inference', dataType: 'json',  cache: true,
+			success: function( inference ) {
+				if( !inference.hasOwnProperty("list") || inference.list.length === 0 )
+					return;
+				$("#inference_duration").val(inference.duration + " ms");
+				$("#detections").empty();
+				for( var i = 0; i < inference.list.length; i++ )
+					$("#detections").append('<tr><td>' + inference.list[i].label + '</td><td>' + inference.list[i].score + '</td></tr>');
+			},
+			error: function( response ){
+				alert("Inference is not responding.  Check if it is running or try refreshing the page");
+//									clearInterval(inferenceTimer);
+			}
+		});
+	} else {
+		$("#model_status").val(App.status.model.status);
+	}
+}
+
+function SetupView( device ) {
+
+
+	switch( device.aspect ) {
+		case '4:3':
+			viewWidth = 640;
+			viewHeight = 480;
+			videoWidth=800;videoHeight=600;
+			imageWidth=800;imageHeight=800;
+		break;
+		case '16:9':
+			viewWidth = 800;
+			viewHeight = 450;
+			videoWidth=1280;
+			videoHeight = 720;
+			imageWidth=800;
+			imageHeight = 450;
+		break;
+		case '1:1':
+			viewWidth = 450;
+			viewHeight = 450;
+			videoWidth=640;videoHeight = 640;
+			imageWidth=640;imageHeight = 640;
+		break;
+		case '16:10':
+			videoWidth=800;videoHeight = 500;
+			imageWidth=800;imageHeight = 500;
+		break;
+	}
+			
+	$("#view").css("width", viewWidth + "px");
+	$("#view").css("height", viewHeight + "px");
+
+	var src = '/axis-cgi/jpg/image.cgi?resolution='+imageWidth+'x'+imageHeight+'&compression=25&camera=1';// '/axis-cgi/mjpg/video.cgi'; //?resolution='+imageWidth+'x'+imageHeight;//+'&compression=40&fps=5';
+	$("#snapshot").attr("src",src);
+	
+	var secureConnection = "";
+	if (location.protocol === 'https:')
+		secureConnection = "secure=true"
+	var player = '<media-stream-player hostname="'+window.location.hostname+'" ' + secureConnection + '  format="RTP_H264" compression="40" audio="0" resolution="'+imageWidth+'x'+imageHeight+'" variant="basic" autoplay></media-stream-player>';				
+	$("#video").append(player);
+}
+
+
+$(document).ready( function() {
+	$.ajax({type: "GET",url: 'app',dataType: 'json',cache: false,success: function( data ) {
+			App = data;
+			SetupView( App.device );
+			$(".acapName").html(App.manifest.acapPackageConf.setup.friendlyName);
+			$("#model_status").val(App.status.model.status);
+			$("#model_labels").val(App.status.model.labels);
+			$("#settings_confidence").val(App.model.confidence);
+		},
+		error: function( response) {
+			alert(response.statusText);
+		}
+	});
+	inferenceTimer = setInterval( inference, 500);
+});
+
+</script>
+</body>  
+
+</html>

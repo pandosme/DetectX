@@ -1,2 +1,2 @@
-# DetectX
-Run Custom YOLO5 models in Axis camera
+python train.py --img 640 --batch 50 --epochs 300 --data ~/dataset/backyard/yolo/data.yaml --weights yolov5n.pt
+python export.py --weights runs/train/axis-train/weights/best.pt --include tflite --int8 --per-tensor
