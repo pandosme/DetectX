@@ -1,0 +1,53 @@
+{
+    "schemaVersion": "1.1",
+    "acapPackageConf": {
+        "setup": {
+            "friendlyName": "DetectX",
+            "appName": "detectx",
+            "vendor": "Fred Juhlin",
+            "embeddedSdkVersion": "3.0",
+            "user": {
+                "group": "sdk",
+                "username": "sdk"
+            },
+            "vendorUrl": "https://pandosme.github.io",
+            "runMode": "once",
+            "version": "1.0.0"
+        },
+        "configuration": {
+			"settingPage": "index.html",
+			"httpConfig": [
+				{
+					"name": "app",
+					"access": "admin",
+					"type": "transferCgi"
+				},
+				{
+					"name": "settings",
+					"access": "admin",
+					"type": "transferCgi"
+				},
+				{
+					"name": "status",
+					"access": "admin",
+					"type": "transferCgi"
+				},
+				{
+					"name": "device",
+					"access": "admin",
+					"type": "transferCgi"
+				},
+				{
+					"name": "model",
+					"access": "admin",
+					"type": "transferCgi"
+				},
+				{
+					"name": "detections",
+					"access": "admin",
+					"type": "transferCgi"
+				}
+			]
+		}
+    }
+}

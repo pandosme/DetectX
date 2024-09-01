@@ -1,205 +1,246 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title class="acapName"></title>
-<link rel="stylesheet" href="css/bootstrap.min.css">
-<link rel="stylesheet" href="css/app.css">
-<link rel="stylesheet" href="css/imgareaselect-default.css">
-
-<script src="js/jquery.min.js"></script>
-<script src="js/bootstrap.min.js"></script>
-<script src="js/jquery.imgareaselect.js"></script>
-<script src="js/media-stream-player.min.js"></script>
-
-<style>
-td.value  {color: blue;}
-</style>
-
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Custom Model</title>
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/app.css">
+    <link rel="stylesheet" href="css/imgareaselect-default.css">
+    <script src="js/jquery.min.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+    <script src="js/media-stream-player.min.js"></script>
+    <script src="js/jquery.imgareaselect.js"></script>
 </head>
 
 <body>
+    <div class="d-flex" id="wrapper">
+        <!-- Sidebar -->
+        <div class="bg-light border-right" id="sidebar-wrapper">
+            <div class="sidebar-heading">Custom Model</div>
+            <div class="list-group list-group-flush">
+                <a href="index.html" class="list-group-item list-group-item-action active">Detections</a>
+                <a href="model.html" class="list-group-item list-group-item-action">Model</a>
+                <a href="about.html" class="list-group-item list-group-item-action">About</a>
+            </div>
+        </div>
+        <!-- /#sidebar-wrapper -->
 
-<div class="card bg-secondary text-white">
-	<h2 class="acapName"></h2>
-</div>
+        <!-- Page Content -->
+        <div id="page-content-wrapper">
+            <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
+                <button class="btn btn-link" id="menu-toggle">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <span class="navbar-text" id="model_status">Loading...</span>
+            </nav>
 
-<div id="page-content-wrapper col-xl-4 col-lg-12 col-md-12 col-sm-12">
-	<div class="container-fluid">
-	
-		<div class="row">
-			<div id="view" style="width:800px; height:450px;">
-				<div id="canvas" style="width:100%; height:100%; position:relative">
-					<img id="snapshot" class="card-img-top" src="" alt="Image" style="width:100%; height:100%; position:absolute; top:0px; left:0px;">
-					<div id="video" style="width:100%; height:100%; position:absolute; top:0px; left:0px;"></div>
-					<canvas id="trackers" width="1920" height="1080" style="width:100%; height:100%; position:absolute; top:0px; left:0px;"></canvas>
-				</div>
-			</div>
-			<div class="card col-lg-4 bg-white text-black">
-				<div class="card bg-white text-black">
-					<div class="card-body">
-						<div class="form-group row">
-							<label for="settings_confidence" class="col-lg-4 col-md-12 col-sm-12 col-form-label">Confidence</label>
-							<div class="col-lg-4 col-md-12 col-sm-12 ">
-								<select id="settings_confidence" class="setting form-control">
-									<option value="10">10</option>
-									<option value="20">20</option>
-									<option value="30">30</option>
-									<option value="40">40</option>
-									<option value="50">50</option>
-									<option value="60">60</option>
-									<option value="70">70</option>
-									<option value="80">80</option>
-									<option value="90">90</option>
-									<option value="100">100</option>
-								</select>
+            <div class="container-fluid">
+                <!-- Image/Video -->
+                <div class="row">
+					<div class="card col-lg-9 bg-white text-black">
+						<div id="view" style="width:800px; height:450px;">
+							<div id="viewgroup" style="width:100%; height:100%; position:relative">
+								<img id="snapshot" class="card-img-top" src="" alt="Image" style="width:100%; height:100%; position:absolute; top:0px; left:0px;">
+								<div id="video" style="width:100%; height:100%; position:absolute; top:0px; left:0px;"></div>
+								<canvas id="canvas" width="1920" height="1080" style="width:100%; height:100%; position:absolute; top:0px; left:0px;"></canvas>
 							</div>
-							<script>
-							$("#settings_confidence").change(function() {
-								$("#detections").empty();
-								App.model.confidence = parseInt( $("#settings_confidence").val() );
-								var setting = {
-									confidence: App.model.confidence
-								}
-								var url = "model?json=" + encodeURIComponent( JSON.stringify(setting) );
-								$.ajax({ type: "GET", url: url, dataType: 'text',  cache: false,
-									error: function( response) {
-										alert(response.statusText);
-									}
-								});
-							});
-							</script>
 						</div>
 					</div>
-				</div>
-				<div class="card-body">
-					<div class="form-group row">
-						<label for="model_status" class="col-lg-2 col-form-label">Status</label>
-						<div class="col-lg-6 col-sm-10">
-							<input id="model_status" type="text" readonly class="form-control-plaintext" value="">
-						</div>
+					<div class="col-2 table-container">
+						<h2>Latest detections</h2>
+						<table class="table table-striped">
+							<thead>
+								<tr>
+									<th>Label</th>
+									<th>Confidence</th>
+								</tr>
+							</thead>
+							<tbody id="detection-table">
+								<!-- Data will be appended here -->
+							</tbody>
+						</table>
 					</div>
-					<div class="form-group row">
-						<label for="model_labels" class="col-lg-2 col-form-label">Labels</label>
-						<div class="col-lg-6 col-sm-10">
-							<input id="model_labels" type="text" readonly class="form-control-plaintext" value="">
-						</div>
-					</div>
-					
-					<div class="form-group row">
-						<label for="inference_duration" class="col-lg-2 col-form-label">Inference time</label>
-						<div class="col-lg-6 col-sm-10">
-							<input id="inference_duration" type="text" readonly class="form-control-plaintext" value="">
-						</div>
-					</div>
-					</br>
-					</br>					
-					<table style="width:100%">
-						<thead>
-							<tr><th>Label</th><th>Score</th></tr>
-						</thead>					
-						<tbody id="detections"></tbody>
-					</script>
-				</div>
-			</div>
-		</div>
-	</div>
-</div>
+                </div>
 
-<script>
+                <!-- Controls -->
+                <div class="control-row">
+                    <label for="settings_confidence" class="form-label">Confidence</label>
+                    <select id="settings_confidence" class="setting form-control">
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="30">30</option>
+                        <option value="40">40</option>
+                        <option value="50">50</option>
+                        <option value="60">60</option>
+                        <option value="70">70</option>
+                        <option value="80">80</option>
+                        <option value="90">90</option>
+                        <option value="100">100</option>
+                    </select>
+                    <button id="aoi_button" class="btn btn-primary">Set Area Of Interest</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
-var App = 0;
-var imageWidth = 800;
-var imageHeight = 450;
-var videoWidth = 640;
-var videoHeight = 360;
-var viewWidth = 800;
-var viewHeight = 450;
-var inferenceTimer = 0;
+    <script>
+        var App = 0;
+        var imageWidth = 800;
+        var imageHeight = 450;
+        var videoWidth = 640;
+        var videoHeight = 360;
+        var viewWidth = 800;
+        var viewHeight = 450;
+        var inferenceTimer = 0;
 
-function inference() {
-	if( App.status.model.state ) {
-		$.ajax({ type: "GET", url: 'inference', dataType: 'json',  cache: true,
-			success: function( inference ) {
-				if( !inference.hasOwnProperty("list") || inference.list.length === 0 )
-					return;
-				$("#inference_duration").val(inference.duration + " ms");
-				$("#detections").empty();
-				for( var i = 0; i < inference.list.length; i++ )
-					$("#detections").append('<tr><td>' + inference.list[i].label + '</td><td>' + inference.list[i].score + '</td></tr>');
-			},
-			error: function( response ){
-				alert("Inference is not responding.  Check if it is running or try refreshing the page");
-//									clearInterval(inferenceTimer);
-			}
-		});
-	} else {
-		$("#model_status").val(App.status.model.status);
-	}
-}
+        $(document).ready(function() {
+            $.ajax({
+                type: "GET",
+                url: 'app',
+                dataType: 'json',
+                cache: false,
+                success: function(data) {
+                    App = data;
+                    // Update UI elements
+                    document.title = App.manifest.acapPackageConf.setup.friendlyName;
+                    $(".acapName").html(App.manifest.acapPackageConf.setup.friendlyName);
+                    $("#sidebar-wrapper .sidebar-heading").html(App.manifest.acapPackageConf.setup.friendlyName);
+                    $("#model_status").text("Model Status: " + App.status.model.status);
+                    $("#settings_confidence").val(App.settings.confidence);
 
-function SetupView( device ) {
+                    SetupView(App.device);
+                },
+                error: function(response) {
+                    alert(response.statusText);
+                }
+            });
 
+            // Set AOI button click handler
+            $("#aoi_button").click(function() {
+                var $img = $("#video");
+                $img.imgAreaSelect({
+					x1: parseInt( App.settings.aoi.x1 / 1000 * imageWidth),
+					y1: parseInt( App.settings.aoi.y1 / 1000 * imageHeight),
+					x2: parseInt( App.settings.aoi.x2 / 1000 * imageWidth),
+					y2: parseInt( App.settings.aoi.y2 / 1000 * imageHeight),
+					handles: true, enable:true, movable:true, resizable:true, show:true,
+					instance: true,
+                    onSelectEnd: function(img, selection) {
+                        var x1 = Math.round(selection.x1 * 1000 / imageWidth);
+                        var x2 = Math.round(selection.x2 * 1000 / imageWidth);
+                        var y1 = Math.round(selection.y1 * 1000 / imageHeight);
+                        var y2 = Math.round(selection.y2 * 1000 / imageHeight);
+                        App.settings.aoi = { x1, y1, x2, y2 };
+                        console.log("AOI set to:", App.settings.aoi);
+                    }
+                });
+            });
 
-	switch( device.aspect ) {
-		case '4:3':
-			viewWidth = 640;
-			viewHeight = 480;
-			videoWidth=800;videoHeight=600;
-			imageWidth=800;imageHeight=800;
-		break;
-		case '16:9':
-			viewWidth = 800;
-			viewHeight = 450;
-			videoWidth=1280;
-			videoHeight = 720;
-			imageWidth=800;
-			imageHeight = 450;
-		break;
-		case '1:1':
-			viewWidth = 450;
-			viewHeight = 450;
-			videoWidth=640;videoHeight = 640;
-			imageWidth=640;imageHeight = 640;
-		break;
-		case '16:10':
-			videoWidth=800;videoHeight = 500;
-			imageWidth=800;imageHeight = 500;
-		break;
-	}
+			$("#settings_confidence").change(function() {
+				var confidenceValue = parseInt($(this).val());
+				App.settings.confidence = confidenceValue;
+				var jsonData = JSON.stringify({ confidence: confidenceValue });
+				var urlEncodedData = encodeURIComponent(jsonData);
+				$.ajax({
+					type: "GET",
+					url: 'settings?json=' + urlEncodedData,
+					dataType: 'text',
+					cache: false,
+					success: function(response) {
+						console.log("Confidence updated successfully.");
+					},
+					error: function(response) {
+						alert("Failed to update confidence: " + response.statusText);
+					}
+				});
+			});
 			
-	$("#view").css("width", viewWidth + "px");
-	$("#view").css("height", viewHeight + "px");
+			setInterval( function(){
+				$.ajax({type: "GET",url: 'detections',dataType: 'json',cache: false,
+					success: function( data ) {
+						var canvas = document.getElementById('canvas');
+						var ctx = canvas.getContext("2d");
+						ctx.beginPath();
+						ctx.clearRect(0, 0, 1000, 1000 );
+						ctx.stroke();
+						if( !Array.isArray(data) || data.length === 0 )
+							return;
+						appendDataToTable(data);
+						ctx.lineWidth = 3;
+						ctx.strokeStyle = '#FFFF00';
+						ctx.beginPath();
+						for( var i = 0; i < data.length; i++ )
+							ctx.rect(data[i].x, data[i].y, data[i].w, data.h );
+						ctx.stroke();	
+					}
+				});
+			
+			},1000);
+        });
 
-	var src = '/axis-cgi/jpg/image.cgi?resolution='+imageWidth+'x'+imageHeight+'&compression=25&camera=1';// '/axis-cgi/mjpg/video.cgi'; //?resolution='+imageWidth+'x'+imageHeight;//+'&compression=40&fps=5';
-	$("#snapshot").attr("src",src);
-	
-	var secureConnection = "";
-	if (location.protocol === 'https:')
-		secureConnection = "secure=true"
-	var player = '<media-stream-player hostname="'+window.location.hostname+'" ' + secureConnection + '  format="RTP_H264" compression="40" audio="0" resolution="'+imageWidth+'x'+imageHeight+'" variant="basic" autoplay></media-stream-player>';				
-	$("#video").append(player);
-}
+        function SetupView(device) {
+            switch (device.aspect) {
+                case '4:3':
+                    viewWidth = 640;
+                    viewHeight = 480;
+                    videoWidth = 800;
+                    videoHeight = 600;
+                    imageWidth = 800;
+                    imageHeight = 800;
+                    break;
+                case '16:9':
+                    viewWidth = 800;
+                    viewHeight = 450;
+                    videoWidth = 1280;
+                    videoHeight = 720;
+                    imageWidth = 800;
+                    imageHeight = 450;
+                    break;
+                case '1:1':
+                    viewWidth = 450;
+                    viewHeight = 450;
+                    videoWidth = 640;
+                    videoHeight = 640;
+                    imageWidth = 640;
+                    imageHeight = 640;
+                    break;
+                case '16:10':
+                    videoWidth = 800;
+                    videoHeight = 500;
+                    imageWidth = 800;
+                    imageHeight = 500;
+                    break;
+            }
 
+            $("#view").css("width", viewWidth + "px");
+            $("#view").css("height", viewHeight + "px");
 
-$(document).ready( function() {
-	$.ajax({type: "GET",url: 'app',dataType: 'json',cache: false,success: function( data ) {
-			App = data;
-			SetupView( App.device );
-			$(".acapName").html(App.manifest.acapPackageConf.setup.friendlyName);
-			$("#model_status").val(App.status.model.status);
-			$("#model_labels").val(App.status.model.labels);
-			$("#settings_confidence").val(App.model.confidence);
-		},
-		error: function( response) {
-			alert(response.statusText);
+            var src = '/axis-cgi/jpg/image.cgi?resolution=' + imageWidth + 'x' + imageHeight + '&compression=25&camera=1'; // '/axis-cgi/mjpg/video.cgi'; //?resolution='+imageWidth+'x'+imageHeight;//+'&compression=40&fps=5';
+            $("#snapshot").attr("src", src);
+
+            var secureConnection = "";
+            if (location.protocol === 'https:')
+                secureConnection = "secure=true"
+            var player = '<media-stream-player hostname="' + window.location.hostname + '" ' + secureConnection + '  format="RTP_H264" compression="40" audio="0" resolution="' + imageWidth + 'x' + imageHeight + '" variant="basic" autoplay></media-stream-player>';
+            $("#video").append(player);
+        }
+
+        $("#menu-toggle").click(function(e) {
+            e.preventDefault();
+            $("#wrapper").toggleClass("toggled");
+        });
+		
+		function appendDataToTable(dataArray) {
+			var $tableBody = $("#detection-table");
+			$tableBody.empty(); // Clear existing data
+			dataArray.forEach(function(item) {
+				var row = `<tr><td>${item.label}</td><td>${item.c}</td></tr>`;
+				$tableBody.append(row);
+			});
 		}
-	});
-	inferenceTimer = setInterval( inference, 500);
-});
-
-</script>
-</body>  
+		
+    </script>
+</body>
 
 </html>

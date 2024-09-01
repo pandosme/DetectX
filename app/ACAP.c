@@ -521,7 +521,6 @@ ACAP_HTTP_main_callback(const gchar *path,const gchar *method, const gchar *quer
 
 void
 ACAP_ENDPOINT_license(const ACAP_HTTP_Response response,const ACAP_HTTP_Request request) {
-	LOG("License");
 
 	FILE* f = ACAP_FILE_Open( "LICENSE", "r" );
 	if( !f ) {

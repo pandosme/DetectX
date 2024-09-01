@@ -18,6 +18,11 @@
 //#define LOG_TRACE(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args); }
 #define LOG_TRACE(fmt, args...)    {}
 
+static bool createAndMapTmpFile(char* fileName, size_t fileSize, void** mappedAddr, int* convFd);
+float iou(float x1, float y1, float w1, float h1, float x2, float y2, float w2, float h2);
+void Model_Close();
+cJSON* non_maximum_suppression(cJSON* list);
+
 unsigned int modelWidth = 640;
 unsigned int modelHeight = 640;
 size_t inputs = 1;
@@ -57,6 +62,160 @@ cJSON* modelConfig = 0;
 char PP_SD_INPUT_FILE_PATTERN[] = "/tmp/larod.pp.test-XXXXXX";
 char OBJECT_DETECTOR_INPUT_FILE_PATTERN[] = "/tmp/larod.in.test-XXXXXX";
 char OBJECT_DETECTOR_OUT1_FILE_PATTERN[]  = "/tmp/larod.out1.test-XXXXXX";
+
+int inferenceErrors = 5;
+
+cJSON*
+Model_Inference(VdoBuffer* image) {
+    larodError* error = NULL;
+
+	if(!image) {
+		LOG_TRACE("%s: No image\n",__func__);
+		return 0;
+	}
+
+	if( !ACAP_STATUS_Bool( "model", "state" ) ) {  //The Model Was not Loaded
+		LOG_TRACE("%s: Model not running\n",__func__);
+		return 0;
+	}
+
+	if( inferenceErrors <= 0 ) {
+		LOG_WARN("Too many inference errors.  Model stopped\n" );
+		Model_Close();
+		return 0;
+	}
+
+
+	uint8_t* nv12Data = (uint8_t*)vdo_buffer_get_data(image);
+	memcpy(ppInputAddr, nv12Data, yuyvBufferSize);
+    if (!larodRunJob(conn, ppReq, &error)) {
+		LOG_WARN("%s: Unable to run job to preprocess model: %s (%d)\n", __func__, error->msg, error->code);
+        larodClearError(&error);
+		inferenceErrors--;
+		return 0;
+	}
+
+    if (lseek(larodOutput1Fd, 0, SEEK_SET) == -1) {
+        LOG_WARN("%s: Unable to rewind output file position: %s\n", __func__, strerror(errno));
+		inferenceErrors--;
+        return 0;
+    }
+
+    if (!larodRunJob(conn, infReq, &error)) {
+		LOG_WARN("%s: Unable to run inference on model: %s (%d)\n", __func__, error->msg, error->code);
+        larodClearError(&error);
+		inferenceErrors--;
+        return 0;
+    }
+
+	uint8_t* output_tensor = (uint8_t*)larodOutput1Addr;
+
+	cJSON* list = cJSON_CreateArray();
+
+
+	for (int i = 0; i < boxes; i++) {
+		int box = i * (5 + classes);
+		float objectness = (output_tensor[box + 4] - quant_zero) * quant;
+        if (objectness >= objectnessThreshold) {
+            float x = (output_tensor[box + 0] - quant_zero) * quant;
+            float y = (output_tensor[box + 1] - quant_zero) * quant;
+            float w = (output_tensor[box + 2] - quant_zero) * quant;
+            float h = (output_tensor[box + 3] - quant_zero) * quant;
+			int classId = -1;
+			float maxConfidence = 0;
+			for( int c = 0; c < classes; c++ ) {
+				float confidence = (output_tensor[box + 5 + c] - quant_zero) * quant;
+				if( confidence > maxConfidence ) {
+					classId = c;
+					maxConfidence = confidence;
+				}
+			}
+			if( maxConfidence > objectness ) {
+				const char* label = "Undefined";
+				cJSON* labels = cJSON_GetObjectItem(modelConfig,"labels");
+				if( labels && classId >= 0 && cJSON_GetArrayItem(labels, classId) )
+					label = cJSON_GetArrayItem(labels, classId)->valuestring;
+				cJSON* detection = cJSON_CreateObject();
+				cJSON_AddStringToObject( detection,"label",label);
+				cJSON_AddNumberToObject( detection,"c",maxConfidence);
+				cJSON_AddNumberToObject( detection,"x",x - (w/2));
+				cJSON_AddNumberToObject( detection,"y",y - (h/2));
+				cJSON_AddNumberToObject( detection,"w",w);
+				cJSON_AddNumberToObject( detection,"h",h);
+				cJSON_AddItemToArray(list,detection);
+			}
+		}
+	}
+	return non_maximum_suppression( list );
+}
+
+float iou(float x1, float y1, float w1, float h1, float x2, float y2, float w2, float h2) {
+    float xx1 = fmax(x1 - (w1 / 2), x2 - (w2 / 2));
+    float yy1 = fmax(y1 - (h1 / 2), y2 - (h2 / 2));
+    float xx2 = fmin(x1 + (w1 / 2), x2 + (w2 / 2));
+    float yy2 = fmin(y1 + (h1 / 2), y2 + (h2 / 2));
+
+    float inter  = fmax(0, xx2 - xx1) * fmax(0, yy2 - yy1);
+    float union_ = w1 * h1 + w2 * h2 - inter;
+
+    return inter / union_;
+}
+
+cJSON*
+non_maximum_suppression(cJSON* list) {
+	
+	int items = cJSON_GetArraySize(list);
+	if( items < 2 )
+		return list;
+	LOG_TRACE("%s: In %d\n", __func__, items);
+	
+    int keep[items];
+    memset(keep, 1, items * sizeof(int));
+	
+    for (int i = 0; i < items; i++) {
+		if( keep[i] ) {
+			cJSON* detection = cJSON_GetArrayItem(list,i);
+			float x1 = cJSON_GetObjectItem(detection,"x")->valuedouble;
+			float y1 = cJSON_GetObjectItem(detection,"y")->valuedouble;
+			float w1 = cJSON_GetObjectItem(detection,"w")->valuedouble;
+			float h1 = cJSON_GetObjectItem(detection,"h")->valuedouble;
+			float c1 = cJSON_GetObjectItem(detection,"c")->valuedouble;
+
+			for (int j = i + 1; j < items; j++) {
+				if( keep[j] ) {
+					cJSON* alternative = cJSON_GetArrayItem(list,i);
+					float x2 = cJSON_GetObjectItem(alternative,"x")->valuedouble;
+					float y2 = cJSON_GetObjectItem(alternative,"y")->valuedouble;
+					float w2 = cJSON_GetObjectItem(alternative,"w")->valuedouble;
+					float h2 = cJSON_GetObjectItem(alternative,"h")->valuedouble;
+					float c2 = cJSON_GetObjectItem(alternative,"c")->valuedouble;
+
+					if (iou(x1, y1, w1, h1, x2, y2, w2, h2) > nms) {
+						if (c1 > c2) {
+							keep[i] = 1;
+							keep[j] = 0;
+						} else {
+							keep[j] = 1;
+							keep[i] = 0;
+							break;
+						}
+					}
+				}
+			}
+		}
+    }
+
+	cJSON* result = cJSON_CreateArray();
+    for (int i = 0; i < items; i++) {
+		cJSON *detection = cJSON_GetArrayItem(list,i);
+		if( keep[i] )
+			cJSON_AddItemToArray( result,  cJSON_Duplicate(detection, 1) );
+	}
+	LOG_TRACE("%s: Exit %d\n", __func__, cJSON_GetArraySize(result));
+	cJSON_Delete( list );
+	return result;
+}
+
 
 static bool 
 createAndMapTmpFile(char* fileName, size_t fileSize, void** mappedAddr, int* convFd) {
@@ -119,161 +278,6 @@ Model_Close() {
 }
 
 
-float iou(float x1, float y1, float w1, float h1, float x2, float y2, float w2, float h2) {
-    float xx1 = fmax(x1 - (w1 / 2), x2 - (w2 / 2));
-    float yy1 = fmax(y1 - (h1 / 2), y2 - (h2 / 2));
-    float xx2 = fmin(x1 + (w1 / 2), x2 + (w2 / 2));
-    float yy2 = fmin(y1 + (h1 / 2), y2 + (h2 / 2));
-
-    float inter  = fmax(0, xx2 - xx1) * fmax(0, yy2 - yy1);
-    float union_ = w1 * h1 + w2 * h2 - inter;
-
-    return inter / union_;
-}
-
-cJSON*
-non_maximum_suppression(cJSON* list) {
-	
-	int items = cJSON_GetArraySize(list);
-	if( items < 2 )
-		return list;
-
-    int keep[items];
-    memset(keep, 1, items * sizeof(int));
-	
-    for (int i = 0; i < items; i++) {
-		if( keep[i] ) {
-			cJSON* detection = cJSON_GetArrayItem(list,i);
-			float x1 = cJSON_GetObjectItem(detection,"x")->valuedouble;
-			float y1 = cJSON_GetObjectItem(detection,"y")->valuedouble;
-			float w1 = cJSON_GetObjectItem(detection,"w")->valuedouble;
-			float h1 = cJSON_GetObjectItem(detection,"h")->valuedouble;
-			float c1 = cJSON_GetObjectItem(detection,"c")->valuedouble;
-
-			for (int j = i + 1; j < items; j++) {
-				if( keep[j] ) {
-					cJSON* alternative = cJSON_GetArrayItem(list,i);
-					float x2 = cJSON_GetObjectItem(alternative,"x")->valuedouble;
-					float y2 = cJSON_GetObjectItem(alternative,"y")->valuedouble;
-					float w2 = cJSON_GetObjectItem(alternative,"w")->valuedouble;
-					float h2 = cJSON_GetObjectItem(alternative,"h")->valuedouble;
-					float c2 = cJSON_GetObjectItem(alternative,"c")->valuedouble;
-
-					if (iou(x1, y1, w1, h1, x2, y2, w2, h2) > nms) {
-						if (c1 > c2) {
-							keep[i] = 1;
-							keep[j] = 0;
-						} else {
-							keep[j] = 1;
-							keep[i] = 0;
-							break;
-						}
-					}
-				}
-			}
-		}
-    }
-
-	cJSON* result = cJSON_CreateArray();
-    for (int i = 0; i < items; i++) {
-		cJSON *detection = cJSON_GetArrayItem(list,i);
-		if( keep[i] )
-			cJSON_AddItemToArray( result,  cJSON_Duplicate(detection, 1) );
-	}
-	cJSON_Delete( list );
-	return result;
-}
-
-int inferenceErrors = 5;
-
-cJSON*
-Model_Inference(VdoBuffer* image) {
-    larodError* error = NULL;
-
-	if(!image) {
-		LOG_TRACE(">");
-		return 0;
-	}
-
-	if( !ACAP_STATUS_Bool( "model", "state" ) ) {  //The Model Was not Loaded
-		LOG_TRACE(">");
-		return 0;
-	}
-
-	if( inferenceErrors <= 0 ) {
-		LOG_WARN("Too many inference errors.  Model stopped\n" );
-		Model_Close();
-		LOG_TRACE(">");
-		return 0;
-	}
-
-
-	uint8_t* nv12Data = (uint8_t*)vdo_buffer_get_data(image);
-	memcpy(ppInputAddr, nv12Data, yuyvBufferSize);
-    if (!larodRunJob(conn, ppReq, &error)) {
-		LOG_WARN("%s: Unable to run job to preprocess model: %s (%d)", __func__, error->msg, error->code);
-        larodClearError(&error);
-		inferenceErrors--;
-		LOG_TRACE(">");
-		return 0;
-	}
-
-    if (lseek(larodOutput1Fd, 0, SEEK_SET) == -1) {
-        LOG_WARN("%s: Unable to rewind output file position: %s", __func__, strerror(errno));
-		inferenceErrors--;
-		LOG_TRACE(">");
-        return 0;
-    }
-
-    if (!larodRunJob(conn, infReq, &error)) {
-		LOG_WARN("%s: Unable to run inference on model: %s (%d)", __func__, error->msg, error->code);
-        larodClearError(&error);
-		inferenceErrors--;
-		LOG_TRACE(">");
-        return 0;
-    }
-
-	uint8_t* output_tensor = (uint8_t*)larodOutput1Addr;
-
-	cJSON* list = cJSON_CreateArray();
-
-	for (int i = 0; i < boxes; i++) {
-		int box = i * (5 + classes);
-		float objectness = (output_tensor[box + 4] - quant_zero) * quant;
-        if (objectness >= objectnessThreshold) {
-            float x = (output_tensor[box + 0] - quant_zero) * quant;
-            float y = (output_tensor[box + 1] - quant_zero) * quant;
-            float w = (output_tensor[box + 2] - quant_zero) * quant;
-            float h = (output_tensor[box + 3] - quant_zero) * quant;
-			int classId = -1;
-			float maxConfidence = 0;
-			for( int c = 0; c < classes; c++ ) {
-				float confidence = (output_tensor[box + 5 + c] - quant_zero) * quant;
-				if( confidence > maxConfidence ) {
-					classId = c;
-					maxConfidence = confidence;
-				}
-			}
-			if( maxConfidence > objectness ) {
-				const char* label = "Undefined";
-				cJSON* labels = cJSON_GetObjectItem(modelConfig,"labels");
-				if( labels && classId >= 0 && cJSON_GetArrayItem(labels, classId) )
-					label = cJSON_GetArrayItem(labels, classId)->valuestring;
-				cJSON* detection = cJSON_CreateObject();
-				cJSON_AddStringToObject( detection,"label",label);
-				cJSON_AddNumberToObject( detection,"c",maxConfidence);
-				cJSON_AddNumberToObject( detection,"x",x - (w/2));
-				cJSON_AddNumberToObject( detection,"y",y - (h/2));
-				cJSON_AddNumberToObject( detection,"w",w);
-				cJSON_AddNumberToObject( detection,"h",h);
-				cJSON_AddItemToArray(list,detection);
-			}
-		}
-	}
-//	return non_maximum_suppression( list );
-	return list;
-}
-
 
 cJSON*
 Model_Setup() {
@@ -287,7 +291,7 @@ Model_Setup() {
 	
 	modelConfig = ACAP_FILE_Read( "html/config/model.json" );
 	if( !modelConfig ) {
-        LOG_WARN("%s: Unabel to read model.json", __func__);
+        LOG_WARN("%s: Unabel to read model.json\n", __func__);
 		return 0;
 	}
 
@@ -306,7 +310,6 @@ Model_Setup() {
 
 	
 
-    LOG_TRACE("%s: Create preprocessing maps\n", __func__);
     ppMap = larodCreateMap(&error);
     if (!ppMap) {
         LOG_WARN("%s: Could not create preprocessing larodMap %s\n",__func__, error->msg);
@@ -362,11 +365,9 @@ Model_Setup() {
 	if( chip && chip->type == cJSON_String ) 
 		chipString = chip->valuestring;
 	
-	LOG("Model platform: %s\n",chipString);
-	
     const larodDevice* device = larodGetDevice(conn, chipString, 0, &error);
     if (!device) {
-        LOG_WARN("%s: Could not get device %s: %s", __func__, chipString, error->msg);
+        LOG_WARN("%s: Could not get device %s: %s\n", __func__, chipString, error->msg);
         larodClearError(&error);
 		Model_Close();
         return 0;
@@ -384,7 +385,7 @@ Model_Setup() {
     const char* larodLibyuvPP = "cpu-proc";
     const larodDevice* device_prePros  = larodGetDevice(conn, larodLibyuvPP, 0, &error);
 	if(!device_prePros) {
-        LOG_WARN("%s: Could not get device %s: %s", __func__, larodLibyuvPP, error->msg);
+        LOG_WARN("%s: Could not get device %s: %s\n", __func__, larodLibyuvPP, error->msg);
         larodClearError(&error);
 		Model_Close();
         return 0;
@@ -396,7 +397,7 @@ Model_Setup() {
 		Model_Close();
         return 0;
     } else {
-		LOG("Loading preprocessing model with chip %s", larodLibyuvPP);
+		LOG("Loading preprocessing model with chip %s\n", larodLibyuvPP);
 	}
 
     // Create input/output tensors
@@ -409,7 +410,7 @@ Model_Setup() {
     }
     ppOutputTensors = larodCreateModelOutputs(ppModel, &ppOutputs, &error);
     if (!ppOutputTensors) {
-        LOG_WARN("%s: Failed retrieving output tensors: %s",__func__, error->msg);
+        LOG_WARN("%s: Failed retrieving output tensors: %s\n",__func__, error->msg);
         larodClearError(&error);
 		Model_Close();
         return 0;
@@ -462,7 +463,7 @@ Model_Setup() {
 		Model_Close();
         return 0;
     }
-
+	
     // Allocate space for input tensor
     if (!createAndMapTmpFile(PP_SD_INPUT_FILE_PATTERN, yuyvBufferSize, &ppInputAddr, &ppInputFd)) {
         LOG_WARN("%s: Could not allocate pre-processor tensor\n",__func__);
@@ -483,13 +484,13 @@ Model_Setup() {
 
     // Connect tensors to file descriptors
     if (!larodSetTensorFd(ppInputTensors[0], ppInputFd, &error)) {
-        LOG_WARN("%s: Failed setting input tensor fd: %s",__func__, error->msg);
+        LOG_WARN("%s: Failed setting input tensor fd: %s\n",__func__, error->msg);
         larodClearError(&error);
 		Model_Close();
         return 0;
     }
     if (!larodSetTensorFd(ppOutputTensors[0], larodInputFd, &error)) {
-        LOG_WARN("%s: Failed setting input tensor fd: %s", __func__, error->msg);
+        LOG_WARN("%s: Failed setting input tensor fd: %s\n", __func__, error->msg);
         larodClearError(&error);
 		Model_Close();
         return 0;
@@ -517,7 +518,7 @@ Model_Setup() {
                                   NULL,
                                   &error);
     if (!ppReq) {
-        LOG_WARN("%s: Failed creating preprocessing job request: %s", __func__,error->msg);
+        LOG_WARN("%s: Failed creating preprocessing job request: %s\n", __func__,error->msg);
 		Model_Close();
         return 0;
     }
@@ -534,7 +535,9 @@ Model_Setup() {
 		Model_Close();
         return 0;
     }
-	LOG("Model %s successfully loaded with %s\n",modelPath,chipString);
+	LOG("Success loding model to %s\n",chipString);
+	LOG("%s: Objectness = %f\n",__func__, objectnessThreshold );
+	
 	ACAP_STATUS_SetString("model","status","Model OK.");
 	ACAP_STATUS_SetBool("model","state", 1);
     return modelConfig;

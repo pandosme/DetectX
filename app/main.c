@@ -18,19 +18,19 @@
 
 #define LOG(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args);}
 #define LOG_WARN(fmt, args...)    { syslog(LOG_WARNING, fmt, ## args); printf(fmt, ## args);}
-#define LOG_TRACE(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args); }
-//#define LOG_TRACE(fmt, args...)    {}
+//#define LOG_TRACE(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args); }
+#define LOG_TRACE(fmt, args...)    {}
 
-#define APP_PACKAGE	"custommodel"
+#define APP_PACKAGE	"detectx"
 
 cJSON* model = 0;
-cJSON* settings = 0;
+
 
 void
 ConfigUpdate( const char *service, cJSON* data) {
 	char *json = cJSON_PrintUnformatted( data );
 	if( json ) {
-		LOG("%s:%s\n", service,json );
+		LOG("%s: %s:%s\n", __func__, service,json );
 		free(json);
 	}
 }
@@ -41,18 +41,39 @@ gboolean
 ImageProcess(gpointer data) {
     struct timeval startTs, endTs;	
 
+	cJSON* settings = ACAP_Service("settings");
+	if(!settings) {
+		ACAP_STATUS_SetString("model","status","Error. Check log");
+		ACAP_STATUS_SetBool("model","state", 0);
+		LOG_WARN("No settings found\n");
+		return G_SOURCE_REMOVE;
+	}
+		
+
 	cJSON* aoi = cJSON_GetObjectItem(settings,"aoi");
-	if(!aoi)
-		return G_SOURCE_CONTINUE;
+	if(!aoi) {
+		ACAP_STATUS_SetString("model","status","Error. Check log");
+		ACAP_STATUS_SetBool("model","state", 0);
+		LOG_WARN("No aoi settings\n");
+		return G_SOURCE_REMOVE;
+	}
+
 	cJSON* labels = cJSON_GetObjectItem(settings,"labels");
-	if(!labels)
-		return G_SOURCE_CONTINUE;
+	if(!labels) {
+		ACAP_STATUS_SetString("model","status","Error. Check log");
+		ACAP_STATUS_SetBool("model","state", 0);
+		LOG_WARN("No labels found\n");
+		return G_SOURCE_REMOVE;
+	}
 	int confidenceThreshold = cJSON_GetObjectItem(settings,"confidence")?cJSON_GetObjectItem(settings,"confidence")->valueint:0.5;
 	
 	VdoBuffer* image = Video_Image();	
 
 	if( !image ) {
-		return G_SOURCE_CONTINUE;
+		ACAP_STATUS_SetString("model","status","Error. Check log");
+		ACAP_STATUS_SetBool("model","state", 0);
+		LOG_WARN("Image capture failed\n");
+		return G_SOURCE_REMOVE;
 	}
 
 	cJSON_Delete(lastDetections);
@@ -63,10 +84,17 @@ ImageProcess(gpointer data) {
     gettimeofday(&endTs, NULL);
 
     unsigned int inferenceTime = (unsigned int)(((endTs.tv_sec - startTs.tv_sec) * 1000) + ((endTs.tv_usec - startTs.tv_usec) / 1000));
-	if( !detections || cJSON_GetArraySize(detections)) {
+	if( !detections || cJSON_GetArraySize(detections) == 0 ) {
 		return G_SOURCE_CONTINUE;
 	}
 
+	if( cJSON_GetArraySize(detections) ) {
+		char *json = cJSON_PrintUnformatted(detections);
+		if( json ) {
+			LOG_TRACE("%s\n",json);
+			free(json);
+		}
+	}
 
 	if( cJSON_GetArraySize( detections ) ) {
 		LOG_TRACE("Detections %d:%u\n", cJSON_GetArraySize( detections ), inferenceTime);
@@ -111,14 +139,15 @@ ImageProcess(gpointer data) {
 			}
 			unsigned int x1 = cJSON_GetObjectItem(aoi,"x1")?cJSON_GetObjectItem(aoi,"x1")->valueint:100;
 			unsigned int y1 = cJSON_GetObjectItem(aoi,"y1")?cJSON_GetObjectItem(aoi,"y1")->valueint:100;
-			unsigned int x2= cJSON_GetObjectItem(aoi,"x2")?cJSON_GetObjectItem(aoi,"x2")->valueint:900;
-			unsigned int y2= cJSON_GetObjectItem(aoi,"y2")?cJSON_GetObjectItem(aoi,"y2")->valueint:900;
-			if( c >= confidenceThreshold && cx >= x1 && cx <= x2 && cy >= y1 && cy <= y2 ) {
-				if( cJSON_GetObjectItem( labels, label )->type == cJSON_True )
+			unsigned int x2 = cJSON_GetObjectItem(aoi,"x2")?cJSON_GetObjectItem(aoi,"x2")->valueint:900;
+			unsigned int y2 = cJSON_GetObjectItem(aoi,"y2")?cJSON_GetObjectItem(aoi,"y2")->valueint:900;
+			if( c >= confidenceThreshold && 
+			    cx >= x1 && 
+				cx <= x2 && 
+				cy >= y1 && 
+				cy <= y2 && 
+				cJSON_GetObjectItem( labels, label )->type == cJSON_True )
 					cJSON_AddItemToArray(lastDetections, cJSON_Duplicate(detection,1));
-			} else {
-				LOG_TRACE("Ignore\n");
-			}
 				
 			detection = detection->next;
 		}
