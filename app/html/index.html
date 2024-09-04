@@ -20,7 +20,7 @@
             <div class="sidebar-heading">Custom Model</div>
             <div class="list-group list-group-flush">
                 <a href="index.html" class="list-group-item list-group-item-action active">Detections</a>
-                <a href="model.html" class="list-group-item list-group-item-action">Model</a>
+                <a href="advanced.html" class="list-group-item list-group-item-action">Advanced</a>
                 <a href="about.html" class="list-group-item list-group-item-action">About</a>
             </div>
         </div>
@@ -78,7 +78,7 @@
                         <option value="90">90</option>
                         <option value="100">100</option>
                     </select>
-                    <button id="aoi_button" class="btn btn-primary">Set Area Of Interest</button>
+                    <button id="aoi_button" class="btn btn-secondary">Set Area Of Interest</button>
                 </div>
             </div>
         </div>
@@ -93,7 +93,8 @@
         var viewWidth = 800;
         var viewHeight = 450;
         var inferenceTimer = 0;
-
+		var imgAreaSelectInstance = null;
+		
         $(document).ready(function() {
             $.ajax({
                 type: "GET",
@@ -106,10 +107,39 @@
                     document.title = App.manifest.acapPackageConf.setup.friendlyName;
                     $(".acapName").html(App.manifest.acapPackageConf.setup.friendlyName);
                     $("#sidebar-wrapper .sidebar-heading").html(App.manifest.acapPackageConf.setup.friendlyName);
-                    $("#model_status").text("Model Status: " + App.status.model.status);
+                    $("#model_status").text("Status: " + App.status.model.status);
                     $("#settings_confidence").val(App.settings.confidence);
-
                     SetupView(App.device);
+					imgAreaSelectInstance = $("#video").imgAreaSelect({
+						x1: parseInt( App.settings.aoi.x1 / 1000 * imageWidth),
+						y1: parseInt( App.settings.aoi.y1 / 1000 * imageHeight),
+						x2: parseInt( App.settings.aoi.x2 / 1000 * imageWidth),
+						y2: parseInt( App.settings.aoi.y2 / 1000 * imageHeight),
+						handles: true, enable:true, movable:true, resizable:true, show:false,
+						instance: true,
+						onSelectEnd: function(img, selection) {
+							var x1 = Math.round(selection.x1 * 1000 / imageWidth);
+							var x2 = Math.round(selection.x2 * 1000 / imageWidth);
+							var y1 = Math.round(selection.y1 * 1000 / imageHeight);
+							var y2 = Math.round(selection.y2 * 1000 / imageHeight);
+							App.settings.aoi = { x1, y1, x2, y2 };
+							var jsonData = JSON.stringify({ aoi: App.settings.aoi });
+							var urlEncodedData = encodeURIComponent(jsonData);
+							$.ajax({
+								type: "GET",
+								url: 'settings?json=' + urlEncodedData,
+								dataType: 'text',
+								cache: false,
+								success: function(response) {
+									console.log("AOI updated successfully.");
+								},
+								error: function(response) {
+									alert("Failed to update AOI: " + response.statusText);
+								}
+							});
+						}
+					});
+					imgAreaSelectInstance.setOptions({hide:true});
                 },
                 error: function(response) {
                     alert(response.statusText);
@@ -117,25 +147,19 @@
             });
 
             // Set AOI button click handler
-            $("#aoi_button").click(function() {
-                var $img = $("#video");
-                $img.imgAreaSelect({
-					x1: parseInt( App.settings.aoi.x1 / 1000 * imageWidth),
-					y1: parseInt( App.settings.aoi.y1 / 1000 * imageHeight),
-					x2: parseInt( App.settings.aoi.x2 / 1000 * imageWidth),
-					y2: parseInt( App.settings.aoi.y2 / 1000 * imageHeight),
-					handles: true, enable:true, movable:true, resizable:true, show:true,
-					instance: true,
-                    onSelectEnd: function(img, selection) {
-                        var x1 = Math.round(selection.x1 * 1000 / imageWidth);
-                        var x2 = Math.round(selection.x2 * 1000 / imageWidth);
-                        var y1 = Math.round(selection.y1 * 1000 / imageHeight);
-                        var y2 = Math.round(selection.y2 * 1000 / imageHeight);
-                        App.settings.aoi = { x1, y1, x2, y2 };
-                        console.log("AOI set to:", App.settings.aoi);
-                    }
-                });
-            });
+			var aoi = false;
+			$("#aoi_button").click(function() {
+
+				if (aoi) {
+					aoi = false;
+					imgAreaSelectInstance.setOptions({hide:true});
+					$(this).removeClass('btn-primary').addClass('btn-secondary');
+				} else {
+					aoi = true;
+					imgAreaSelectInstance.setOptions({show:true});
+					$(this).removeClass('btn-secondary').addClass('btn-primary');
+				}
+			});
 
 			$("#settings_confidence").change(function() {
 				var confidenceValue = parseInt($(this).val());
@@ -161,9 +185,6 @@
 					success: function( data ) {
 						var canvas = document.getElementById('canvas');
 						var ctx = canvas.getContext("2d");
-						ctx.beginPath();
-						ctx.clearRect(0, 0, 1000, 1000 );
-						ctx.stroke();
 						if( !Array.isArray(data) || data.length === 0 )
 							return;
 						appendDataToTable(data);
@@ -176,7 +197,18 @@
 					}
 				});
 			
-			},1000);
+			},500);
+			setInterval( function(){
+				$.ajax({type: "GET",url: 'status',dataType: 'json',cache: false,
+					success: function( data ) {
+						$("#model_status").text("Status: " + data.model.status);
+					},
+					error(){
+						$("#model_status").text("Status: No response");
+					}
+				});
+			
+			},4000);
         });
 
         function SetupView(device) {

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Custom Model</title>
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/app.css">
+    <script src="js/jquery.min.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+</head>
+
+<body>
+    <div class="d-flex" id="wrapper">
+        <!-- Sidebar -->
+        <div class="bg-light border-right" id="sidebar-wrapper">
+            <div class="sidebar-heading">Custom Model</div>
+            <div class="list-group list-group-flush">
+                <a href="index.html" class="list-group-item list-group-item-action">Detections</a>
+                <a href="advanced.html" class="list-group-item list-group-item-action">Advanced</a>
+                <a href="about.html" class="list-group-item list-group-item-action active">About</a>
+            </div>
+        </div>
+        <!-- /#sidebar-wrapper -->
+
+        <!-- Page Content -->
+        <div id="page-content-wrapper">
+            <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
+                <button class="btn btn-link" id="menu-toggle">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <span class="navbar-text" id="model_status">Loading...</span>
+            </nav>
+
+            <div class="container-fluid">
+                <div class="row">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var App = 0;
+		
+        $(document).ready(function() {
+            $.ajax({
+                type: "GET",
+                url: 'app',
+                dataType: 'json',
+                cache: false,
+                success: function(data) {
+                    App = data;
+                    // Update UI elements
+                    document.title = App.manifest.acapPackageConf.setup.friendlyName;
+                    $(".acapName").html(App.manifest.acapPackageConf.setup.friendlyName);
+                    $("#sidebar-wrapper .sidebar-heading").html(App.manifest.acapPackageConf.setup.friendlyName);
+                    $("#model_status").text("Status: " + App.status.model.status);
+                },
+                error: function(response) {
+                    alert(response.statusText);
+                }
+            });
+
+			setInterval( function(){
+				$.ajax({type: "GET",url: 'status',dataType: 'json',cache: false,
+					success: function( data ) {
+						$("#model_status").text("Status: " + data.model.status);
+					},
+					error(){
+						$("#model_status").text("Status: No response");
+					}
+				});
+			
+			},4000);
+        });
+
+        $("#menu-toggle").click(function(e) {
+            e.preventDefault();
+            $("#wrapper").toggleClass("toggled");
+        });
+    </script>
+</body>
+
+</html>

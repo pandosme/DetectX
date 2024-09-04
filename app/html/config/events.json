@@ -1,0 +1,11 @@
+[	
+	{
+		"id": "label",
+		"name": "DetectX: State change",
+		"state": true,
+		"show": true,
+		"data": [
+			{"label":"string"}
+		]
+	}
+]

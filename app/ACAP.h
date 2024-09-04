@@ -17,6 +17,7 @@
 #include <gio/gio.h>
 #include <sys/sysinfo.h>
 #include <sys/time.h>
+#include <axsdk/axevent.h>
 
 #include "cJSON.h"
 
@@ -49,19 +50,19 @@ int    		ACAP_FILE_exists( const char *filepath );
 	DEVICE
   -----------------------------------------------------*/
 
-cJSON*		ACAP_DEVICE();
-const char *ACAP_DEVICE_Prop( const char *name );
-int         ACAP_DEVICE_Prop_Int( const char *name );
-cJSON      *ACAP_DEVICE_JSON( const char *name );
-int			ACAP_DEVICE_Seconds_Since_Midnight();
-double		ACAP_DEVICE_Timestamp();  //UTC in milliseconds
-const char* ACAP_DEVICE_Local_Time(); //YYYY-MM-DD HH:MM:SS
-const char* ACAP_DEVICE_ISOTime(); //YYYY-MM-DDTHH:MM:SS+0000
-const char* ACAP_DEVICE_Date(); //YYYY-MM-DD
-const char* ACAP_DEVICE_Time(); //HH:MM:SS
-double		ACAP_DEVICE_Uptime();
-double		ACAP_DEVICE_CPU_Average();
-double		ACAP_DEVICE_Network_Average();
+cJSON*		  ACAP_DEVICE();
+const char   *ACAP_DEVICE_Prop( const char *name );
+int           ACAP_DEVICE_Prop_Int( const char *name );
+cJSON        *ACAP_DEVICE_JSON( const char *name );
+int			  ACAP_DEVICE_Seconds_Since_Midnight();
+double        ACAP_DEVICE_Timestamp();  //UTC in milliseconds
+const char*   ACAP_DEVICE_Local_Time(); //YYYY-MM-DD HH:MM:SS
+const char*   ACAP_DEVICE_ISOTime(); //YYYY-MM-DDTHH:MM:SS+0000
+const char*   ACAP_DEVICE_Date(); //YYYY-MM-DD
+const char*   ACAP_DEVICE_Time(); //HH:MM:SS
+double		  ACAP_DEVICE_Uptime();
+double		  ACAP_DEVICE_CPU_Average();
+double		  ACAP_DEVICE_Network_Average();
 
 
 /*-----------------------------------------------------
@@ -107,6 +108,22 @@ void ACAP_STATUS_SetString(  const char *group, const char *name, const char *st
 void ACAP_STATUS_SetObject(  const char *group, const char *name, cJSON* data );
 void ACAP_STATUS_SetNull( const char *group, const char *name );
 
+
+typedef void (*ACAP_EVENTS_Callback) (cJSON *event);
+
+cJSON*	EVENTS();
+
+//Declarations
+int		ACAP_EVENTS_Add_Event( const char* Id, const char* NiceName, int state );
+int		ACAP_EVENTS_Add_Event_JSON( cJSON* event );
+int		ACAP_EVENTS_Remove_Event( const char* Id );
+int		ACAP_EVENTS_Fire_State( const char* Id, int value );
+int		ACAP_EVENTS_Fire( const char* Id );
+int		ACAP_EVENTS_Fire_JSON( const char* Id, cJSON* data );
+
+//Subscriptions
+int		ACAP_EVENTS_SetCallback( ACAP_EVENTS_Callback callback );
+int		ACAP_EVENTS_Subscribe( cJSON* eventDeclaration );
 
 
 #ifdef  __cplusplus

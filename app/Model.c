@@ -130,6 +130,7 @@ Model_Inference(VdoBuffer* image) {
 					maxConfidence = confidence;
 				}
 			}
+//			LOG("%f %f %f %f %f %d\n",x,y,w,h,maxConfidence,classId);
 			if( maxConfidence > objectness ) {
 				const char* label = "Undefined";
 				cJSON* labels = cJSON_GetObjectItem(modelConfig,"labels");
@@ -167,7 +168,7 @@ non_maximum_suppression(cJSON* list) {
 	int items = cJSON_GetArraySize(list);
 	if( items < 2 )
 		return list;
-	LOG_TRACE("%s: In %d\n", __func__, items);
+//	LOG("%s: Start %d\n", __func__, items);
 	
     int keep[items];
     memset(keep, 1, items * sizeof(int));
@@ -211,7 +212,7 @@ non_maximum_suppression(cJSON* list) {
 		if( keep[i] )
 			cJSON_AddItemToArray( result,  cJSON_Duplicate(detection, 1) );
 	}
-	LOG_TRACE("%s: Exit %d\n", __func__, cJSON_GetArraySize(result));
+//	LOG("%s: Exit %d\n", __func__, cJSON_GetArraySize(result));
 	cJSON_Delete( list );
 	return result;
 }
@@ -397,7 +398,7 @@ Model_Setup() {
 		Model_Close();
         return 0;
     } else {
-		LOG("Loading preprocessing model with chip %s\n", larodLibyuvPP);
+//		LOG("Loading preprocessing model with chip %s\n", larodLibyuvPP);
 	}
 
     // Create input/output tensors
@@ -535,8 +536,8 @@ Model_Setup() {
 		Model_Close();
         return 0;
     }
-	LOG("Success loding model to %s\n",chipString);
-	LOG("%s: Objectness = %f\n",__func__, objectnessThreshold );
+//	LOG("Success loding model to %s\n",chipString);
+//	LOG("%s: Objectness = %f\n",__func__, objectnessThreshold );
 	
 	ACAP_STATUS_SetString("model","status","Model OK.");
 	ACAP_STATUS_SetBool("model","state", 1);

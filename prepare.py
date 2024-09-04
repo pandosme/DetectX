@@ -80,7 +80,7 @@ def generate_json():
     print("\nGenerated JSON:")
     print(json.dumps(data, indent=2))
 
-def generate_settings_json(labels):
+def generate_settings_json():
     settings = {
         "confidence": 50,
         "aoi": {
@@ -89,7 +89,12 @@ def generate_settings_json(labels):
             "x2": 900,
             "y2": 900
         },
-        "labels": {label: True for label in labels}
+        "ignore": [],
+        "sdcard": {
+          "capture": False,
+          "width": 1280,
+          "height": 720
+        }
     }
 
     # Ensure the directory exists
@@ -113,4 +118,4 @@ if __name__ == "__main__":
     labels_path = "./app/model/labels.txt"
     labels = parse_labels_file(labels_path)
     
-    generate_settings_json(labels)
+    generate_settings_json()

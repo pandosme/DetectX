@@ -2,7 +2,7 @@ PROG1	= detectx
 OBJS1	= main.c ACAP.c cJSON.c Model.c Video.c imgprovider.c
 PROGS	= $(PROG1)
 
-PKGS = gio-2.0 gio-unix-2.0 liblarod vdostream axhttp
+PKGS = gio-2.0 gio-unix-2.0 liblarod vdostream axhttp axevent
 
 LDFLAGS += -L./$(LIBDIR) -Wl,-rpath,'$$ORIGIN/$(LIBDIR)'
 
