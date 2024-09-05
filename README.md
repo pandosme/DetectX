@@ -23,7 +23,7 @@ The package is designed to minimize customization needs, encapsulating complexit
 
 ## Training Your Model
 
-To ensure the model is compatible with the camera, follow these steps[1]:
+To ensure the model is compatible with the camera, follow steps:
 
 ```bash
 git clone https://github.com/ultralytics/yolov5
@@ -33,7 +33,11 @@ curl -L https://acap-ml-model-storage.s3.amazonaws.com/yolov5/yolov5-axis-A8.pat
 pip install -r requirements.txt
 ```
 
-Create a directory for images and label files. [Read more here](https://docs.ultralytics.com/yolov5/tutorials/train_custom_data/).
+More info found in [YOLOv5 on ARTPEC-8](https://github.com/AxisCommunications/axis-model-zoo/blob/main/docs/yolov5-on-artpec8.md)
+
+Create a directory for images and label files.
+[Read more here on labels and training](https://docs.ultralytics.com/yolov5/tutorials/train_custom_data/).
+
 
 ### Model Selection
 
