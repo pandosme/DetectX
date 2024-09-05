@@ -17,9 +17,9 @@
 #include "Video.h"
 #include "cJSON.h"
 
-#define LOG(fmt, args...)    { syslog(LOG_INFO, fmt, ## args);}
-#define LOG_WARN(fmt, args...)    { syslog(LOG_WARNING, fmt, ## args);}
-//#define LOG_TRACE(fmt, args...)    { syslog(LOG_INFO, fmt, ## args);}
+#define LOG(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args);}
+#define LOG_WARN(fmt, args...)    { syslog(LOG_WARNING, fmt, ## args); printf(fmt, ## args);}
+//#define LOG_TRACE(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args); }
 #define LOG_TRACE(fmt, args...)    {}
 
 #define APP_PACKAGE	"detectx"
@@ -32,13 +32,21 @@ unsigned int captureHeight = 720;
 
 void
 ConfigUpdate( const char *service, cJSON* data) {
+	LOG_TRACE("%s: %s\n",__func__,service);
 	cJSON* setting = data->child;
+	cJSON* value;
 	while(setting) {
+		LOG_TRACE("%s: Processing %s\n",__func__,setting->string);
 		if( strcmp( "sdcard", setting->string ) == 0 ) {
-			captureSDCARD = cJSON_GetObjectItem(setting,"capture")?cJSON_GetObjectItem(setting,"capture")->type == cJSON_True:0;
+			value = cJSON_GetObjectItem(setting,"capture");
+			if( value ) {
+				captureSDCARD = (value->type == cJSON_True);
+			} else {
+				LOG_WARN("%s: Invalid settings for sdcard\n",__func__);
+			}
 		}
 		if( strcmp( "eventState", setting->string ) == 0 ) {
-			LOG("Changed event state to %d\n", cJSON_GetObjectItem(setting,"eventState")->valueint);
+			LOG("Changed event state to %d\n", setting->valueint);
 		}
 		if( strcmp( "aoi", setting->string ) == 0 ) {
 			LOG("Updated area of intrest\n");
@@ -47,17 +55,18 @@ ConfigUpdate( const char *service, cJSON* data) {
 			LOG("Update labels to be processed\n");
 		}
 		if( strcmp( "confidence", setting->string ) == 0 ) {
-			LOG("Updated confidence threshold to %d\n", cJSON_GetObjectItem(setting,"confidence")->valueint);
+			LOG("Updated confidence threshold to %d\n", setting->valueint);
 		}
 		setting = setting->next;
 	}
+	LOG_TRACE("%s: Exit\n",__func__);
 }
 
 // Event state management
 GHashTable *label_timers;
 gboolean label_state_expired(gpointer data) {
     const char *label = (const char *)data;
-	
+	LOG_TRACE("%s: %s\n",__func__,label);
 	cJSON* eventData = cJSON_CreateObject();
 	cJSON_AddFalseToObject(eventData,"state");
 	cJSON_AddStringToObject(eventData,"label",label);
@@ -80,7 +89,8 @@ void label_event(const char *label) {
 		cJSON_AddStringToObject(eventData,"label",label);
 		ACAP_EVENTS_Fire_JSON( "label", eventData );
         // Create a GLib timeout
-		guint interval = cJSON_GetObjectItem(settings,"eventState")?cJSON_GetObjectItem(settings,"eventState")->valueint:2;
+		LOG_TRACE("%s: %s\n",__func__,label);
+		guint interval = cJSON_GetObjectItem(settings,"eventState")?cJSON_GetObjectItem(settings,"eventState")->valueint:5;
         g_timeout_add_seconds(interval, label_state_expired, g_strdup(label));
     } else {
         // Timer exists, reset it
@@ -95,6 +105,7 @@ VdoMap *capture_VDO_map = NULL;
 int processBusy = 0;
 int inferenceCounter = 0;
 unsigned int inferenceAverage = 0;
+
 
 gboolean
 ImageProcess(gpointer data) {
@@ -296,28 +307,14 @@ void HTTP_ENDPOINT_detections(const ACAP_HTTP_Response response,const ACAP_HTTP_
 
 int main(void) {
 	static GMainLoop *main_loop = NULL;
+	setbuf(stdout, NULL);
+
 	openlog(APP_PACKAGE, LOG_PID|LOG_CONS, LOG_USER);
 
 	lastDetections = cJSON_CreateArray();
-
 	ACAP( APP_PACKAGE, ConfigUpdate );
 	ACAP_HTTP_Node( "detections", HTTP_ENDPOINT_detections );
 	ACAP_EVENTS();
-	
-	model = Model_Setup();
-	if( model ) {
-		ACAP_Register("model", model );
-		unsigned int width = cJSON_GetObjectItem( model, "videoWidth")?cJSON_GetObjectItem( model, "videoWidth")->valueint:0;
-		unsigned int height = cJSON_GetObjectItem( model, "videoHeight")?cJSON_GetObjectItem( model, "videoHeight")->valueint:0;
-		if( width && height && Video_Start_YUV( width, height ) ) {
-			LOG("Video %ux%u started\n",width,height);
-			g_idle_add(ImageProcess, NULL);
-		} else {
-			LOG_WARN("Video stream failed\n");
-		}
-	} else {
-		LOG_WARN("Model setup failed\n");
-	}
 
 	settings = ACAP_Service("settings");
 	if(!settings) {
@@ -348,6 +345,21 @@ int main(void) {
 	}
 
 	label_timers = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, (GDestroyNotify)g_timer_destroy);
+
+	model = Model_Setup();
+	if( model ) {
+		ACAP_Register("model", model );
+		unsigned int width = cJSON_GetObjectItem( model, "videoWidth")?cJSON_GetObjectItem( model, "videoWidth")->valueint:0;
+		unsigned int height = cJSON_GetObjectItem( model, "videoHeight")?cJSON_GetObjectItem( model, "videoHeight")->valueint:0;
+		if( width && height && Video_Start_YUV( width, height ) ) {
+			LOG("Video %ux%u started\n",width,height);
+			g_idle_add(ImageProcess, NULL);
+		} else {
+			LOG_WARN("Video stream failed\n");
+		}
+	} else {
+		LOG_WARN("Model setup failed\n");
+	}
 
 	main_loop = g_main_loop_new(NULL, FALSE);
 	g_main_loop_run(main_loop);

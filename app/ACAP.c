@@ -59,11 +59,16 @@ ACAP_ENDPOINT_settings(const ACAP_HTTP_Response response,const ACAP_HTTP_Request
 
 cJSON*
 ACAP( const char *package, ACAP_Config_Update callback ) {
-	LOG_TRACE("%s:\n",__func__);
+	LOG_TRACE("%s: ENTRY\n",__func__);
+	LOG_TRACE("%s: DEBUG 1 %s\n",__func__,package);
 	sprintf(ACAP_package_name,"%s",package);
+	LOG_TRACE("%s: DEBUG X\n",__func__);
 	ACAP_FILE_Init();
+	LOG_TRACE("%s: DEBUG 2\n",__func__);
 	ACAP_HTTP();
+	LOG_TRACE("%s: DEBUG 3\n",__func__);
 	cJSON* device = ACAP_DEVICE();
+	LOG_TRACE("%s: DEBUG 4\n",__func__);
 
 	ACAP_UpdateCallback = callback;
 	
@@ -76,6 +81,8 @@ ACAP( const char *package, ACAP_Config_Update callback ) {
 	if(!settings)
 		settings = cJSON_CreateObject();
 
+	LOG_TRACE("%s DEBUG 1:\n",__func__);
+
 	cJSON* savedSettings = ACAP_FILE_Read( "localdata/settings.json" );
 	if( savedSettings ) {
 		cJSON* prop = savedSettings->child;
@@ -86,6 +93,9 @@ ACAP( const char *package, ACAP_Config_Update callback ) {
 		}
 		cJSON_Delete(savedSettings);
 	}
+
+	LOG_TRACE("%s DEBUG 2:\n",__func__);
+
 
 	if( !cJSON_GetObjectItem( settings,"deviceName") )
 		cJSON_AddStringToObject( settings,"deviceName", ACAP_DEVICE_Prop("serial") );
@@ -100,6 +110,7 @@ ACAP( const char *package, ACAP_Config_Update callback ) {
 	
 	cJSON_AddItemToObject(app, "settings",settings);
 
+	LOG_TRACE("%s DEBUG 3:\n",__func__);
 
 	ACAP_Register("status", ACAP_STATUS());
 	ACAP_Register("device", device);
@@ -169,7 +180,7 @@ int
 ACAP_Register(const char* service, cJSON* serviceSettings ) {
 	LOG_TRACE("%s: %s\n",__func__,service);
 	if( cJSON_GetObjectItem(app,service) ) {
-		LOG_TRACE("%s: %s already registered\n",__func__);
+		LOG_TRACE("%s: %s already registered\n",__func__,service);
 		return 1;
 	}
 	cJSON_AddItemToObject( app, service, serviceSettings );
@@ -187,8 +198,15 @@ ACAP_FILE_AppPath() {
 
 int
 ACAP_FILE_Init( const char* package ) {
-	LOG_TRACE("%s: %s\n",__func__,package );
-	sprintf( ACAP_FILE_Path,"/usr/local/packages/%s/", package );
+	LOG_TRACE("%s: ENTRY\n",__func__);
+	if(!package) {
+		LOG_WARN("%s: Invalid Package\n",__func__);
+		return 0;
+	}
+	LOG_TRACE("%s: DEBUG 1\n",__func__);
+//	sprintf( ACAP_FILE_Path,"/usr/local/packages/%s/", package );
+	sprintf( ACAP_FILE_Path,"/usr/local/packages/detectx/");
+	LOG_TRACE("%s: DEBUG 2\n",__func__);
 	return 1;
 }
 
@@ -348,16 +366,19 @@ ACAP_HTTP_Node( const char *name, ACAP_HTTP_Callback callback ) {
 		return 0;
 	}
 
+	LOG_TRACE("%s: Debug 1 %s\n",__func__, name);
+	LOG_TRACE("%s: Debug 2 %s\n",__func__, ACAP_package_name);
+
 	gchar path[128];
 	g_snprintf (path, 128, "/local/%s/%s", ACAP_package_name, name );
 
-	LOG_TRACE("%s:%s", __func__, path );
+	LOG_TRACE("%s:%s\n", __func__, path );
 
 	if( !ACAP_HTTP_node_table )
 		ACAP_HTTP_node_table = g_hash_table_new_full(g_str_hash, g_str_equal,g_free, NULL);
 	g_hash_table_insert( ACAP_HTTP_node_table, g_strdup( path ), (gpointer*)callback);
 
-	LOG_TRACE("%s: Exit", __func__);
+	LOG_TRACE("%s: Exit\n", __func__);
 
 	return 1;
 }
