@@ -32,25 +32,69 @@ unsigned int captureHeight = 720;
 
 void
 ConfigUpdate( const char *service, cJSON* data) {
-	char *json = cJSON_PrintUnformatted( data );
-	if( json ) {
-		LOG("%s: %s:%s\n", __func__, service,json );
-		free(json);
-	}
 	cJSON* setting = data->child;
 	while(setting) {
 		if( strcmp( "sdcard", setting->string ) == 0 ) {
-			LOG("Updating sdcard \n");
+			captureSDCARD = cJSON_GetObjectItem(setting,"capture")?cJSON_GetObjectItem(setting,"capture")->type == cJSON_True:0;
+		}
+		if( strcmp( "eventState", setting->string ) == 0 ) {
+			LOG("Changed event state to %d\n", cJSON_GetObjectItem(setting,"eventState")->valueint);
+		}
+		if( strcmp( "aoi", setting->string ) == 0 ) {
+			LOG("Updated area of intrest\n");
+		}
+		if( strcmp( "ignore", setting->string ) == 0 ) {
+			LOG("Update labels to be processed\n");
+		}
+		if( strcmp( "confidence", setting->string ) == 0 ) {
+			LOG("Updated confidence threshold to %d\n", cJSON_GetObjectItem(setting,"confidence")->valueint);
 		}
 		setting = setting->next;
 	}
 }
 
+// Event state management
+GHashTable *label_timers;
+gboolean label_state_expired(gpointer data) {
+    const char *label = (const char *)data;
+	
+	cJSON* eventData = cJSON_CreateObject();
+	cJSON_AddFalseToObject(eventData,"state");
+	cJSON_AddStringToObject(eventData,"label",label);
+	ACAP_EVENTS_Fire_JSON( "label", eventData );
+    // Remove the timer from the hash table
+    g_hash_table_remove(label_timers, label);
+
+    return FALSE; // Do not repeat the timer
+}
+
+void label_event(const char *label) {
+    GTimer *timer = g_hash_table_lookup(label_timers, label);
+
+    if (timer == NULL) {
+        // No timer exists, create a new one and fite state high
+        timer = g_timer_new();
+        g_hash_table_insert(label_timers, g_strdup(label), timer);
+		cJSON* eventData = cJSON_CreateObject();
+		cJSON_AddTrueToObject(eventData,"state");
+		cJSON_AddStringToObject(eventData,"label",label);
+		ACAP_EVENTS_Fire_JSON( "label", eventData );
+        // Create a GLib timeout
+		guint interval = cJSON_GetObjectItem(settings,"eventState")?cJSON_GetObjectItem(settings,"eventState")->valueint:2;
+        g_timeout_add_seconds(interval, label_state_expired, g_strdup(label));
+    } else {
+        // Timer exists, reset it
+        g_timer_start(timer);
+    }
+}
+
+//Process image capture, run inference and process output
 cJSON* lastDetections = 0;
 VdoMap *capture_VDO_map = NULL;
 
 int processBusy = 0;
-
+int inferenceCounter = 0;
+unsigned int inferenceAverage = 0;
 
 gboolean
 ImageProcess(gpointer data) {
@@ -85,12 +129,18 @@ ImageProcess(gpointer data) {
 		return G_SOURCE_REMOVE;
 	}
 
-	cJSON_Delete(lastDetections);
-	lastDetections = cJSON_CreateArray();
-
     gettimeofday(&startTs, NULL);
 	cJSON* detections = Model_Inference(buffer);
     gettimeofday(&endTs, NULL);
+	unsigned int inferenceTime = (unsigned int)(((endTs.tv_sec - startTs.tv_sec) * 1000) + ((endTs.tv_usec - startTs.tv_usec) / 1000));
+	inferenceCounter++;
+	inferenceAverage += inferenceTime;
+	if( inferenceCounter >= 10 ) {
+		ACAP_STATUS_SetNumber(  "model", "averageTime", (int)(inferenceAverage / 10) );
+		inferenceCounter = 0;
+		inferenceAverage = 0;
+	}
+
 	if( !detections || cJSON_GetArraySize(detections) == 0 ) {
 		processBusy = 0;
 		return G_SOURCE_CONTINUE;
@@ -98,10 +148,8 @@ ImageProcess(gpointer data) {
 
 	double timestamp = ACAP_DEVICE_Timestamp();
 
-	//Apply User filters
-	unsigned int inferenceTime = (unsigned int)(((endTs.tv_sec - startTs.tv_sec) * 1000) + ((endTs.tv_usec - startTs.tv_usec) / 1000));
-	LOG("Inference %u ms\n", inferenceTime);
-
+	//Apply Transform detection data and apply user filters
+	cJSON* processedDetections = cJSON_CreateArray();
 	cJSON* aoi = cJSON_GetObjectItem(settings,"aoi");
 	if(!aoi) {
 		ACAP_STATUS_SetString("model","status","Error. Check log");
@@ -170,17 +218,22 @@ ImageProcess(gpointer data) {
 
 		if( insert ) {
 			cJSON_AddNumberToObject( detection, "timestamp", timestamp );
+			cJSON_AddItemToArray(processedDetections, cJSON_Duplicate(detection,1));
 			cJSON_AddItemToArray(lastDetections, cJSON_Duplicate(detection,1));
+			label_event(label);
 		}
 		detection = detection->next;
 	}
 
-	if( cJSON_GetArraySize(lastDetections) == 0 || !jpegBuffer ) {
+	while( cJSON_GetArraySize( lastDetections ) > 10 )
+		cJSON_DeleteItemFromArray(lastDetections, 0);
+
+
+	//Store image capture and update detections.txt on SD Card
+	if( !jpegBuffer ) {
 		processBusy = 0;
 		return G_SOURCE_CONTINUE;	
 	}
-
-	//Store image capture and update detections.txt on SD Card
 		
 	FILE* fp_detection = fopen("/var/spool/storage/SD_DISK/DetectX/detections.txt", "a");
 	if( !fp_detection ) {
@@ -189,7 +242,7 @@ ImageProcess(gpointer data) {
 		return G_SOURCE_CONTINUE;	
 	}
 
-	cJSON* item = detections->child;
+	cJSON* item = processedDetections->child;
 	while( item ) {
 		char *json = cJSON_PrintUnformatted(item);
 		if( json ) {
@@ -233,6 +286,11 @@ ImageProcess(gpointer data) {
 
 
 void HTTP_ENDPOINT_detections(const ACAP_HTTP_Response response,const ACAP_HTTP_Request request) {
+	const char *reset = ACAP_HTTP_Request_Param( request, "reset");
+	if( reset ) {
+		cJSON_Delete(lastDetections);
+		lastDetections = cJSON_CreateArray();
+	}
 	ACAP_HTTP_Respond_JSON(  response, lastDetections);
 }
 
@@ -244,6 +302,7 @@ int main(void) {
 
 	ACAP( APP_PACKAGE, ConfigUpdate );
 	ACAP_HTTP_Node( "detections", HTTP_ENDPOINT_detections );
+	ACAP_EVENTS();
 	
 	model = Model_Setup();
 	if( model ) {
@@ -287,6 +346,8 @@ int main(void) {
 		vdo_map_set_uint32(capture_VDO_map, "width", captureWidth);
 		vdo_map_set_uint32(capture_VDO_map, "height", captureHeight);
 	}
+
+	label_timers = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, (GDestroyNotify)g_timer_destroy);
 
 	main_loop = g_main_loop_new(NULL, FALSE);
 	g_main_loop_run(main_loop);

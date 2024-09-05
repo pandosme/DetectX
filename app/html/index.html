@@ -43,12 +43,13 @@
 							<div id="viewgroup" style="width:100%; height:100%; position:relative">
 								<img id="snapshot" class="card-img-top" src="" alt="Image" style="width:100%; height:100%; position:absolute; top:0px; left:0px;">
 								<div id="video" style="width:100%; height:100%; position:absolute; top:0px; left:0px;"></div>
-								<canvas id="canvas" width="1920" height="1080" style="width:100%; height:100%; position:absolute; top:0px; left:0px;"></canvas>
+								<canvas id="canvas" width="1000" height="1000" style="width:100%; height:100%; position:absolute; top:0px; left:0px;"></canvas>
 							</div>
 						</div>
 					</div>
 					<div class="col-2 table-container">
-						<h2>Latest detections</h2>
+						<h4>Latest detections</h4>
+						<button id="reset_detections" class="btn btn-primary">Reset</button>
 						<table class="table table-striped">
 							<thead>
 								<tr>
@@ -146,6 +147,10 @@
                 }
             });
 
+			$("#reset_detections").click(function() {
+				$.ajax({type: "GET",url: 'detections?reset=yes',dataType: 'json',cache: false});
+			});
+
             // Set AOI button click handler
 			var aoi = false;
 			$("#aoi_button").click(function() {
@@ -187,12 +192,15 @@
 						var ctx = canvas.getContext("2d");
 						if( !Array.isArray(data) || data.length === 0 )
 							return;
+						ctx.beginPath();
+						ctx.clearRect(0, 0, App.model.imageWidth, App.model.imageHeight );
+						ctx.stroke();
 						appendDataToTable(data);
 						ctx.lineWidth = 3;
 						ctx.strokeStyle = '#FFFF00';
 						ctx.beginPath();
 						for( var i = 0; i < data.length; i++ )
-							ctx.rect(data[i].x, data[i].y, data[i].w, data.h );
+							ctx.rect(data[i].x, data[i].y, data[i].w, data[i].h );
 						ctx.stroke();	
 					}
 				});

@@ -35,10 +35,32 @@
 			<div class="container-fluid">
 				<div class="row">
 					<div class="col-md-12">
-						<div class="form-check">
-							<input type="checkbox" class="form-check-input" id="storeImagesCheckbox">
-							<label class="form-check-label" for="storeImagesCheckbox">Store detection images on SD Card</label>
+						<br>
+						<h3 id="debug-heading">Settings</h3>
+						<div class="form-group">
+							<div class="form-control">
+								<input type="checkbox" class="form-check-input" id="storeImagesCheckbox">
+								<label class="form-check-label" for="storeImagesCheckbox">Store detection images on SD Card (Use with caution)</label>
+							</div>
+						
+							<div class="form-control">
+								<label for="stateDuration" class="col-form-label">Min event state duration</label>
+								<select class="form-control" id="stateDuration" >
+									<option value="1">1 second</option>
+									<option value="2">2 seconds</option>
+									<option value="3">3 seconds</option>
+									<option value="5">5 seconds</option>
+									<option value="10">10 seconds</option>
+									<option value="15">15 seconds</option>
+									<option value="30">30 seconds</option>
+								</select>
+							</div>
 						</div>
+						<br><br>						
+						<h3 id="labels-heading">Labels Processed</h3>
+						<table class="table" id="labelsTable">
+							<!-- Checkboxes will be dynamically inserted here -->
+						</table>
 					</div>
 				</div>
 			</div>
@@ -61,10 +83,91 @@
                     $(".acapName").html(App.manifest.acapPackageConf.setup.friendlyName);
                     $("#sidebar-wrapper .sidebar-heading").html(App.manifest.acapPackageConf.setup.friendlyName);
                     $("#model_status").text("Status: " + App.status.model.status);
+					// Create checkboxes for labels
+					$('#storeImagesCheckbox').prop('checked', App.settings.sdcard.capture);
+					createLabelCheckboxes(App.model.labels, App.settings.ignore);
+					$("#stateDuration").val(App.settings.eventState);
+					
                 },
                 error: function(response) {
                     alert(response.statusText);
                 }
+            });
+
+			// Function to create label checkboxes
+			function createLabelCheckboxes(labels, ignoreList) {
+				const table = $('#labelsTable');
+				const columns = 10; // Number of columns
+
+				for (let i = 0; i < labels.length; i += columns) {
+					const row = $('<tr></tr>');
+
+					for (let j = 0; j < columns; j++) {
+						const index = i + j;
+						const label = labels[index];
+						if (index >= labels.length) break;
+
+						const isChecked = !ignoreList.includes(label);
+
+						const cell = $(`
+							<td>
+								<div class="form-check">
+									<input type="checkbox" class="form-check-input label-checkbox" id="label-${index}" data-label="${label}" ${isChecked ? 'checked' : ''}>
+									<label class="form-check-label" for="label-${index}">${label}</label>
+								</div>
+							</td>
+						`);
+
+						row.append(cell);
+					}
+
+					table.append(row);
+				}
+
+				// Add event listeners to checkboxes
+				$('.label-checkbox').change(function() {
+					const label = $(this).data('label');
+
+					if (this.checked) {
+						// Remove label from ignore list
+						App.settings.ignore = App.settings.ignore.filter(item => item !== label);
+					} else {
+						// Add label to ignore list
+						if (!App.settings.ignore.includes(label)) {
+							App.settings.ignore.push(label);
+						}
+					}
+
+					// Send updated ignore list to server
+					const jsonData = JSON.stringify({"ignore": App.settings.ignore});
+					const urlEncodedJSON = encodeURIComponent(jsonData);
+
+					$.ajax({
+						type: "GET",
+						url: 'settings?json=' + urlEncodedJSON,
+						success: function(response) {
+							console.log("Ignore settings updated successfully");
+						},
+						error: function(response) {
+							console.error("Error updating ignore settings: " + response.statusText);
+						}
+					});
+				});
+			}
+
+            $('#stateDuration').change(function() {
+				const jsonData = JSON.stringify({ "eventState": parseInt($(this).val()) });
+				const urlEncodedJSON = encodeURIComponent(jsonData);
+				$.ajax({
+					type: "GET",
+					url: 'settings?json=' + urlEncodedJSON,
+					success: function(response) {
+						console.log("Ignore settings updated successfully");
+					},
+					error: function(response) {
+						console.error("Error updating ignore settings: " + response.statusText);
+					}
+				});
             });
 
 			$('#storeImagesCheckbox').change(function() {
@@ -77,7 +180,7 @@
 				// Send the HTTP GET request
 				$.ajax({
 					type: "GET",
-					url: '/settings?json=' + urlEncodedJSON,
+					url: 'settings?json=' + urlEncodedJSON,
 					success: function(response) {
 					},
 					error: function(response) {
@@ -85,8 +188,6 @@
 					}
 				});
 			});
-
-
 
 			setInterval( function(){
 				$.ajax({type: "GET",url: 'status',dataType: 'json',cache: false,

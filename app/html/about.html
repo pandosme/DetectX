@@ -32,16 +32,36 @@
                 <span class="navbar-text" id="model_status">Loading...</span>
             </nav>
 
-            <div class="container-fluid">
-                <div class="row">
-                </div>
-            </div>
+			<div class="container">
+				<div class="row">
+					<div class="col-12">
+						<br>
+						<h2>Application</h2>
+						<p>Version: <span class="version"></span></p>
+						<p>Vendor: <span class="vendor"></span></p>
+						<p>URL: <a href="" class="vendorUrl"></a></p>
+						<p>Model: <span class="model"></span></p>
+						<p>Firmware: <span class="firmware"></span></p>
+						<p>Serial: <span class="serial"></span></p>
+					</div>
+				</div>
+				<br><br>
+				<div class="row">
+					<div class="col-12">
+						<h2>Model</h2>
+						<p>Size: <span class="modelSize"></span></p>
+						<p>Labels: <span class="labels"></span></p>
+						<p>DLPU: <span class="dlpu"></span></p>
+						<p>Avg inference: <span class="averageInference"></span>ms</p>
+						<p>Quantization: <span class="quantization"></span></p>
+						<p>Image size: <span class="imageSize"></span></p>
+					</div>
+				</div>
+			</div>
         </div>
     </div>
 
     <script>
-        var App = 0;
-		
         $(document).ready(function() {
             $.ajax({
                 type: "GET",
@@ -55,23 +75,40 @@
                     $(".acapName").html(App.manifest.acapPackageConf.setup.friendlyName);
                     $("#sidebar-wrapper .sidebar-heading").html(App.manifest.acapPackageConf.setup.friendlyName);
                     $("#model_status").text("Status: " + App.status.model.status);
+                    $('.version').text(data.manifest.acapPackageConf.setup.version);
+                    $('.vendor').text(data.manifest.acapPackageConf.setup.vendor);
+                    $('.vendorUrl').attr('href', data.manifest.acapPackageConf.setup.vendorUrl).text(data.manifest.acapPackageConf.setup.vendorUrl);
+                    $('.serial').text(data.settings.deviceName);
+                    $('.model').text(data.device.model);
+                    $('.firmware').text(data.device.firmware);
+                    $('.modelSize').text(data.model.modelWidth + 'x' + data.model.modelHeight);
+                    $('.labels').text(data.model.classes);
+                    $('.dlpu').text(data.model.chip);
+                    $('.quantization').text(data.model.quant);
+                    $('.imageSize').text(data.model.videoWidth + 'x' + data.model.videoHeight);
+					$('.averageInference').text(App.status.model.averageTime.toString());
+                    $('#model_status').text('Status: ' + data.status.model.status);
                 },
                 error: function(response) {
                     alert(response.statusText);
                 }
             });
 
-			setInterval( function(){
-				$.ajax({type: "GET",url: 'status',dataType: 'json',cache: false,
-					success: function( data ) {
-						$("#model_status").text("Status: " + data.model.status);
-					},
-					error(){
-						$("#model_status").text("Status: No response");
-					}
-				});
-			
-			},4000);
+            setInterval(function() {
+                $.ajax({
+                    type: "GET",
+                    url: 'status',
+                    dataType: 'json',
+                    cache: false,
+                    success: function(data) {
+                        $('#model_status').text('Status: ' + data.model.status);
+						$('.averageInference').text(data.model.averageTime.toString());
+                    },
+                    error() {
+                        $('#model_status').text('Status: No response');
+                    }
+                });
+            }, 4000);
         });
 
         $("#menu-toggle").click(function(e) {
@@ -80,5 +117,4 @@
         });
     </script>
 </body>
-
 </html>

@@ -1814,7 +1814,7 @@ ACAP_EVENTS_Fire_JSON( const char* Id, cJSON* data ) {
 }
 
 cJSON*
-EVENTS() {
+ACAP_EVENTS() {
 	LOG_TRACE("%s:\n",__func__);
 	//Get the ACAP package ID and Nice Name
 	cJSON* manifest = ACAP_Service("manifest");

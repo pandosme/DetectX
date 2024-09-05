@@ -111,7 +111,7 @@ void ACAP_STATUS_SetNull( const char *group, const char *name );
 
 typedef void (*ACAP_EVENTS_Callback) (cJSON *event);
 
-cJSON*	EVENTS();
+cJSON*	ACAP_EVENTS();
 
 //Declarations
 int		ACAP_EVENTS_Add_Event( const char* Id, const char* NiceName, int state );
