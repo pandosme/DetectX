@@ -148,6 +148,12 @@
             });
 
 			$("#reset_detections").click(function() {
+				var canvas = document.getElementById('canvas');
+				var ctx = canvas.getContext("2d");
+				ctx.beginPath();
+				ctx.clearRect(0, 0, 1000, 1000 );
+				ctx.stroke();
+				appendDataToTable([]);
 				$.ajax({type: "GET",url: 'detections?reset=yes',dataType: 'json',cache: false});
 			});
 
@@ -193,7 +199,7 @@
 						if( !Array.isArray(data) || data.length === 0 )
 							return;
 						ctx.beginPath();
-						ctx.clearRect(0, 0, App.model.imageWidth, App.model.imageHeight );
+						ctx.clearRect(0, 0, 1000, 1000 );
 						ctx.stroke();
 						appendDataToTable(data);
 						ctx.lineWidth = 3;

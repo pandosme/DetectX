@@ -94,7 +94,8 @@ def generate_settings_json():
           "capture": False,
           "width": 1280,
           "height": 720
-        }
+        },
+        "eventState": 3
     }
 
     # Ensure the directory exists

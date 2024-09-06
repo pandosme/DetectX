@@ -107,6 +107,55 @@ int inferenceCounter = 0;
 unsigned int inferenceAverage = 0;
 
 
+void
+Save_To_SDCARD(double timestamp, VdoBuffer* buffer, cJSON* detections ) {
+	//Store image capture and update detections.txt on SD Card
+	if( !buffer || !detections || cJSON_GetArraySize(detections))
+		return;	
+		
+	FILE* fp_detection = fopen("/var/spool/storage/SD_DISK/DetectX/detections.txt", "a");
+	if( !fp_detection ) {
+		LOG_WARN("Unable to create detection file on SD Card\n");
+		return;	
+	}
+
+	cJSON* item = detections->child;
+	while( item ) {
+		char *json = cJSON_PrintUnformatted(item);
+		if( json ) {
+			fprintf(fp_detection, "%s\n", json);
+			free(json);
+		}
+		item = item->next;
+	}
+	fclose( fp_detection );
+
+	char filepath[128];
+	sprintf(filepath,"/var/spool/storage/SD_DISK/DetectX/%.0f.jpg",timestamp);
+	FILE* fp_image = fopen(filepath, "wb");
+	if( !fp_image ) {
+		LOG_WARN("Unable to create a jpeg file on SD Card\n");
+		processBusy = 0;
+		return;	
+	}
+
+	VdoFrame*  frame = vdo_buffer_get_frame(buffer);
+	if (!frame) {
+		LOG_WARN("Unable to get frame for jpeg file\n");
+		fclose(fp_image);
+		processBusy = 0;
+		return;	
+	}
+
+	void *jpegdata = (void *)vdo_buffer_get_data(buffer);
+	unsigned int size = vdo_frame_get_size(frame);
+	if( jpegdata && size )
+		fwrite(jpegdata, sizeof(char), size, fp_image);
+	fclose(fp_image);
+	LOG_TRACE("JPEG: %.0f.jpg\n",timestamp);
+}
+
+
 gboolean
 ImageProcess(gpointer data) {
     struct timeval startTs, endTs;	
@@ -236,63 +285,15 @@ ImageProcess(gpointer data) {
 		detection = detection->next;
 	}
 
+	Save_To_SDCARD( timestamp, jpegBuffer, processedDetections );
+	g_object_unref(jpegBuffer);
+
+	//Add code here if you want to create some specific output for the preocesses detection list
+	cJSON_Delete(processedDetections);
+
 	while( cJSON_GetArraySize( lastDetections ) > 10 )
 		cJSON_DeleteItemFromArray(lastDetections, 0);
-
-
-	//Store image capture and update detections.txt on SD Card
-	if( !jpegBuffer ) {
-		processBusy = 0;
-		return G_SOURCE_CONTINUE;	
-	}
-		
-	FILE* fp_detection = fopen("/var/spool/storage/SD_DISK/DetectX/detections.txt", "a");
-	if( !fp_detection ) {
-		LOG_WARN("Unable to create detection file on SD Card\n");
-		processBusy = 0;
-		return G_SOURCE_CONTINUE;	
-	}
-
-	cJSON* item = processedDetections->child;
-	while( item ) {
-		char *json = cJSON_PrintUnformatted(item);
-		if( json ) {
-			fprintf(fp_detection, "%s\n", json);
-			free(json);
-		}
-		item = item->next;
-	}
-	fclose( fp_detection );
-
-	char filepath[128];
-	sprintf(filepath,"/var/spool/storage/SD_DISK/DetectX/%.0f.jpg",timestamp);
-	FILE* fp_image = fopen(filepath, "wb");
-	if( !fp_image ) {
-		LOG_WARN("Unable to create a jpeg file on SD Card\n");
-		processBusy = 0;
-		return G_SOURCE_CONTINUE;	
-	}
-
-	VdoFrame*  frame = vdo_buffer_get_frame(jpegBuffer);
-	if (!frame) {
-		g_object_unref(jpegBuffer);
-		LOG_WARN("Unable to get frame for jpeg file\n");
-		fclose(fp_image);
-		processBusy = 0;
-		return G_SOURCE_CONTINUE;	
-	}
-
-	void *jpegdata = (void *)vdo_buffer_get_data(jpegBuffer);
-	unsigned int size = vdo_frame_get_size(frame);
-	if( jpegdata && size )
-		fwrite(jpegdata, sizeof(char), size, fp_image);
-	fclose(fp_image);
-	g_object_unref(jpegBuffer);
-	LOG_TRACE("JPEG: %.0f.jpg\n",timestamp);
-	
-	cJSON_Delete( detections );
-	processBusy = 0;
-	return G_SOURCE_CONTINUE;	
+	return G_SOURCE_CONTINUE;
 }
 
 

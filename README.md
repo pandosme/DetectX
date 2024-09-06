@@ -101,3 +101,12 @@ You should now have a new EAP file ready for installation on your camera.
 
 Remember, tools like Perplexity or other LLMs can assist you with any challenges you encounter.
 
+## History
+
+### 1.0.0	June 5, 2024
+- Initial commit
+
+### 1.0.1	June 6, 2024
+- Updated manifest.json to version "1.0.1"
+- Restructured SD Card image store on detect images. Fix a flaw that could result in error "Too many files open...".
+- Fixed so Reset button cleared all bounding boxes and table

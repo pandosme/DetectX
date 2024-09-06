@@ -36,24 +36,33 @@
 				<div class="row">
 					<div class="col-md-12">
 						<br>
-						<h3 id="debug-heading">Settings</h3>
-						<div class="form-group">
-							<div class="form-control">
-								<input type="checkbox" class="form-check-input" id="storeImagesCheckbox">
-								<label class="form-check-label" for="storeImagesCheckbox">Store detection images on SD Card (Use with caution)</label>
+						<div class="container">
+							<div class="row align-items-center">
+								<div class="col-auto">
+									<h3 id="debug-heading">Settings</h3>
+								</div>
 							</div>
-						
-							<div class="form-control">
-								<label for="stateDuration" class="col-form-label">Min event state duration</label>
-								<select class="form-control" id="stateDuration" >
-									<option value="1">1 second</option>
-									<option value="2">2 seconds</option>
-									<option value="3">3 seconds</option>
-									<option value="5">5 seconds</option>
-									<option value="10">10 seconds</option>
-									<option value="15">15 seconds</option>
-									<option value="30">30 seconds</option>
-								</select>
+							<div class="row align-items-center">
+								<div class="col">
+									<input type="checkbox" class="form-check-input" id="storeImagesCheckbox">
+									<label class="form-check-label" for="storeImagesCheckbox">Store detection images on SD Card (Use with caution)</label>
+								</div>
+							</div>
+							<div class="row align-items-center mt-2">
+								<div class="col-auto">
+									<label for="stateDuration" class="col-form-label">Min event state duration</label>
+								</div>
+								<div class="col">
+									<select class="form-control" id="stateDuration">
+										<option value="1">1 second</option>
+										<option value="2">2 seconds</option>
+										<option value="3">3 seconds</option>
+										<option value="5">5 seconds</option>
+										<option value="10">10 seconds</option>
+										<option value="15">15 seconds</option>
+										<option value="30">30 seconds</option>
+									</select>
+								</div>
 							</div>
 						</div>
 						<br><br>						
