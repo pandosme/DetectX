@@ -102,15 +102,14 @@ void label_event(const char *label) {
 cJSON* lastDetections = 0;
 VdoMap *capture_VDO_map = NULL;
 
-int processBusy = 0;
 int inferenceCounter = 0;
 unsigned int inferenceAverage = 0;
-
 
 void
 Save_To_SDCARD(double timestamp, VdoBuffer* buffer, cJSON* detections ) {
 	//Store image capture and update detections.txt on SD Card
-	if( !buffer || !detections || cJSON_GetArraySize(detections))
+
+	if( !captureSDCARD || !buffer || !detections || cJSON_GetArraySize(detections) == 0)
 		return;	
 		
 	FILE* fp_detection = fopen("/var/spool/storage/SD_DISK/DetectX/detections.txt", "a");
@@ -135,7 +134,6 @@ Save_To_SDCARD(double timestamp, VdoBuffer* buffer, cJSON* detections ) {
 	FILE* fp_image = fopen(filepath, "wb");
 	if( !fp_image ) {
 		LOG_WARN("Unable to create a jpeg file on SD Card\n");
-		processBusy = 0;
 		return;	
 	}
 
@@ -143,7 +141,6 @@ Save_To_SDCARD(double timestamp, VdoBuffer* buffer, cJSON* detections ) {
 	if (!frame) {
 		LOG_WARN("Unable to get frame for jpeg file\n");
 		fclose(fp_image);
-		processBusy = 0;
 		return;	
 	}
 
@@ -163,13 +160,6 @@ ImageProcess(gpointer data) {
 	if( !settings || !model )
 		return G_SOURCE_REMOVE;
 
-	if( processBusy ) {
-		LOG("Busy\n");
-		return G_SOURCE_REMOVE;
-	}
-
-	processBusy = 1;
-	
 	VdoBuffer* buffer = Video_Capture_YUV();	
 	VdoBuffer* jpegBuffer = NULL;
 	if( captureSDCARD > 0 ) {
@@ -185,7 +175,6 @@ ImageProcess(gpointer data) {
 		ACAP_STATUS_SetString("model","status","Error. Check log");
 		ACAP_STATUS_SetBool("model","state", 0);
 		LOG_WARN("Image capture failed\n");
-		processBusy = 0;
 		return G_SOURCE_REMOVE;
 	}
 
@@ -202,7 +191,6 @@ ImageProcess(gpointer data) {
 	}
 
 	if( !detections || cJSON_GetArraySize(detections) == 0 ) {
-		processBusy = 0;
 		return G_SOURCE_CONTINUE;
 	}
 
@@ -215,7 +203,6 @@ ImageProcess(gpointer data) {
 		ACAP_STATUS_SetString("model","status","Error. Check log");
 		ACAP_STATUS_SetBool("model","state", 0);
 		LOG_WARN("No aoi settings\n");
-		processBusy = 0;
 		return G_SOURCE_REMOVE;
 	}
 
@@ -263,6 +250,8 @@ ImageProcess(gpointer data) {
 		unsigned int y1 = cJSON_GetObjectItem(aoi,"y1")?cJSON_GetObjectItem(aoi,"y1")->valueint:100;
 		unsigned int x2 = cJSON_GetObjectItem(aoi,"x2")?cJSON_GetObjectItem(aoi,"x2")->valueint:900;
 		unsigned int y2 = cJSON_GetObjectItem(aoi,"y2")?cJSON_GetObjectItem(aoi,"y2")->valueint:900;
+
+		//FILTER DETECTIONS
 		int insert = 0;
 		if( c >= confidenceThreshold && cx >= x1 && cx <= x2 && cy >= y1 && cy <= y2 )
 			insert = 1;
@@ -286,7 +275,8 @@ ImageProcess(gpointer data) {
 	}
 
 	Save_To_SDCARD( timestamp, jpegBuffer, processedDetections );
-	g_object_unref(jpegBuffer);
+	if( jpegBuffer )
+		g_object_unref(jpegBuffer);
 
 	//Add code here if you want to create some specific output for the preocesses detection list
 	cJSON_Delete(processedDetections);

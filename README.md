@@ -107,6 +107,9 @@ Remember, tools like Perplexity or other LLMs can assist you with any challenges
 - Initial commit
 
 ### 1.0.1	June 6, 2024
-- Updated manifest.json to version "1.0.1"
 - Restructured SD Card image store on detect images. Fix a flaw that could result in error "Too many files open...".
 - Fixed so Reset button cleared all bounding boxes and table
+
+### 1.0.2	June 7, 2024
+- Fixed flaw that prevented detections
+- Fixed flaw tham images not stored on SD Card when users enabled that feature
