@@ -51,7 +51,12 @@ Decide on the image input size and base model (weights). These choices impact pe
 
 Start with yolov5n and move to yolov5s if needed. Choose a model size that is a multiple of 32 (default is 640). Smaller sizes reduce inference time, while larger sizes improve detection quality.
 
-Note: The example ACAP uses yolov5 with an image size of 640x640, with inference times ranging from 110-150ms.
+Inference time: 
+
+| Model size | Model image size | Inference time |
+|----------|----------|----------|
+| yolov5n | 640   | 110-150 ms   |
+| yolov5s | 800   | 250-300 ms   |
 
 ### Training Configuration
 
