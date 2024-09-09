@@ -92,17 +92,16 @@ python export.py --weights runs/train/exp[X]/weights/best.pt --include tflite --
 Each training session creates a new directory `exp[X]`.
 
 ## Building the ACAP
+Before building the ACAP with your model,  test the model on your PC/server.  Troubleshooting a model when it is running in the cameras is hard.
+It is recommended to use LLM assistance to generate scripts.  E.g. a script that capture images from the Axis camera, runs inference using you molde and labels and prints out the result.  
 
 ### Installation
-
 Open a Linux shell and navigate to your home directory:
 
 ```bash
 git clone https://github.com/pandosme/DetectX.git
 ```
-
 ### Building the Package
-
 You do not need to alter any C or H files. However, to create a custom ACAP, you may want to alter:
 
 - `main.c`
@@ -129,4 +128,4 @@ Remember, tools like Perplexity or other LLMs can assist you with any challenges
 
 ### 1.0.2	June 7, 2024
 - Fixed flaw that prevented detections
-- Fixed flaw tham images not stored on SD Card when users enabled that feature
+- Fixed flaw that images was not stored on SD Card when users enabled that feature. 
