@@ -58,7 +58,7 @@ Note: The example ACAP uses yolov5 with an image size of 640x640, with inference
 Use 80% of images for training and 20% for validation. For example, to train on yolov5n:
 
 ```bash
-python train.py --img 640 --batch 50 --epochs 300 --data [DIRECTORY TO YOUR DATASET]/data.yaml --weights yolov5n.pt --cfg yolov5n.yaml
+python train.py --img 640 --batch 50 --epochs 300 --data [DIRECTORY TO YOUR DATASET]/data.yaml --weights ./models/yolov5n.pt
 ```
 
 - `--batch 50`: Number of images processed at once. Higher values increase speed but may exhaust memory.
