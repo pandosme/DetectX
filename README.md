@@ -58,6 +58,17 @@ Inference time:
 | yolov5n | 640   | 110-150 ms   |
 | yolov5s | 800   | 250-300 ms   |
 
+### Building a dataset
+If you do not already have a data of images you must build one.  How many images you need for each label depends on what accuracy you want and how complext the detection is.  Start with 20-30 iamges for each label and grow as you build your dataset to a good prediction point.  Use one or more cameras to capture images to your computer and store them in a directory e.g. /dataset/mymodel/images.  
+
+Example:
+Use LLM to help you create a script to capture images.
+Prompt:
+```
+Write a pyhton script that captures images from an Axis camera with IP address 1.2.3.4 and user/password root/pass.  Note that the camera uses digest authentication.  Capture images with a resolution of 1280x720 resoution every 10 seconds and store the images in /dataset/mymodel/images.  THe image filen name is epoch timestamp millisecond resolution.
+```
+For labeling you can download a labeling tool.
+
 ### Training Configuration
 
 Use 80% of images for training and 20% for validation. For example, to train on yolov5n:
