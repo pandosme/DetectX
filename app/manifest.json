@@ -12,7 +12,7 @@
             },
             "vendorUrl": "https://pandosme.github.io",
             "runMode": "once",
-            "version": "1.0.3"
+            "version": "1.0.2"
         },
         "configuration": {
 			"settingPage": "index.html",
