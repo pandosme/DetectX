@@ -1,3 +1,5 @@
+Here is a readme file for a GitHub Repo.  Can you please review spelling, grammar and phrasing?
+
 ## DetectX
 
 DetectX is an open-source package designed for developers and integrators who wish to train or deploy a YOLOv5 object detection model directly on Axis cameras with ARTPEC-8. While Axis cameras offer robust built-in object detection analytics for common use cases, some scenarios require more specialized detection. This package allows you to leverage a trained YOLOv5 model on the camera itself, bypassing the need for server-based processing.
@@ -51,31 +53,14 @@ Decide on the image input size and base model (weights). These choices impact pe
 
 Start with yolov5n and move to yolov5s if needed. Choose a model size that is a multiple of 32 (default is 640). Smaller sizes reduce inference time, while larger sizes improve detection quality.
 
-Inference time: 
-
-| Model size | Model image size | Inference time |
-|----------|----------|----------|
-| yolov5n | 640   | 110-150 ms   |
-| yolov5s | 800   | 250-300 ms   |
-
-### Building a dataset
-If you do not already have a dataset of images you must build one or download an opensource dataset of images (Google Search).  How many images you need for each label depends on what accuracy you want and how complext the detection is.  Start with 20-30 images for each label and grow as you build your dataset to a good prediction point.  
-
-Use one or more cameras to capture images to your computer and store them in a directory e.g. /dataset/mymodel/images.  
-Example:
-Use an LLM to help you create a script to capture images.
-Prompt:
-```
-Write a pyhton script that captures images from an Axis camera with IP address 1.2.3.4 and user/password root/pass.  Note that the camera uses digest authentication.  Capture images with a resolution of 1280x720 resoution every 10 seconds and store the images in /dataset/mymodel/images.  THe image filen name is epoch timestamp millisecond resolution.
-```
-For labeling you can download a labeling tool.
+Note: The example ACAP uses yolov5 with an image size of 640x640, with inference times ranging from 110-150ms.
 
 ### Training Configuration
 
 Use 80% of images for training and 20% for validation. For example, to train on yolov5n:
 
 ```bash
-python train.py --img 640 --batch 50 --epochs 300 --data [DIRECTORY TO YOUR DATASET]/data.yaml --weights ./models/yolov5n.pt
+python train.py --img 640 --batch 50 --epochs 300 --data [DIRECTORY TO YOUR DATASET]/data.yaml --weights yolov5n.pt --cfg yolov5n.yaml
 ```
 
 - `--batch 50`: Number of images processed at once. Higher values increase speed but may exhaust memory.
@@ -92,16 +77,17 @@ python export.py --weights runs/train/exp[X]/weights/best.pt --include tflite --
 Each training session creates a new directory `exp[X]`.
 
 ## Building the ACAP
-Before building the ACAP with your model,  test the model on your PC/server.  Troubleshooting a model when it is running in the cameras is hard.
-It is recommended to use LLM assistance to generate scripts.  E.g. a script that capture images from the Axis camera, runs inference using you molde and labels and prints out the result.  
 
 ### Installation
+
 Open a Linux shell and navigate to your home directory:
 
 ```bash
 git clone https://github.com/pandosme/DetectX.git
 ```
+
 ### Building the Package
+
 You do not need to alter any C or H files. However, to create a custom ACAP, you may want to alter:
 
 - `main.c`
@@ -117,15 +103,52 @@ You should now have a new EAP file ready for installation on your camera.
 
 Remember, tools like Perplexity or other LLMs can assist you with any challenges you encounter.
 
-## History
 
-### 1.0.0	June 5, 2024
+## Running and configuring the ACAP
+Install the EAP in your Camera.
+
+### Detections
+![Detections](pictures/detections.png)
+Here is where you validate the detections and filter Arae-Of-Intrest and minimum confidence level.  
+You will see the last 10 dections in both video and the table to the right.  
+
+**Area-of-Intrest**
+![Detections](pictures/aoi.png)
+Press the button "Set Area of Intrest" and it turns blue.  Use the mouse to adjust the area.  End with pressing the button again so it turns gray.  
+
+### Advanced
+![Detections](pictures/aoi.png)
+If you have an SD Card you can capture and store detection images and detection data.  This is primarily useful when debuggin a model or capturing additional images for your dataset.
+Images are stored under /var/spool/storage/SD_DISK/DetecX.  There is a file called detections.txt that holds the detection data.  
+To get these images, enable SSH on the camera and use a SFTP client to grab them.
+*Note that leaving this on for a long time may quickly exhaust the SD Card.  
+<br>
+The minimum event state controls how long the event for each detected label should be.  The event will stay high until X seconds passed from the last detection.
+
+![Detections](pictures/labels.png)
+You can enable and disable labels if they cause false detections.
+
+### About
+![Detections](pictures/about.png)
+Information about the ACAP and the Model.  The "Avg inference" is continously updated.  A value of e.g. 150 ms means that apprx 6-7 images are processed per second.
+
+## Integrating with the ACAP
+You can use the cameras Event/Action to trigger various actions.  Look for "DetectX: State change".  The event includes a state and a label.  
+Instead of using Events/Actions it may be more useful and easier to configure MQTT publishing upon the event.  You MQTT client will get a payload with label and state.
+
+# History
+
+### 1.0.0	September 5, 2024
 - Initial commit
 
-### 1.0.1	June 6, 2024
+### 1.0.1	Septeber 6, 2024
 - Restructured SD Card image store on detect images. Fix a flaw that could result in error "Too many files open...".
 - Fixed so Reset button cleared all bounding boxes and table
 
-### 1.0.2	June 7, 2024
+### 1.0.2	September 7, 2024
 - Fixed flaw that prevented detections
-- Fixed flaw that images was not stored on SD Card when users enabled that feature. 
+- Fixed flaw tham images not stored on SD Card when users enabled that feature
+
+### 1.0.3	September 15, 2024
+- Restructures the model.json and settings.json and code realted to those config files including prepare.py
+

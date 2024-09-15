@@ -7,10 +7,6 @@
     "y2": 900
   },
   "ignore": [],
-  "sdcard": {
-    "capture": false,
-    "width": 1280,
-    "height": 720
-  },
-  "eventState": 3
+  "eventTimer": 3,
+  "capture": false
 }

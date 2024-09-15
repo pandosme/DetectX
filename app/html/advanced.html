@@ -93,9 +93,9 @@
                     $("#sidebar-wrapper .sidebar-heading").html(App.manifest.acapPackageConf.setup.friendlyName);
                     $("#model_status").text("Status: " + App.status.model.status);
 					// Create checkboxes for labels
-					$('#storeImagesCheckbox').prop('checked', App.settings.sdcard.capture);
+					$('#storeImagesCheckbox').prop('checked', App.settings.capture);
 					createLabelCheckboxes(App.model.labels, App.settings.ignore);
-					$("#stateDuration").val(App.settings.eventState);
+					$("#stateDuration").val(App.settings.eventTimer);
 					
                 },
                 error: function(response) {
@@ -165,7 +165,7 @@
 			}
 
             $('#stateDuration').change(function() {
-				const jsonData = JSON.stringify({ "eventState": parseInt($(this).val()) });
+				const jsonData = JSON.stringify({ "eventTimer": parseInt($(this).val()) });
 				const urlEncodedJSON = encodeURIComponent(jsonData);
 				$.ajax({
 					type: "GET",
@@ -180,10 +180,10 @@
             });
 
 			$('#storeImagesCheckbox').change(function() {
-				App.settings.sdcard.capture = this.checked;
+				App.settings.capture = this.checked;
 
 				// Prepare the JSON data
-				var jsonData = JSON.stringify({"sdcard": App.settings.sdcard});
+				var jsonData = JSON.stringify({"capture": App.settings.capture});
 				var urlEncodedJSON = encodeURIComponent(jsonData);
 
 				// Send the HTTP GET request

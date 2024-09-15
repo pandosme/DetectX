@@ -24,10 +24,12 @@ def generate_json():
         "nms": 0.05,
         "path": "model/model.tflite",
         "scaleMode": 0,
-        "videoWidth": 1280,
-        "videoHeight": 720,
+        "videoWidth": 800,
+        "videoHeight": 600,
+        "videoAspect": "4:3",
         "chip": "axis-a8-dlpu-tflite",
-        "labels": ["label1", "label2"]
+        "labels": ["label1", "label2"],
+        "description": ""  # Added empty string property "description"
     }
 
     # 1. Parse labels file
@@ -90,12 +92,8 @@ def generate_settings_json():
             "y2": 900
         },
         "ignore": [],
-        "sdcard": {
-          "capture": False,
-          "width": 1280,
-          "height": 720
-        },
-        "eventState": 3
+        "eventTimer": 3,
+        "capture": False  # Added new boolean parameter "capture"
     }
 
     # Ensure the directory exists

@@ -26,27 +26,21 @@
 
 cJSON* settings = 0;
 cJSON* model = 0;
+int SDCARD = 0;
 int captureSDCARD = 0;
-unsigned int captureWidth = 1280;
-unsigned int captureHeight = 720;
 
 void
 ConfigUpdate( const char *service, cJSON* data) {
 	LOG_TRACE("%s: %s\n",__func__,service);
 	cJSON* setting = data->child;
-	cJSON* value;
 	while(setting) {
 		LOG_TRACE("%s: Processing %s\n",__func__,setting->string);
-		if( strcmp( "sdcard", setting->string ) == 0 ) {
-			value = cJSON_GetObjectItem(setting,"capture");
-			if( value ) {
-				captureSDCARD = (value->type == cJSON_True);
-			} else {
-				LOG_WARN("%s: Invalid settings for sdcard\n",__func__);
-			}
+		if( strcmp( "capture", setting->string ) == 0 ) {
+			captureSDCARD = cJSON_GetObjectItem( settings, "capture" ) ? cJSON_GetObjectItem( settings, "capture" )->type == cJSON_True:0;
+			LOG("Updated capture to %d\n", setting->valueint);
 		}
-		if( strcmp( "eventState", setting->string ) == 0 ) {
-			LOG("Changed event state to %d\n", setting->valueint);
+		if( strcmp( "eventTimer", setting->string ) == 0 ) {
+			LOG("Changed event state to %d\n", captureSDCARD);
 		}
 		if( strcmp( "aoi", setting->string ) == 0 ) {
 			LOG("Updated area of intrest\n");
@@ -90,7 +84,7 @@ void label_event(const char *label) {
 		ACAP_EVENTS_Fire_JSON( "label", eventData );
         // Create a GLib timeout
 		LOG_TRACE("%s: %s\n",__func__,label);
-		guint interval = cJSON_GetObjectItem(settings,"eventState")?cJSON_GetObjectItem(settings,"eventState")->valueint:5;
+		guint interval = cJSON_GetObjectItem(settings,"eventTimer")?cJSON_GetObjectItem(settings,"eventTimer")->valueint:5;
         g_timeout_add_seconds(interval, label_state_expired, g_strdup(label));
     } else {
         // Timer exists, reset it
@@ -109,7 +103,7 @@ void
 Save_To_SDCARD(double timestamp, VdoBuffer* buffer, cJSON* detections ) {
 	//Store image capture and update detections.txt on SD Card
 
-	if( !captureSDCARD || !buffer || !detections || cJSON_GetArraySize(detections) == 0)
+	if( !SDCARD || !captureSDCARD || !buffer || !detections || cJSON_GetArraySize(detections) == 0)
 		return;	
 		
 	FILE* fp_detection = fopen("/var/spool/storage/SD_DISK/DetectX/detections.txt", "a");
@@ -162,7 +156,7 @@ ImageProcess(gpointer data) {
 
 	VdoBuffer* buffer = Video_Capture_YUV();	
 	VdoBuffer* jpegBuffer = NULL;
-	if( captureSDCARD > 0 ) {
+	if( SDCARD && captureSDCARD > 0 ) {
 		GError *error = NULL;
 		jpegBuffer = vdo_stream_snapshot(capture_VDO_map, &error);
 		if( !jpegBuffer ) {
@@ -299,6 +293,8 @@ void HTTP_ENDPOINT_detections(const ACAP_HTTP_Response response,const ACAP_HTTP_
 int main(void) {
 	static GMainLoop *main_loop = NULL;
 	setbuf(stdout, NULL);
+	unsigned int videoWidth = 800;
+	unsigned int videoHeight = 600;
 
 	openlog(APP_PACKAGE, LOG_PID|LOG_CONS, LOG_USER);
 
@@ -312,42 +308,51 @@ int main(void) {
 		ACAP_STATUS_SetString("model","status","Error. Check log");
 		ACAP_STATUS_SetBool("model","state", 0);
 		LOG_WARN("No settings found\n");
-		return G_SOURCE_REMOVE;
+		return 1;
 	}
 
-	if( cJSON_GetObjectItem(settings,"sdcard") ) {
-		cJSON* sdcard = cJSON_GetObjectItem(settings,"sdcard");
-		captureSDCARD = -1;
+	model = Model_Setup();
 
-		if( cJSON_GetObjectItem(sdcard,"capture") )
-			captureSDCARD = cJSON_GetObjectItem(sdcard,"capture")->type == cJSON_True;
+
+	if( cJSON_GetObjectItem(settings,"capture") && cJSON_GetObjectItem(settings,"capture")->type == cJSON_True )
+		captureSDCARD = 1;
+
+	videoWidth = cJSON_GetObjectItem(model,"videoWidth")?cJSON_GetObjectItem(model,"videoWidth")->valueint:800;
+	videoHeight = cJSON_GetObjectItem(model,"videoHeight")?cJSON_GetObjectItem(model,"videoHeight")->valueint:600;
+	
+	if( captureSDCARD ) {
 		struct stat sb;
-		captureWidth = cJSON_GetObjectItem(sdcard,"width")?cJSON_GetObjectItem(sdcard,"width")->valueint:1280;
-		captureHeight = cJSON_GetObjectItem(sdcard,"height")?cJSON_GetObjectItem(sdcard,"height")->valueint:720;
 		if (stat("/var/spool/storage/SD_DISK/DetectX", &sb) != 0) {  //Check if directory exists
-			if( mkdir("/var/spool/storage/SD_DISK/DetectX", 0777) < 0)
-				captureSDCARD = -1;
-			LOG("JPEG capture to /var/spool/storage/SD_DISK/DetectX\n");
+			if( mkdir("/var/spool/storage/SD_DISK/DetectX", 0777) < 0) {
+				SDCARD = 0;
+				captureSDCARD = 0;
+				LOG_WARN("Unable to access SD Card\n");
+				
+			} else {
+				SDCARD = 1;
+				captureSDCARD = 1;
+				LOG("JPEG capture %dx%d to /var/spool/storage/SD_DISK/DetectX\n", videoWidth,videoHeight);
+			}
 		}
-		capture_VDO_map = vdo_map_new();
-		vdo_map_set_uint32(capture_VDO_map, "format", VDO_FORMAT_JPEG);
-		vdo_map_set_uint32(capture_VDO_map, "width", captureWidth);
-		vdo_map_set_uint32(capture_VDO_map, "height", captureHeight);
+		if( captureSDCARD ) {
+			capture_VDO_map = vdo_map_new();
+			vdo_map_set_uint32(capture_VDO_map, "format", VDO_FORMAT_JPEG);
+			vdo_map_set_uint32(capture_VDO_map, "width", videoWidth);
+			vdo_map_set_uint32(capture_VDO_map, "height", videoHeight);
+		}
 	}
 
 	label_timers = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, (GDestroyNotify)g_timer_destroy);
 
-	model = Model_Setup();
 	if( model ) {
 		ACAP_Register("model", model );
-		unsigned int width = cJSON_GetObjectItem( model, "videoWidth")?cJSON_GetObjectItem( model, "videoWidth")->valueint:0;
-		unsigned int height = cJSON_GetObjectItem( model, "videoHeight")?cJSON_GetObjectItem( model, "videoHeight")->valueint:0;
-		if( width && height && Video_Start_YUV( width, height ) ) {
-			LOG("Video %ux%u started\n",width,height);
-			g_idle_add(ImageProcess, NULL);
+		if( Video_Start_YUV( videoWidth, videoHeight ) ) {
+			LOG("Video %ux%u started\n",videoWidth,videoHeight);
 		} else {
-			LOG_WARN("Video stream failed\n");
+			LOG_WARN("Video stream for image capture failed\n");
+			captureSDCARD = 0;
 		}
+		g_idle_add(ImageProcess, NULL);
 	} else {
 		LOG_WARN("Model setup failed\n");
 	}

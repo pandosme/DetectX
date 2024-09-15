@@ -9,8 +9,9 @@
   "nms": 0.05,
   "path": "model/model.tflite",
   "scaleMode": 0,
-  "videoWidth": 1280,
-  "videoHeight": 720,
+  "videoWidth": 640,
+  "videoHeight": 480,
+  "videoAspect": "4:3",
   "chip": "axis-a8-dlpu-tflite",
   "labels": [
     "person",
@@ -104,5 +105,6 @@
     "hair drier",
     "toothbrush",
     "hair brush"
-  ]
+  ],
+  "description": "Trained on COCO dataset"
 }

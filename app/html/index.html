@@ -27,7 +27,13 @@
         <!-- /#sidebar-wrapper -->
 
         <!-- Page Content -->
-        <div id="page-content-wrapper">
+        <div id="page-content-wrapper" class="p-0">
+            <div id='modal' style='display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000;'>
+                <div style='position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:20px;'>
+                    <h2>Model Offline</h2>
+                    <p>The model is currently loading. Please wait.</p>
+                </div>
+            </div>		
             <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
                 <button class="btn btn-link" id="menu-toggle">
                     <i class="fas fa-bars"></i>
@@ -38,49 +44,49 @@
             <div class="container-fluid">
                 <!-- Image/Video -->
                 <div class="row">
-					<div class="card col-lg-9 bg-white text-black">
-						<div id="view" style="width:800px; height:450px;">
-							<div id="viewgroup" style="width:100%; height:100%; position:relative">
-								<img id="snapshot" class="card-img-top" src="" alt="Image" style="width:100%; height:100%; position:absolute; top:0px; left:0px;">
-								<div id="video" style="width:100%; height:100%; position:absolute; top:0px; left:0px;"></div>
+                    <div class="p-0">
+                        <div id="view">
+                            <div id="viewgroup" style="width:100%; height:100%; position:relative">
+                                <img id="snapshot" class="card-img-top" src="" alt="Image" style="width:100%; height:100%; position:absolute; top:0; left:0; object-fit: contain;">
+                                <div id="video" style="width:100%; height:100%; position:absolute; top:0; left:0;"></div>
 								<canvas id="canvas" width="1000" height="1000" style="width:100%; height:100%; position:absolute; top:0px; left:0px;"></canvas>
-							</div>
+                            </div>
+                        </div>
+						<div class="control-row mt-4">
+							<label for="settings_confidence" class="form-label">Confidence</label>
+							<select id="settings_confidence" class="setting form-control">
+								<option value="10">10</option>
+								<option value="20">20</option>
+								<option value="30">30</option>
+								<option value="40">40</option>
+								<option value="50">50</option>
+								<option value="60">60</option>
+								<option value="70">70</option>
+								<option value="80">80</option>
+								<option value="90">90</option>
+								<option value="100">100</option>
+							</select>
+							<button id="aoi_button" class="btn btn-secondary">Set Area Of Interest</button>
 						</div>
-					</div>
-					<div class="col-2 table-container">
-						<h4>Latest detections</h4>
-						<button id="reset_detections" class="btn btn-primary">Reset</button>
-						<table class="table table-striped">
-							<thead>
-								<tr>
-									<th>Label</th>
-									<th>Confidence</th>
-								</tr>
-							</thead>
-							<tbody id="detection-table">
-								<!-- Data will be appended here -->
-							</tbody>
-						</table>
-					</div>
+                    </div>
+                    <div class="table-container">
+                        <h4>10 last detections</h4>
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Label</th>
+                                    <th>Confidence</th>
+                                </tr>
+                            </thead>
+                            <tbody id="detection-table">
+                                <!-- Data will be appended here -->
+                            </tbody>
+                        </table>
+                        <button id="reset_detections" class="btn btn-primary">Reset</button>
+                    </div>
                 </div>
 
                 <!-- Controls -->
-                <div class="control-row">
-                    <label for="settings_confidence" class="form-label">Confidence</label>
-                    <select id="settings_confidence" class="setting form-control">
-                        <option value="10">10</option>
-                        <option value="20">20</option>
-                        <option value="30">30</option>
-                        <option value="40">40</option>
-                        <option value="50">50</option>
-                        <option value="60">60</option>
-                        <option value="70">70</option>
-                        <option value="80">80</option>
-                        <option value="90">90</option>
-                        <option value="100">100</option>
-                    </select>
-                    <button id="aoi_button" class="btn btn-secondary">Set Area Of Interest</button>
-                </div>
             </div>
         </div>
     </div>
@@ -95,6 +101,8 @@
         var viewHeight = 450;
         var inferenceTimer = 0;
 		var imgAreaSelectInstance = null;
+		var statusTimer = 0;
+		
 		
         $(document).ready(function() {
             $.ajax({
@@ -110,7 +118,7 @@
                     $("#sidebar-wrapper .sidebar-heading").html(App.manifest.acapPackageConf.setup.friendlyName);
                     $("#model_status").text("Status: " + App.status.model.status);
                     $("#settings_confidence").val(App.settings.confidence);
-                    SetupView(App.device);
+                    SetupView(App.model.videoAspect);
 					imgAreaSelectInstance = $("#video").imgAreaSelect({
 						x1: parseInt( App.settings.aoi.x1 / 1000 * imageWidth),
 						y1: parseInt( App.settings.aoi.y1 / 1000 * imageHeight),
@@ -192,48 +200,54 @@
 			});
 			
 			setInterval( function(){
-				$.ajax({type: "GET",url: 'detections',dataType: 'json',cache: false,
-					success: function( data ) {
-						var canvas = document.getElementById('canvas');
-						var ctx = canvas.getContext("2d");
-						if( !Array.isArray(data) || data.length === 0 )
-							return;
-						ctx.beginPath();
-						ctx.clearRect(0, 0, 1000, 1000 );
-						ctx.stroke();
-						appendDataToTable(data);
-						ctx.lineWidth = 3;
-						ctx.strokeStyle = '#FFFF00';
-						ctx.beginPath();
-						for( var i = 0; i < data.length; i++ )
-							ctx.rect(data[i].x, data[i].y, data[i].w, data[i].h );
-						ctx.stroke();	
-					}
-				});
-			
+				if( status ) {
+					$.ajax({type: "GET",url: 'detections',dataType: 'json',cache: false,
+						success: function( data ) {
+							var canvas = document.getElementById('canvas');
+							var ctx = canvas.getContext("2d");
+							if( !Array.isArray(data) || data.length === 0 )
+								return;
+							ctx.beginPath();
+							ctx.clearRect(0, 0, 1000, 1000 );
+							ctx.stroke();
+							appendDataToTable(data);
+							ctx.lineWidth = 3;
+							ctx.strokeStyle = '#FFFF00';
+							ctx.beginPath();
+							for( var i = 0; i < data.length; i++ )
+								ctx.rect(data[i].x, data[i].y, data[i].w, data[i].h );
+							ctx.stroke();	
+						}
+					});
+				} else {
+					$.ajax({type: "GET",url: 'status',dataType: 'json',cache: false,
+						success: function( data ) {
+							$("#model_status").text("Status: " + data.model.status);
+							status = data.model.state;
+						   // Show or hide the modal based on data.model.status
+							if (!data.model.status) {
+								$('#modal').show();
+							} else {
+								$('#modal').hide();
+							}
+						},
+						error(){
+							$("#model_status").text("Status: No response");
+						}
+					});
+				}
 			},500);
-			setInterval( function(){
-				$.ajax({type: "GET",url: 'status',dataType: 'json',cache: false,
-					success: function( data ) {
-						$("#model_status").text("Status: " + data.model.status);
-					},
-					error(){
-						$("#model_status").text("Status: No response");
-					}
-				});
-			
-			},4000);
-        });
+        });			
 
-        function SetupView(device) {
-            switch (device.aspect) {
+        function SetupView(aspect) {
+            switch (aspect) {
                 case '4:3':
-                    viewWidth = 640;
-                    viewHeight = 480;
+                    viewWidth = 800;
+                    viewHeight = 600;
                     videoWidth = 800;
                     videoHeight = 600;
                     imageWidth = 800;
-                    imageHeight = 800;
+                    imageHeight = 600;
                     break;
                 case '16:9':
                     viewWidth = 800;
