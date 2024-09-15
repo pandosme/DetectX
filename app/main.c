@@ -320,26 +320,26 @@ int main(void) {
 	videoWidth = cJSON_GetObjectItem(model,"videoWidth")?cJSON_GetObjectItem(model,"videoWidth")->valueint:800;
 	videoHeight = cJSON_GetObjectItem(model,"videoHeight")?cJSON_GetObjectItem(model,"videoHeight")->valueint:600;
 	
-	if( captureSDCARD ) {
-		struct stat sb;
-		if (stat("/var/spool/storage/SD_DISK/DetectX", &sb) != 0) {  //Check if directory exists
-			if( mkdir("/var/spool/storage/SD_DISK/DetectX", 0777) < 0) {
-				SDCARD = 0;
-				captureSDCARD = 0;
-				LOG_WARN("Unable to access SD Card\n");
-				
-			} else {
-				SDCARD = 1;
-				captureSDCARD = 1;
-				LOG("JPEG capture %dx%d to /var/spool/storage/SD_DISK/DetectX\n", videoWidth,videoHeight);
-			}
+	struct stat sb;
+	if (stat("/var/spool/storage/SD_DISK/DetectX", &sb) != 0) {  //Check if directory exists
+		if( mkdir("/var/spool/storage/SD_DISK/DetectX", 0777) < 0) {
+			SDCARD = 0;
+			captureSDCARD = 0;
+			LOG_WARN("Unable to access SD Card\n");
+			
+		} else {
+			SDCARD = 1;
 		}
-		if( captureSDCARD ) {
-			capture_VDO_map = vdo_map_new();
-			vdo_map_set_uint32(capture_VDO_map, "format", VDO_FORMAT_JPEG);
-			vdo_map_set_uint32(capture_VDO_map, "width", videoWidth);
-			vdo_map_set_uint32(capture_VDO_map, "height", videoHeight);
-		}
+	} else {
+		SDCARD = 1;
+	}
+
+	if( SDCARD ) {
+		capture_VDO_map = vdo_map_new();
+		vdo_map_set_uint32(capture_VDO_map, "format", VDO_FORMAT_JPEG);
+		vdo_map_set_uint32(capture_VDO_map, "width", videoWidth);
+		vdo_map_set_uint32(capture_VDO_map, "height", videoHeight);
+		LOG("JPEG capture %dx%d running to /var/spool/storage/SD_DISK/DetectX\n", videoWidth,videoHeight);
 	}
 
 	label_timers = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, (GDestroyNotify)g_timer_destroy);
