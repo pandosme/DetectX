@@ -101,7 +101,7 @@
         var viewHeight = 450;
         var inferenceTimer = 0;
 		var imgAreaSelectInstance = null;
-		var statusTimer = 0;
+		var modelRunning = false;
 		
 		
         $(document).ready(function() {
@@ -200,7 +200,7 @@
 			});
 			
 			setInterval( function(){
-				if( status ) {
+				if( modelRunning ) {
 					$.ajax({type: "GET",url: 'detections',dataType: 'json',cache: false,
 						success: function( data ) {
 							var canvas = document.getElementById('canvas');
@@ -217,13 +217,18 @@
 							for( var i = 0; i < data.length; i++ )
 								ctx.rect(data[i].x, data[i].y, data[i].w, data[i].h );
 							ctx.stroke();	
+						},
+						error: function(data) {
+							$('#modal').show();
+							modelRunning = false;
 						}
+						
 					});
 				} else {
 					$.ajax({type: "GET",url: 'status',dataType: 'json',cache: false,
 						success: function( data ) {
 							$("#model_status").text("Status: " + data.model.status);
-							status = data.model.state;
+							modelRunning = data.model.state;
 						   // Show or hide the modal based on data.model.status
 							if (!data.model.status) {
 								$('#modal').show();
@@ -232,7 +237,8 @@
 							}
 						},
 						error(){
-							$("#model_status").text("Status: No response");
+							$('#modal').show();
+							$("#model_status").text("Status: Loading...");
 						}
 					});
 				}
