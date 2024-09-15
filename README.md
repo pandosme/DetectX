@@ -117,7 +117,7 @@ You will see the last 10 dections in both video and the table to the right.
 Press the button "Set Area of Intrest" and it turns blue.  Use the mouse to adjust the area.  End with pressing the button again so it turns gray.  
 
 ### Advanced
-![Detections](pictures/aoi.png)
+![Detections](pictures/settings.png)
 If you have an SD Card you can capture and store detection images and detection data.  This is primarily useful when debuggin a model or capturing additional images for your dataset.
 Images are stored under /var/spool/storage/SD_DISK/DetecX.  There is a file called detections.txt that holds the detection data.  
 To get these images, enable SSH on the camera and use a SFTP client to grab them.
