@@ -84,7 +84,7 @@
                     $('.firmware').text(data.device.firmware);
                     $('.modelDescription').text(data.model.description);
                     $('.modelSize').text(data.model.modelWidth + 'x' + data.model.modelHeight);
-                    $('.labels').text(data.model.classes);
+                    $('.labels').text(data.model.labels.length);
                     $('.dlpu').text(data.model.chip);
                     $('.quantization').text(data.model.quant);
                     $('.imageSize').text(data.model.videoWidth + 'x' + data.model.videoHeight);
