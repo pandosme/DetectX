@@ -169,12 +169,15 @@ ImageProcess(gpointer data) {
 		ACAP_STATUS_SetString("model","status","Error. Check log");
 		ACAP_STATUS_SetBool("model","state", 0);
 		LOG_WARN("Image capture failed\n");
+		if( jpegBuffer )
+			g_object_unref(jpegBuffer);
 		return G_SOURCE_REMOVE;
 	}
 
     gettimeofday(&startTs, NULL);
 	cJSON* detections = Model_Inference(buffer);
     gettimeofday(&endTs, NULL);
+
 	unsigned int inferenceTime = (unsigned int)(((endTs.tv_sec - startTs.tv_sec) * 1000) + ((endTs.tv_usec - startTs.tv_usec) / 1000));
 	inferenceCounter++;
 	inferenceAverage += inferenceTime;
@@ -182,10 +185,6 @@ ImageProcess(gpointer data) {
 		ACAP_STATUS_SetNumber(  "model", "averageTime", (int)(inferenceAverage / 10) );
 		inferenceCounter = 0;
 		inferenceAverage = 0;
-	}
-
-	if( !detections || cJSON_GetArraySize(detections) == 0 ) {
-		return G_SOURCE_CONTINUE;
 	}
 
 	double timestamp = ACAP_DEVICE_Timestamp();
