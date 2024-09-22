@@ -1,5 +1,3 @@
-Here is a readme file for a GitHub Repo.  Can you please review spelling, grammar and phrasing?
-
 ## DetectX
 
 DetectX is an open-source package designed for developers and integrators who wish to train or deploy a YOLOv5 object detection model directly on Axis cameras with ARTPEC-8. While Axis cameras offer robust built-in object detection analytics for common use cases, some scenarios require more specialized detection. This package allows you to leverage a trained YOLOv5 model on the camera itself, bypassing the need for server-based processing.
