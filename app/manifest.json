@@ -2,7 +2,7 @@
     "schemaVersion": "1.1",
     "acapPackageConf": {
         "setup": {
-            "friendlyName": "DetectX COCO",
+            "friendlyName": "DetectX City Objects",
             "appName": "detectx",
             "vendor": "Fred Juhlin",
             "embeddedSdkVersion": "3.0",
