@@ -162,59 +162,60 @@ float iou(float x1, float y1, float w1, float h1, float x2, float y2, float w2, 
     return inter / union_;
 }
 
-cJSON*
-non_maximum_suppression(cJSON* list) {
-	
-	int items = cJSON_GetArraySize(list);
-	if( items < 2 )
-		return list;
-//	LOG("%s: Start %d\n", __func__, items);
-	
+cJSON* non_maximum_suppression(cJSON* list) {
+    int items = cJSON_GetArraySize(list);
+    
+    if (items < 2)
+        return list;
+    
     int keep[items];
     memset(keep, 1, items * sizeof(int));
-	
+    
     for (int i = 0; i < items; i++) {
-		if( keep[i] ) {
-			cJSON* detection = cJSON_GetArrayItem(list,i);
-			float x1 = cJSON_GetObjectItem(detection,"x")->valuedouble;
-			float y1 = cJSON_GetObjectItem(detection,"y")->valuedouble;
-			float w1 = cJSON_GetObjectItem(detection,"w")->valuedouble;
-			float h1 = cJSON_GetObjectItem(detection,"h")->valuedouble;
-			float c1 = cJSON_GetObjectItem(detection,"c")->valuedouble;
-
-			for (int j = i + 1; j < items; j++) {
-				if( keep[j] ) {
-					cJSON* alternative = cJSON_GetArrayItem(list,i);
-					float x2 = cJSON_GetObjectItem(alternative,"x")->valuedouble;
-					float y2 = cJSON_GetObjectItem(alternative,"y")->valuedouble;
-					float w2 = cJSON_GetObjectItem(alternative,"w")->valuedouble;
-					float h2 = cJSON_GetObjectItem(alternative,"h")->valuedouble;
-					float c2 = cJSON_GetObjectItem(alternative,"c")->valuedouble;
-
-					if (iou(x1, y1, w1, h1, x2, y2, w2, h2) > nms) {
-						if (c1 > c2) {
-							keep[i] = 1;
-							keep[j] = 0;
-						} else {
-							keep[j] = 1;
-							keep[i] = 0;
-							break;
-						}
-					}
-				}
-			}
-		}
+        if (keep[i]) {
+            cJSON* detection = cJSON_GetArrayItem(list, i);
+            float x1 = cJSON_GetObjectItem(detection, "x")->valuedouble;
+            float y1 = cJSON_GetObjectItem(detection, "y")->valuedouble;
+            float w1 = cJSON_GetObjectItem(detection, "w")->valuedouble;
+            float h1 = cJSON_GetObjectItem(detection, "h")->valuedouble;
+            float c1 = cJSON_GetObjectItem(detection, "c")->valuedouble;
+            const char* label1 = cJSON_GetObjectItem(detection, "label")->valuestring;
+            
+            for (int j = i + 1; j < items; j++) {
+                if (keep[j]) {
+                    cJSON* alternative = cJSON_GetArrayItem(list, j);  // Fixed indexing
+                    float x2 = cJSON_GetObjectItem(alternative, "x")->valuedouble;
+                    float y2 = cJSON_GetObjectItem(alternative, "y")->valuedouble;
+                    float w2 = cJSON_GetObjectItem(alternative, "w")->valuedouble;
+                    float h2 = cJSON_GetObjectItem(alternative, "h")->valuedouble;
+                    float c2 = cJSON_GetObjectItem(alternative, "c")->valuedouble;
+                    const char* label2 = cJSON_GetObjectItem(alternative, "label")->valuestring;
+                    
+                    float iou_value = iou(x1, y1, w1, h1, x2, y2, w2, h2);
+                    
+                    if (iou_value > nms) {
+                        if (c1 > c2) {
+                            keep[j] = 0;
+                        } else {
+                            keep[i] = 0;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
     }
-
-	cJSON* result = cJSON_CreateArray();
+    
+    cJSON* result = cJSON_CreateArray();
     for (int i = 0; i < items; i++) {
-		cJSON *detection = cJSON_GetArrayItem(list,i);
-		if( keep[i] )
-			cJSON_AddItemToArray( result,  cJSON_Duplicate(detection, 1) );
-	}
-//	LOG("%s: Exit %d\n", __func__, cJSON_GetArraySize(result));
-	cJSON_Delete( list );
-	return result;
+        if (keep[i]) {
+            cJSON* detection = cJSON_GetArrayItem(list, i);
+            cJSON_AddItemToArray(result, cJSON_Duplicate(detection, 1));
+        }
+    }
+    
+    cJSON_Delete(list);
+    return result;
 }
 
 
@@ -309,7 +310,11 @@ Model_Setup() {
 	objectnessThreshold = cJSON_GetObjectItem(modelConfig,"objectness")->valuedouble;
 	nms = cJSON_GetObjectItem(modelConfig,"nms")->valuedouble;
 
-	
+	char* json = cJSON_PrintUnformatted(modelConfig);
+	if(json) {
+		LOG("%s\n", json);
+		free(json);
+	}
 
     ppMap = larodCreateMap(&error);
     if (!ppMap) {
@@ -365,6 +370,7 @@ Model_Setup() {
 	cJSON* chip = cJSON_GetObjectItem(modelConfig,"chip");
 	if( chip && chip->type == cJSON_String ) 
 		chipString = chip->valuestring;
+	LOG("Loading model for %s\n",chipString);
 	
     const larodDevice* device = larodGetDevice(conn, chipString, 0, &error);
     if (!device) {
@@ -443,6 +449,7 @@ Model_Setup() {
     }
 
     yuyvBufferSize = ppInputPitches->pitches[0];
+	LOG("Buffer size: %zu\n",yuyvBufferSize);
     const larodTensorPitches* ppOutputPitches = larodGetTensorPitches(ppOutputTensors[0], &error);
     if (!ppOutputPitches) {
         LOG_WARN("%s: Could not get pitches of tensor: %s\n",__func__, error->msg);
@@ -541,6 +548,7 @@ Model_Setup() {
 	
 	ACAP_STATUS_SetString("model","status","Model OK.");
 	ACAP_STATUS_SetBool("model","state", 1);
+	
     return modelConfig;
 }
 

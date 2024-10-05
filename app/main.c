@@ -202,6 +202,8 @@ ImageProcess(gpointer data) {
 	int confidenceThreshold = cJSON_GetObjectItem(settings,"confidence")?cJSON_GetObjectItem(settings,"confidence")->valueint:0.5;
 		
 	cJSON* detection = detections->child;
+	if( cJSON_GetArraySize(detections) > 1 )
+		LOG("More than 1 detection %d\n", cJSON_GetArraySize(detections));
 	while(detection) {
 		cJSON* property = detection->child;
 		unsigned cx = 0;
