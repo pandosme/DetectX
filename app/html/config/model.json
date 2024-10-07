@@ -1,10 +1,10 @@
 {
   "modelWidth": 800,
   "modelHeight": 800,
-  "quant": 0.004102877341210842,
-  "zeroPoint": 1,
+  "quant": 0.0039215353317558765,
+  "zeroPoint": 0,
   "boxes": 39375,
-  "classes": 4,
+  "classes": 19,
   "objectness": 0.25,
   "nms": 0.05,
   "path": "model/model.tflite",
@@ -14,10 +14,25 @@
   "videoAspect": "4:3",
   "chip": "axis-a8-dlpu-tflite",
   "labels": [
-    "Cyclist",
-    "E-scooter",
-    "Person",
-    "Vehicle"
+	"no_gesture",
+    "call",
+    "dislike",
+    "fist",
+    "four",
+    "like",
+    "mute",
+    "ok",
+    "one",
+    "palm",
+    "peace",
+    "peace_inverted",
+    "rock",
+    "stop",
+    "stop_inverted",
+    "three",
+    "three2",
+    "two_up",
+    "two_up_inverted"
   ],
-  "description": "Based on dataset by Simone Bernabe smart-city-pedestrian-bike-detection"
+  "description": "Based on dataset https://github.com/hukenovs/hagrid"
 }

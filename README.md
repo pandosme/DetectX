@@ -1,4 +1,4 @@
-## DetectX
+## DetectX - City Objects
 
 DetectX is an open-source package designed for developers and integrators who wish to train or deploy a YOLOv5 object detection model directly on Axis cameras with ARTPEC-8. While Axis cameras offer robust built-in object detection analytics for common use cases, some scenarios require more specialized detection. This package allows you to leverage a trained YOLOv5 model on the camera itself, bypassing the need for server-based processing.
 
@@ -147,8 +147,12 @@ Instead of using Events/Actions it may be more useful and easier to configure MQ
 
 ### 1.0.2	September 7, 2024
 - Fixed flaw that prevented detections
-- Fixed flaw tham images not stored on SD Card when users enabled that feature
+- Fixed flaw that did not store images on SD Card when users enabled this feature
 
 ### 1.0.3	September 15, 2024
 - Restructures the model.json and settings.json and code realted to those config files including prepare.py
 
+
+### 1.2.0	October 7, 2024
+- Added support fo filter minimum size
+- Fixed a flaw that preventet detecting mutliple detections in the same scene.

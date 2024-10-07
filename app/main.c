@@ -198,14 +198,32 @@ ImageProcess(gpointer data) {
 		LOG_WARN("No aoi settings\n");
 		return G_SOURCE_REMOVE;
 	}
+	unsigned int x1 = cJSON_GetObjectItem(aoi,"x1")?cJSON_GetObjectItem(aoi,"x1")->valueint:100;
+	unsigned int y1 = cJSON_GetObjectItem(aoi,"y1")?cJSON_GetObjectItem(aoi,"y1")->valueint:100;
+	unsigned int x2 = cJSON_GetObjectItem(aoi,"x2")?cJSON_GetObjectItem(aoi,"x2")->valueint:900;
+	unsigned int y2 = cJSON_GetObjectItem(aoi,"y2")?cJSON_GetObjectItem(aoi,"y2")->valueint:900;
+
+	cJSON* size = cJSON_GetObjectItem(settings,"size");
+	if(!size) {
+		ACAP_STATUS_SetString("model","status","Error. Check log");
+		ACAP_STATUS_SetBool("model","state", 0);
+		LOG_WARN("No size settings\n");
+		return G_SOURCE_REMOVE;
+	}
+	unsigned int minWidth = cJSON_GetObjectItem(size,"x2")->valueint - cJSON_GetObjectItem(size,"x1")->valueint;
+	unsigned int minHeight = cJSON_GetObjectItem(size,"y2")->valueint - cJSON_GetObjectItem(size,"y1")->valueint;
 
 	int confidenceThreshold = cJSON_GetObjectItem(settings,"confidence")?cJSON_GetObjectItem(settings,"confidence")->valueint:0.5;
 		
 	cJSON* detection = detections->child;
+	if( cJSON_GetArraySize(detections) > 1 )
+		LOG("More than 1 detection %d\n", cJSON_GetArraySize(detections));
 	while(detection) {
 		cJSON* property = detection->child;
 		unsigned cx = 0;
 		unsigned cy = 0;
+		unsigned width = 0;
+		unsigned height = 0;
 		unsigned c = 0;
 		const char* label = "Undefined";
 		while(property) {
@@ -226,11 +244,13 @@ ImageProcess(gpointer data) {
 			}
 			if( strcmp("w",property->string) == 0 ) {
 				property->valueint = property->valuedouble * 1000;
+				width = property->valueint;
 				property->valuedouble = property->valueint;
 				cx += property->valueint / 2;
 			}
 			if( strcmp("h",property->string) == 0 ) {
 				property->valueint = property->valuedouble * 1000;
+				height = property->valueint;
 				property->valuedouble = property->valueint;
 				cy += property->valueint / 2;
 			}
@@ -239,15 +259,14 @@ ImageProcess(gpointer data) {
 			}
 			property = property->next;
 		}
-		unsigned int x1 = cJSON_GetObjectItem(aoi,"x1")?cJSON_GetObjectItem(aoi,"x1")->valueint:100;
-		unsigned int y1 = cJSON_GetObjectItem(aoi,"y1")?cJSON_GetObjectItem(aoi,"y1")->valueint:100;
-		unsigned int x2 = cJSON_GetObjectItem(aoi,"x2")?cJSON_GetObjectItem(aoi,"x2")->valueint:900;
-		unsigned int y2 = cJSON_GetObjectItem(aoi,"y2")?cJSON_GetObjectItem(aoi,"y2")->valueint:900;
+		
 
 		//FILTER DETECTIONS
 		int insert = 0;
 		if( c >= confidenceThreshold && cx >= x1 && cx <= x2 && cy >= y1 && cy <= y2 )
 			insert = 1;
+		if( width < minWidth || height < minHeight )
+			insert = 0;
 		cJSON* ignore = cJSON_GetObjectItem(settings,"ignore");
 		if( insert && ignore && ignore->type == cJSON_Array && cJSON_GetArraySize(ignore) > 0 ) {
 			cJSON* ignoreLabel = ignore->child;
