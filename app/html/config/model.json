@@ -12,7 +12,7 @@
   "videoWidth": 800,
   "videoHeight": 600,
   "videoAspect": "4:3",
-  "chip": "google-edge-tpu-tflite",
+  "chip": "axis-a8-dlpu-tflite",
   "labels": [
 	"no_gesture",
     "call",
