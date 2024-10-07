@@ -12,10 +12,9 @@
   "videoWidth": 800,
   "videoHeight": 600,
   "videoAspect": "4:3",
-  "chip": "axis-a8-dlpu-tflite",
+  "chip": "google-edge-tpu-tflite",
   "labels": [
-    "no_gesture",
-    "hand",
+	"no_gesture",
     "call",
     "dislike",
     "fist",
@@ -35,5 +34,5 @@
     "two_up",
     "two_up_inverted"
   ],
-  "description": "Based on dataset https://github.com/hukenovs/hagrid"
+  "description": ""
 }
