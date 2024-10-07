@@ -67,6 +67,7 @@
 								<option value="100">100</option>
 							</select>
 							<button id="aoi_button" class="btn btn-secondary">Set Area Of Interest</button>
+							<button id="size_button" class="btn btn-secondary">Set Minumum size</button>
 						</div>
                     </div>
                     <div class="table-container">
@@ -102,6 +103,7 @@
         var inferenceTimer = 0;
 		var imgAreaSelectInstance = null;
 		var modelRunning = false;
+		var selectionMode = "aoi";
 		
 		
         $(document).ready(function() {
@@ -131,21 +133,39 @@
 							var x2 = Math.round(selection.x2 * 1000 / imageWidth);
 							var y1 = Math.round(selection.y1 * 1000 / imageHeight);
 							var y2 = Math.round(selection.y2 * 1000 / imageHeight);
-							App.settings.aoi = { x1, y1, x2, y2 };
-							var jsonData = JSON.stringify({ aoi: App.settings.aoi });
-							var urlEncodedData = encodeURIComponent(jsonData);
-							$.ajax({
-								type: "GET",
-								url: 'settings?json=' + urlEncodedData,
-								dataType: 'text',
-								cache: false,
-								success: function(response) {
-									console.log("AOI updated successfully.");
-								},
-								error: function(response) {
-									alert("Failed to update AOI: " + response.statusText);
-								}
-							});
+							if( selectionMode === "aoi" ) {
+								App.settings.aoi = { x1, y1, x2, y2 };
+								var jsonData = JSON.stringify({ aoi: App.settings.aoi });
+								var urlEncodedData = encodeURIComponent(jsonData);
+								$.ajax({
+									type: "GET",
+									url: 'settings?json=' + urlEncodedData,
+									dataType: 'text',
+									cache: false,
+									success: function(response) {
+										console.log("AOI updated successfully.");
+									},
+									error: function(response) {
+										alert("Failed to update AOI: " + response.statusText);
+									}
+								});
+							} else {
+								App.settings.size = { x1, y1, x2, y2 };
+								var jsonData = JSON.stringify({ size: App.settings.size });
+								var urlEncodedData = encodeURIComponent(jsonData);
+								$.ajax({
+									type: "GET",
+									url: 'settings?json=' + urlEncodedData,
+									dataType: 'text',
+									cache: false,
+									success: function(response) {
+										console.log("Size updated successfully.");
+									},
+									error: function(response) {
+										alert("Failed to update Size: " + response.statusText);
+									}
+								});
+							}
 						}
 					});
 					imgAreaSelectInstance.setOptions({hide:true});
@@ -166,17 +186,40 @@
 			});
 
             // Set AOI button click handler
-			var aoi = false;
 			$("#aoi_button").click(function() {
+				var x1 = parseInt( App.settings.aoi.x1 / 1000 * imageWidth);
+				var y1 = parseInt( App.settings.aoi.y1 / 1000 * imageHeight);
+				var x2 = parseInt( App.settings.aoi.x2 / 1000 * imageWidth);
+				var y2 = parseInt( App.settings.aoi.y2 / 1000 * imageHeight);
 
-				if (aoi) {
-					aoi = false;
+				imgAreaSelectInstance.setSelection(x1, y1, x2, y2, 0);		
+				if (selectionMode === "aoi" ) {
+					selectionMode = "none";
 					imgAreaSelectInstance.setOptions({hide:true});
 					$(this).removeClass('btn-primary').addClass('btn-secondary');
 				} else {
-					aoi = true;
+					selectionMode = "aoi";
+					imgAreaSelectInstance.setOptions({show:true});
+					$("#size_button").removeClass('btn-primary').addClass('btn-secondary');
+					$(this).removeClass('btn-secondary').addClass('btn-primary');
+				}
+			});
+
+			$("#size_button").click(function() {
+				if (selectionMode === "size" ) {
+					selectionMode = "none";
+					imgAreaSelectInstance.setOptions({hide:true});
+					$(this).removeClass('btn-primary').addClass('btn-secondary');
+				} else {
+					selectionMode = "size";
+					var x1 = parseInt( App.settings.size.x1 / 1000 * imageWidth);
+					var y1 = parseInt( App.settings.size.y1 / 1000 * imageHeight);
+					var x2 = parseInt( App.settings.size.x2 / 1000 * imageWidth);
+					var y2 = parseInt( App.settings.size.y2 / 1000 * imageHeight);
+					imgAreaSelectInstance.setSelection(x1, y1, x2, y2, 0);
 					imgAreaSelectInstance.setOptions({show:true});
 					$(this).removeClass('btn-secondary').addClass('btn-primary');
+					$("#aoi_button").removeClass('btn-primary').addClass('btn-secondary');
 				}
 			});
 

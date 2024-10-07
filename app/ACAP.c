@@ -10,6 +10,7 @@
 #include <axsdk/axhttp.h>
 #include <axsdk/axevent.h>
 
+
 #define LOG(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args);}
 #define LOG_WARN(fmt, args...)    { syslog(LOG_WARNING, fmt, ## args); printf(fmt, ## args);}
 //#define LOG_TRACE(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args); }
@@ -18,7 +19,6 @@
 cJSON* app = 0;
 char ACAP_package_name[30];
 ACAP_Config_Update	ACAP_UpdateCallback = 0;
-
 
 static void
 ACAP_ENDPOINT_app(const ACAP_HTTP_Response response,const ACAP_HTTP_Request request) {
@@ -60,15 +60,10 @@ ACAP_ENDPOINT_settings(const ACAP_HTTP_Response response,const ACAP_HTTP_Request
 cJSON*
 ACAP( const char *package, ACAP_Config_Update callback ) {
 	LOG_TRACE("%s: ENTRY\n",__func__);
-	LOG_TRACE("%s: DEBUG 1 %s\n",__func__,package);
 	sprintf(ACAP_package_name,"%s",package);
-	LOG_TRACE("%s: DEBUG X\n",__func__);
 	ACAP_FILE_Init();
-	LOG_TRACE("%s: DEBUG 2\n",__func__);
 	ACAP_HTTP();
-	LOG_TRACE("%s: DEBUG 3\n",__func__);
 	cJSON* device = ACAP_DEVICE();
-	LOG_TRACE("%s: DEBUG 4\n",__func__);
 
 	ACAP_UpdateCallback = callback;
 	
@@ -197,16 +192,9 @@ ACAP_FILE_AppPath() {
 
 
 int
-ACAP_FILE_Init( const char* package ) {
+ACAP_FILE_Init() {
 	LOG_TRACE("%s: ENTRY\n",__func__);
-	if(!package) {
-		LOG_WARN("%s: Invalid Package\n",__func__);
-		return 0;
-	}
-	LOG_TRACE("%s: DEBUG 1\n",__func__);
-//	sprintf( ACAP_FILE_Path,"/usr/local/packages/%s/", package );
-	sprintf( ACAP_FILE_Path,"/usr/local/packages/detectx/");
-	LOG_TRACE("%s: DEBUG 2\n",__func__);
+	sprintf( ACAP_FILE_Path,"/usr/local/packages/%s/", ACAP_package_name );
 	return 1;
 }
 

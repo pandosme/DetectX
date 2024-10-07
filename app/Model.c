@@ -15,8 +15,8 @@
 
 #define LOG(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args);}
 #define LOG_WARN(fmt, args...)    { syslog(LOG_WARNING, fmt, ## args); printf(fmt, ## args);}
-#define LOG_TRACE(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args); }
-//#define LOG_TRACE(fmt, args...)    {}
+//#define LOG_TRACE(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args); }
+#define LOG_TRACE(fmt, args...)    {}
 
 static bool createAndMapTmpFile(char* fileName, size_t fileSize, void** mappedAddr, int* convFd);
 float iou(float x1, float y1, float w1, float h1, float x2, float y2, float w2, float h2);
@@ -179,7 +179,6 @@ cJSON* non_maximum_suppression(cJSON* list) {
             float w1 = cJSON_GetObjectItem(detection, "w")->valuedouble;
             float h1 = cJSON_GetObjectItem(detection, "h")->valuedouble;
             float c1 = cJSON_GetObjectItem(detection, "c")->valuedouble;
-            const char* label1 = cJSON_GetObjectItem(detection, "label")->valuestring;
             
             for (int j = i + 1; j < items; j++) {
                 if (keep[j]) {
@@ -189,7 +188,6 @@ cJSON* non_maximum_suppression(cJSON* list) {
                     float w2 = cJSON_GetObjectItem(alternative, "w")->valuedouble;
                     float h2 = cJSON_GetObjectItem(alternative, "h")->valuedouble;
                     float c2 = cJSON_GetObjectItem(alternative, "c")->valuedouble;
-                    const char* label2 = cJSON_GetObjectItem(alternative, "label")->valuestring;
                     
                     float iou_value = iou(x1, y1, w1, h1, x2, y2, w2, h2);
                     
