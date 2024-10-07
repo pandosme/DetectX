@@ -150,8 +150,8 @@
 									}
 								});
 							} else {
-								App.settings.aoi = { x1, y1, x2, y2 };
-								var jsonData = JSON.stringify({ aoi: App.settings.size });
+								App.settings.size = { x1, y1, x2, y2 };
+								var jsonData = JSON.stringify({ size: App.settings.size });
 								var urlEncodedData = encodeURIComponent(jsonData);
 								$.ajax({
 									type: "GET",
@@ -194,7 +194,7 @@
 
 				imgAreaSelectInstance.setSelection(x1, y1, x2, y2, 0);		
 				if (selectionMode === "aoi" ) {
-					selectionMode = "none;
+					selectionMode = "none";
 					imgAreaSelectInstance.setOptions({hide:true});
 					$(this).removeClass('btn-primary').addClass('btn-secondary');
 				} else {

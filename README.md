@@ -147,8 +147,12 @@ Instead of using Events/Actions it may be more useful and easier to configure MQ
 
 ### 1.0.2	September 7, 2024
 - Fixed flaw that prevented detections
-- Fixed flaw tham images not stored on SD Card when users enabled that feature
+- Fixed flaw that did not store images on SD Card when users enabled this feature
 
 ### 1.0.3	September 15, 2024
 - Restructures the model.json and settings.json and code realted to those config files including prepare.py
 
+
+### 1.2.0	October 7, 2024
+- Added support fo filter minimum size
+- Fixed a flaw that preventet detecting mutliple detections in the same scene.
