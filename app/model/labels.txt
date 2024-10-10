@@ -1,11 +1,11 @@
-no_gesture
-hand
 call
 dislike
 fist
 four
 like
+middle_finger
 mute
+no_gesture
 ok
 one
 palm
@@ -15,6 +15,6 @@ rock
 stop
 stop_inverted
 three
-three2
+thumb_index
 two_up
 two_up_inverted

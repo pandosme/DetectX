@@ -156,3 +156,6 @@ Instead of using Events/Actions it may be more useful and easier to configure MQ
 ### 1.2.0	October 7, 2024
 - Added support fo filter minimum size
 - Fixed a flaw that preventet detecting mutliple detections in the same scene.
+
+### 2.0.0	October 10, 2024
+- Retrained model based on slected images from Hagrid V2 https://github.com/hukenovs/hagrid
