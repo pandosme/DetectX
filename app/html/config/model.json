@@ -1,10 +1,10 @@
 {
   "modelWidth": 800,
   "modelHeight": 800,
-  "quant": 0.0039215353317558765,
+  "quant": 0.003921531606465578,
   "zeroPoint": 0,
   "boxes": 39375,
-  "classes": 19,
+  "classes": 20,
   "objectness": 0.25,
   "nms": 0.05,
   "path": "model/model.tflite",
@@ -12,15 +12,16 @@
   "videoWidth": 800,
   "videoHeight": 600,
   "videoAspect": "4:3",
-  "chip": "axis-a8-dlpu-tflite",
+  "chip": "google-edge-tpu-tflite",
   "labels": [
-	"no_gesture",
     "call",
     "dislike",
     "fist",
     "four",
     "like",
+    "middle_finger",
     "mute",
+    "no_gesture",
     "ok",
     "one",
     "palm",
@@ -30,9 +31,9 @@
     "stop",
     "stop_inverted",
     "three",
-    "three2",
+    "thumb_index",
     "two_up",
     "two_up_inverted"
   ],
-  "description": "Based on dataset https://github.com/hukenovs/hagrid"
+  "description": "Trained on selected Hagrid V2 https://github.com/hukenovs/hagrid"
 }

@@ -91,6 +91,12 @@ def generate_settings_json():
             "x2": 900,
             "y2": 900
         },
+        "size": {
+            "x1": 490,
+            "y1": 490,
+            "x2": 510,
+            "y2": 510
+        },
         "ignore": [],
         "eventTimer": 3,
         "capture": False  # Added new boolean parameter "capture"
