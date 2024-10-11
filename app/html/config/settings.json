@@ -14,5 +14,6 @@
   },  
   "ignore": [],
   "eventTimer": 3,
+  "eventsTransition": 600,
   "capture": false
 }

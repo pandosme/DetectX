@@ -99,6 +99,7 @@ def generate_settings_json():
         },
         "ignore": [],
         "eventTimer": 3,
+        "eventsTransition": 600,
         "capture": False  # Added new boolean parameter "capture"
     }
 
