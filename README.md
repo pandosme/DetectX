@@ -33,11 +33,11 @@ A minumum time that the detection must be stable before an event is fired.
 The minumum event duration a detection may have.  The duration will be high from the lat detection of a gesture.
 
 ### Labels Processed
-IEnable or ignore selected gestures.
+Enable or disable selected gestures.
 
 ## Integration
 Events will be fired when a hand gesture is detected and not.  The event includes the labal and it state.
-Trigger event ´´´DetectX State changed´´´.  If triggering on detection, use the event as a trigger, set ´´´state´´´ high and label to what ever label should trigger.  
+Trigger event ```DetectX State changed```.  If triggering on detection, use the event as a trigger, set ```state``` high and label to what ever label should trigger.  
 Available events: call, dislike, fist, four, like, middle_finger, mute, no_gesture, ok, one, palm, peace, peace_inverted, rock, stop, stop_inverted, three, thumb_index, two_up, two_up_inverted,
 
 # History
