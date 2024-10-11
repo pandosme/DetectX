@@ -12,7 +12,7 @@
             },
             "vendorUrl": "https://pandosme.github.io",
             "runMode": "once",
-            "version": "1.2.0"
+            "version": "2.1.0"
         },
         "configuration": {
 			"settingPage": "index.html",
@@ -44,6 +44,11 @@
 				},
 				{
 					"name": "detections",
+					"access": "admin",
+					"type": "transferCgi"
+				},
+				{
+					"name": "eventsTransition",
 					"access": "admin",
 					"type": "transferCgi"
 				}
