@@ -39,7 +39,7 @@ Enable or disable selected gestures.
 Events will be fired when a hand gesture is detected and not.  The event includes the labal and it state.
 Trigger event ```DetectX State changed```.  If triggering on detection, use the event as a trigger, set ```state``` high and label to what ever label should trigger.  
 
-###Available events
+### Events labels
 call, dislike, fist, four, like, middle_finger, mute, no_gesture, ok, one, palm, peace, peace_inverted, rock, stop, stop_inverted, three, thumb_index, two_up, two_up_inverted,
 
 # History
