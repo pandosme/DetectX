@@ -13,7 +13,7 @@
     "y2": 510
   },  
   "ignore": [],
-  "eventTimer": 3,
   "eventsTransition": 600,
+  "eventTimer": 3,
   "capture": false
 }
