@@ -11,8 +11,9 @@
     "y1": 490,
     "x2": 510,
     "y2": 510
-  },
+  },  
   "ignore": [],
   "eventTimer": 3,
+  "eventsTransition": 600,
   "capture": false
 }

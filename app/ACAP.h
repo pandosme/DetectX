@@ -45,7 +45,6 @@ int    		ACAP_FILE_Write( const char *filepath,  cJSON* object );
 int			ACAP_FILE_WriteData( const char *filepath, const char *data );
 int    		ACAP_FILE_exists( const char *filepath );
 
-
 /*-----------------------------------------------------
 	DEVICE
   -----------------------------------------------------*/

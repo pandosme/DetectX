@@ -85,6 +85,19 @@
                         </table>
                         <button id="reset_detections" class="btn btn-primary">Reset</button>
                     </div>
+                    <div class="table-container">
+                        <h4>Active event states</h4>
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Event</th>
+                                </tr>
+                            </thead>
+                            <tbody id="events-table">
+                                <!-- Data will be appended here -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
                 <!-- Controls -->
@@ -266,6 +279,18 @@
 							modelRunning = false;
 						}
 						
+					});
+					$.ajax({type: "GET",url: 'eventsTransition',dataType: 'json',cache: false,
+						success: function( events ) {
+							var $tableBody = $("#events-table");
+							$tableBody.empty(); // Clear existing data
+							for( var label in events ) {
+								if( events[label].state ) {
+									var row = `<tr><td>${label}</td></tr>`;
+									$tableBody.append(row);
+								}
+							};
+						}
 					});
 				} else {
 					$.ajax({type: "GET",url: 'status',dataType: 'json',cache: false,
