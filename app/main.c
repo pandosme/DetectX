@@ -419,6 +419,8 @@ int main(void) {
 	videoWidth = cJSON_GetObjectItem(model,"videoWidth")?cJSON_GetObjectItem(model,"videoWidth")->valueint:800;
 	videoHeight = cJSON_GetObjectItem(model,"videoHeight")?cJSON_GetObjectItem(model,"videoHeight")->valueint:600;
 	
+	SDCARD = 0;
+/*	
 	struct stat sb;
 	if (stat("/var/spool/storage/SD_DISK/DetectX", &sb) != 0) {  //Check if directory exists
 		if( mkdir("/var/spool/storage/SD_DISK/DetectX", 0777) < 0) {
@@ -440,7 +442,7 @@ int main(void) {
 		vdo_map_set_uint32(capture_VDO_map, "height", videoHeight);
 		LOG("JPEG capture %dx%d running to /var/spool/storage/SD_DISK/DetectX\n", videoWidth,videoHeight);
 	}
-
+*/
 	label_timers = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, (GDestroyNotify)g_timer_destroy);
 
 	if( model ) {
