@@ -42,10 +42,23 @@
 									<h3 id="debug-heading">Settings</h3>
 								</div>
 							</div>
-							<div class="row align-items-center">
-								<div class="col">
-									<input type="checkbox" class="form-check-input" id="storeImagesCheckbox">
-									<label class="form-check-label" for="storeImagesCheckbox">Store detection images on SD Card (Use with caution)</label>
+							<div class="row align-items-center mt-2">
+								<div class="col-auto">
+									<label for="eventsTransition" class="col-form-label">Detection transition</label>
+								</div>
+								<div class="col-3">
+									<select class="form-control" id="eventsTransition">
+										<option value="0">Immediately</option>
+										<option value="300">300 ms</option>
+										<option value="600">600 ms</option>
+										<option value="900">900 ms</option>
+										<option value="1200">1.2 s</option>
+										<option value="1200">1.5 s</option>
+										<option value="1800">1.8 s</option>
+										<option value="2500">2.5 s</option>
+										<option value="3000">3.0 s</option>
+										<option value="4000">4.0 s</option>
+									</select>
 								</div>
 							</div>
 							<div class="row align-items-center mt-2">
@@ -54,7 +67,6 @@
 								</div>
 								<div class="col-3">
 									<select class="form-control" id="stateDuration">
-										<option value="1">1 second</option>
 										<option value="2">2 seconds</option>
 										<option value="3">3 seconds</option>
 										<option value="5">5 seconds</option>
@@ -96,7 +108,7 @@
 					$('#storeImagesCheckbox').prop('checked', App.settings.capture);
 					createLabelCheckboxes(App.model.labels, App.settings.ignore);
 					$("#stateDuration").val(App.settings.eventTimer);
-					
+					$("#eventsTransition").val(App.settings.eventsTransition);
                 },
                 error: function(response) {
                     alert(response.statusText);
@@ -155,10 +167,10 @@
 						type: "GET",
 						url: 'settings?json=' + urlEncodedJSON,
 						success: function(response) {
-							console.log("Ignore settings updated successfully");
+							console.log("Settings updated successfully");
 						},
 						error: function(response) {
-							console.error("Error updating ignore settings: " + response.statusText);
+							console.error("Error updating settings: " + response.statusText);
 						}
 					});
 				});
@@ -171,10 +183,25 @@
 					type: "GET",
 					url: 'settings?json=' + urlEncodedJSON,
 					success: function(response) {
-						console.log("Ignore settings updated successfully");
+						console.log("Settings updated successfully");
 					},
 					error: function(response) {
-						console.error("Error updating ignore settings: " + response.statusText);
+						console.error("Error updating settings: " + response.statusText);
+					}
+				});
+            });
+
+            $('#eventsTransition').change(function() {
+				const jsonData = JSON.stringify({ "eventsTransition": parseInt($(this).val()) });
+				const urlEncodedJSON = encodeURIComponent(jsonData);
+				$.ajax({
+					type: "GET",
+					url: 'settings?json=' + urlEncodedJSON,
+					success: function(response) {
+						console.log("Settings updated successfully");
+					},
+					error: function(response) {
+						console.error("Error updating settings: " + response.statusText);
 					}
 				});
             });
