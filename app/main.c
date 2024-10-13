@@ -72,7 +72,7 @@ label_state_expired(gpointer data) {
 	cJSON_AddFalseToObject(eventData,"state");
 	cJSON_AddStringToObject(eventData,"label",label);
 	ACAP_EVENTS_Fire_JSON( "label", eventData );
-    // Remove the timer from the hash table
+	cJSON_Delete(eventData);
     g_hash_table_remove(label_timers, label);
 
 	if( !eventsTransition ) 
@@ -101,17 +101,24 @@ cleanupTransitionCallback(gpointer data) {
 	cJSON* event = eventsTransition? eventsTransition->child:0;
 	while( event ) {
 		if( cJSON_GetObjectItem(event,"state")->type == cJSON_False && cJSON_GetObjectItem(event,"timestamp")->type == cJSON_Number ) {
-			if( (now - cJSON_GetObjectItem(event,"timestamp")->valuedouble) > transitionTime )
+			if( (now - cJSON_GetObjectItem(event,"timestamp")->valuedouble) > transitionTime ) {
 				cJSON_GetObjectItem(event,"timestamp")->type = cJSON_NULL;
+				cJSON_GetObjectItem(event,"timestamp")->valuedouble = 0;
+				cJSON_GetObjectItem(event,"timestamp")->valueint = 0;
+			}
 		}
 		event = event->next;
 	}
     return TRUE; // Do not repeat the timer
 }
 
-void label_event(const char *label) {
-
+void
+label_event(const char *label) {
 	double transitionTime = 0;
+	
+	if(!label || label[0]==0 )
+		return;
+
 	cJSON* settingsEventsTransition = cJSON_GetObjectItem(settings,"eventsTransition");
 	if( settingsEventsTransition && settingsEventsTransition->valuedouble > 0 )
 		transitionTime = settingsEventsTransition->valuedouble;
@@ -120,49 +127,49 @@ void label_event(const char *label) {
 
 	if( !eventsTransition ) 
 		eventsTransition = cJSON_CreateObject();
+
 	cJSON* lastDetection = cJSON_GetObjectItem(eventsTransition,label);
-	
-	if( lastDetection ) {
-		if( transitionTime > 0 && cJSON_GetObjectItem(lastDetection,"timestamp")->type == cJSON_NULL ) {
-			cJSON_GetObjectItem(lastDetection,"timestamp")->type = cJSON_Number;
-			cJSON_GetObjectItem(lastDetection,"timestamp")->valuedouble = now;
-			cJSON_GetObjectItem(lastDetection,"timestamp")->valueint = now;			
-			return;
-		}
-		if( cJSON_GetObjectItem(lastDetection,"timestamp")->type == cJSON_Number ) {
-			if( (now - cJSON_GetObjectItem(lastDetection,"timestamp")->valuedouble) < transitionTime ) {
-				return;
-			}
-		}
-	} else {
+
+	if( !lastDetection ) {
 		lastDetection = cJSON_CreateObject();
 		cJSON_AddNumberToObject(lastDetection,"timestamp",now);
 		cJSON_AddFalseToObject(lastDetection,"state");
 		cJSON_AddItemToObject(eventsTransition,label,lastDetection);
-		if( transitionTime )
-			return;
 	}
 
-	cJSON_GetObjectItem(lastDetection,"state")->type = cJSON_True;
-	
-    GTimer *timer = g_hash_table_lookup(label_timers, label);
+	if( cJSON_GetObjectItem(lastDetection,"state")->type == cJSON_False ) {
+		if( cJSON_GetObjectItem(lastDetection,"timestamp")->type == cJSON_Number) {
+			if( (now - cJSON_GetObjectItem(lastDetection,"timestamp")->valuedouble) < transitionTime )
+				return;
+		} else {
+			cJSON_GetObjectItem(lastDetection,"timestamp")->type = cJSON_Number;
+			cJSON_GetObjectItem(lastDetection,"timestamp")->valuedouble = now;
+			cJSON_GetObjectItem(lastDetection,"timestamp")->valueint = (int)now;
+			cJSON_GetObjectItem(lastDetection,"state")->type = cJSON_True;
+		}
+	}
 
-    if (timer == NULL) {
-        // No timer exists, create a new one and fite state high
-        timer = g_timer_new();
-        g_hash_table_insert(label_timers, g_strdup(label), timer);
-		cJSON* eventData = cJSON_CreateObject();
-		cJSON_AddTrueToObject(eventData,"state");
-		cJSON_AddStringToObject(eventData,"label",label);
-		ACAP_EVENTS_Fire_JSON( "label", eventData );
-        // Create a GLib timeout
-		LOG_TRACE("%s: %s\n",__func__,label);
-		guint interval = cJSON_GetObjectItem(settings,"eventTimer")?cJSON_GetObjectItem(settings,"eventTimer")->valueint:5;
-        g_timeout_add_seconds(interval, label_state_expired, g_strdup(label));
+	double timestamp = (cJSON_GetObjectItem(lastDetection,"timestamp")->type == cJSON_Number)?cJSON_GetObjectItem(lastDetection,"timestamp")->valuedouble:0;
+    guint interval = cJSON_GetObjectItem(settings, "eventTimer") ? cJSON_GetObjectItem(settings, "eventTimer")->valueint : 3;
+	double refreshTimer = ((double)interval * 1000) / 3.0;
+
+    guint timer = GPOINTER_TO_UINT(g_hash_table_lookup(label_timers, label));
+    if (timer) {
+		if( (now - timestamp) < refreshTimer )
+			return;
+       g_source_remove(timer);
+       g_hash_table_remove(label_timers, label);
     } else {
-        // Timer exists, reset it
-        g_timer_start(timer);
-    }
+		cJSON* eventData = cJSON_CreateObject();
+		cJSON_AddTrueToObject(eventData, "state");
+		cJSON_AddStringToObject(eventData, "label", label);
+		ACAP_EVENTS_Fire_JSON("label", eventData);
+		cJSON_Delete(eventData);
+	}
+    
+    char *label_copy = g_strdup(label);
+    timer = g_timeout_add_seconds(interval, label_state_expired, label_copy);
+    g_hash_table_insert(label_timers, g_strdup(label), GUINT_TO_POINTER(timer));
 }
 
 //Process image capture, run inference and process output
@@ -419,8 +426,6 @@ int main(void) {
 	videoWidth = cJSON_GetObjectItem(model,"videoWidth")?cJSON_GetObjectItem(model,"videoWidth")->valueint:800;
 	videoHeight = cJSON_GetObjectItem(model,"videoHeight")?cJSON_GetObjectItem(model,"videoHeight")->valueint:600;
 	
-	SDCARD = 0;
-/*	
 	struct stat sb;
 	if (stat("/var/spool/storage/SD_DISK/DetectX", &sb) != 0) {  //Check if directory exists
 		if( mkdir("/var/spool/storage/SD_DISK/DetectX", 0777) < 0) {
@@ -442,8 +447,8 @@ int main(void) {
 		vdo_map_set_uint32(capture_VDO_map, "height", videoHeight);
 		LOG("JPEG capture %dx%d running to /var/spool/storage/SD_DISK/DetectX\n", videoWidth,videoHeight);
 	}
-*/
-	label_timers = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, (GDestroyNotify)g_timer_destroy);
+
+	label_timers = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
 
 	if( model ) {
 		ACAP_Register("model", model );

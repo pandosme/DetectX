@@ -62,3 +62,7 @@ Each label detection has its own state.
 ### 2.1.0 October 11, 2024
 - Added support for Detection transition
 - Removed ability to store detectection images on SD Card
+
+### 2.1.1	October 13, 2024
+- Fixed flawed event states
+- Fixed potential memoryleak
