@@ -49,3 +49,7 @@ call, dislike, fist, four, like, middle_finger, mute, no_gesture, ok, one, palm,
 
 ### 2.1.0	October 11, 2024
 - Added support for Detection transition
+
+### 2.1.1	October 13, 2024
+- Fixed flawed event states
+- Fixed potential memoryleak
