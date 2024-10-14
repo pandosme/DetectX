@@ -14,26 +14,7 @@
   "videoAspect": "4:3",
   "chip": "axis-a8-dlpu-tflite",
   "labels": [
-    "call",
-    "dislike",
-    "fist",
-    "four",
-    "like",
-    "middle_finger",
-    "mute",
-    "no_gesture",
-    "ok",
-    "one",
-    "palm",
-    "peace",
-    "peace_inverted",
-    "rock",
-    "stop",
-    "stop_inverted",
-    "three",
-    "thumb_index",
-    "two_up",
-    "two_up_inverted"
+    "face"
   ],
-  "description": "Trained on selected labels from Hagrid V2 https://github.com/hukenovs/hagrid"
+  "description": "Trained on the Wider-Face dataset https://huggingface.co/datasets/CUHK-CSE/wider_face"
 }

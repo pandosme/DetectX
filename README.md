@@ -1,9 +1,8 @@
 # DetectX - Hand-Gestures
 
 This ACAP is based on [DetectX](https://github.com/pandosme/DetectX), an open-source package.
-The model is trained on selected labels in the [Hagird V2](https://github.com/hukenovs/hagrid) dataset.  
-
-![gestures](https://raw.githubusercontent.com/hukenovs/hagrid/Hagrid_v1/images/gestures.jpg)
+The model is trained on the [Wider-Face](https://huggingface.co/datasets/CUHK-CSE/wider_face) dataset.  
+Labels: face
 
 # Pre-requsite
 - Axis Camera based on ARTPEC-8.  A special firmware for ARTPEC-7 having a TPU can be requested.
@@ -39,17 +38,7 @@ Enable or disable selected gestures.
 Events will be fired when a hand gesture is detected and not.  The event includes the labal and it state.
 Trigger event ```DetectX State changed```.  If triggering on detection, use the event as a trigger, set ```state``` high and label to what ever label should trigger.  
 
-### Events labels
-call, dislike, fist, four, like, middle_finger, mute, no_gesture, ok, one, palm, peace, peace_inverted, rock, stop, stop_inverted, three, thumb_index, two_up, two_up_inverted,
-
 # History
 
-### 2.0.0	October 10, 2024
-- Updated model with training with selected labes from Hagrid V2
-
-### 2.1.0	October 11, 2024
-- Added support for Detection transition
-
-### 2.1.1	October 13, 2024
-- Fixed flawed event states
-- Fixed potential memoryleak
+### 2.1.1	October 14, 2024
+- Initial version
