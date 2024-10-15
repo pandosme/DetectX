@@ -53,3 +53,6 @@ call, dislike, fist, four, like, middle_finger, mute, no_gesture, ok, one, palm,
 ### 2.1.1	October 13, 2024
 - Fixed flawed event states
 - Fixed potential memoryleak
+
+### 2.1.2	October 15, 2024
+- Re-trained (improved) the model
