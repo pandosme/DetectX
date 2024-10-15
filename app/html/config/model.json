@@ -1,10 +1,10 @@
 {
   "modelWidth": 800,
   "modelHeight": 800,
-  "quant": 0.004361813422292471,
+  "quant": 0.005149665754288435,
   "zeroPoint": 2,
   "boxes": 39375,
-  "classes": 20,
+  "classes": 1,
   "objectness": 0.25,
   "nms": 0.05,
   "path": "model/model.tflite",
