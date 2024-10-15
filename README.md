@@ -31,7 +31,7 @@ A minumum time that the detection must be stable before an event is fired.
 The minumum event duration a detection may have.  The duration will be high from the lat detection of a gesture.
 
 ### Labels Processed
-Enable or disable selected gestures.
+Select labels to be processed.  Typically used to ignore selected labels detections.
 
 ## Integration
 An event (DetectX: State Change) is fired when a label is detected and will reamin high as long as the label is detected.  Min event state duration setting controls how long the event will remain high after the last detection.
