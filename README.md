@@ -56,3 +56,6 @@ call, dislike, fist, four, like, middle_finger, mute, no_gesture, ok, one, palm,
 
 ### 2.1.2	October 15, 2024
 - Re-trained (improved) the model
+
+### 2.1.3	October 17, 2024
+- Fixed model tflite export that resulted in very high (2s) inference time.
