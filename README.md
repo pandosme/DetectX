@@ -53,3 +53,6 @@ call, dislike, fist, four, like, middle_finger, mute, no_gesture, ok, one, palm,
 ### 2.1.1	October 13, 2024
 - Fixed flawed event states
 - Fixed potential memoryleak
+
+### 2.1.3	October 17, 2024
+- Fixed model tflite export that resulted in very high (2s) inference time.
