@@ -1,10 +1,10 @@
 {
   "modelWidth": 800,
   "modelHeight": 800,
-  "quant": 0.003921531606465578,
+  "quant": 0.003929207567125559,
   "zeroPoint": 0,
   "boxes": 39375,
-  "classes": 20,
+  "classes": 7,
   "objectness": 0.25,
   "nms": 0.05,
   "path": "model/model.tflite",
@@ -14,26 +14,13 @@
   "videoAspect": "4:3",
   "chip": "google-edge-tpu-tflite",
   "labels": [
-    "call",
-    "dislike",
-    "fist",
-    "four",
-    "like",
-    "middle_finger",
-    "mute",
-    "no_gesture",
-    "ok",
-    "one",
-    "palm",
-    "peace",
-    "peace_inverted",
-    "rock",
-    "stop",
-    "stop_inverted",
-    "three",
-    "thumb_index",
-    "two_up",
-    "two_up_inverted"
+    "Angry",
+    "Disgust",
+    "Fear",
+    "Happy",
+    "Sad",
+    "Surprise",
+    "Neutral"
   ],
-  "description": "Trained on selected Hagrid V2 https://github.com/hukenovs/hagrid"
+  "description": "Trained on FER2013 https://paperswithcode.com/dataset/fer2013 dataset."
 }

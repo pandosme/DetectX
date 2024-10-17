@@ -1,7 +1,7 @@
 # DetectX - Hand-Gestures
 
 This ACAP is based on [DetectX](https://github.com/pandosme/DetectX), an open-source package.
-The model is trained on selected labels in the [Hagird V2](https://github.com/hukenovs/hagrid) dataset.  
+The model is trained on selected labels in the [FER2013](https://paperswithcode.com/dataset/fer2013) dataset.  
 
 ![gestures](https://raw.githubusercontent.com/hukenovs/hagrid/Hagrid_v1/images/gestures.jpg)
 
