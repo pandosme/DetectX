@@ -1,9 +1,8 @@
-# DetectX - Hand-Gestures
+# DetectX - Mood
+Detects mood (sentiment) of detected faces
+Labels: Angry, Disgust, Fear, Happy, Sad, Surprise, Neutral  
 
 This ACAP is based on [DetectX](https://github.com/pandosme/DetectX), an open-source package.
-The model is trained on selected labels in the [FER2013](https://paperswithcode.com/dataset/fer2013) dataset.  
-
-![gestures](https://raw.githubusercontent.com/hukenovs/hagrid/Hagrid_v1/images/gestures.jpg)
 
 # Pre-requsite
 - Axis Camera based on ARTPEC-8.  A special firmware for ARTPEC-7 having a TPU can be requested.
@@ -38,9 +37,6 @@ Enable or disable selected gestures.
 ## Integration
 Events will be fired when a hand gesture is detected and not.  The event includes the labal and it state.
 Trigger event ```DetectX State changed```.  If triggering on detection, use the event as a trigger, set ```state``` high and label to what ever label should trigger.  
-
-### Events labels
-call, dislike, fist, four, like, middle_finger, mute, no_gesture, ok, one, palm, peace, peace_inverted, rock, stop, stop_inverted, three, thumb_index, two_up, two_up_inverted,
 
 # History
 
