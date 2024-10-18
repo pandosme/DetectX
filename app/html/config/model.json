@@ -1,10 +1,10 @@
 {
   "modelWidth": 800,
   "modelHeight": 800,
-  "quant": 0.003921563737094402,
-  "zeroPoint": 0,
+  "quant": 0.003929207567125559,
+  "zeroPoint": 1,
   "boxes": 39375,
-  "classes": 20,
+  "classes": 7,
   "objectness": 0.25,
   "nms": 0.05,
   "path": "model/model.tflite",
@@ -14,26 +14,13 @@
   "videoAspect": "4:3",
   "chip": "axis-a8-dlpu-tflite",
   "labels": [
-    "call",
-    "dislike",
-    "fist",
-    "four",
-    "like",
-    "middle_finger",
-    "mute",
-    "no_gesture",
-    "ok",
-    "one",
-    "palm",
-    "peace",
-    "peace_inverted",
-    "rock",
-    "stop",
-    "stop_inverted",
-    "three",
-    "thumb_index",
-    "two_up",
-    "two_up_inverted"
+    "Angry",
+    "Disgust",
+    "Fear",
+    "Happy",
+    "Sad",
+    "Surprise",
+    "Neutral"
   ],
-  "description": "Trained on selected labels from Hagrid V2 https://github.com/hukenovs/hagrid"
+  "description": ""
 }
