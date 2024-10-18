@@ -1,7 +1,7 @@
 {
   "modelWidth": 800,
   "modelHeight": 800,
-  "quant": 0.0039215353317558765,
+  "quant": 0.003921563737094402,
   "zeroPoint": 0,
   "boxes": 39375,
   "classes": 20,
