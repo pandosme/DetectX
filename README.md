@@ -4,7 +4,7 @@ Run custom trained data models.  This package includes MobileNet SSD COCO model.
 Please read [Train-Build.md](https://github.com/pandosme/DetectX/blob/main/Train-Build.md) to understand how to train and build the package.
 
 # Pre-requsite
-- Axis Camera based on ARTPEC-8.  A special firmware for ARTPEC-7 having a TPU can be requested.
+- Axis Camera based on ARTPEC-8.  By using edgetpu compiler it is possible to build for cameras based on ARTPEC-7 having a TPU (e.g. P3255).
 
 # User interface
 The user interface is designed to validate detection and apply various filters.
