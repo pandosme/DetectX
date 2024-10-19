@@ -5,7 +5,9 @@ Detects various objects related tp PPE (Personal Protection Equipment) used to i
 *The model trained is mainly for inspiration and has not been validated for production depolyment.  Detection quality depnds on distance to workers, lighting conditions, etc*
 
 ## Labels
-person, ear, ear-mufs, face, face-guard, face-mask-medical, foot, tools, glasses, gloves, helmet, hand, head, medical-suit, shoe, safety-suit, safety-vest
+person, ear, ear-mufs, face, face-guard, face-mask-medical, foot, tools, glasses, gloves, helmet, hand, head, medical-suit, shoe, safety-suit, safety-vest  
+
+*Note that the images below are based on the training data, not the actual detections*
 ![image1](https://raw.githubusercontent.com/pandosme/DetectX/PPE/pictures/PPE-Worker.jpg)
 ![image2](https://raw.githubusercontent.com/pandosme/DetectX/PPE/pictures/PPE-medical.jpg)
 ![image3](https://raw.githubusercontent.com/pandosme/DetectX/PPE/pictures/PPE-protection.jpg)
