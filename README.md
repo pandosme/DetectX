@@ -1,8 +1,7 @@
 # DetectX - PPE
 
-Detects various objects related tp PPE (Personal Protection Equipment) used to increase safty.  
-This ACAP is based on [DetectX](https://github.com/pandosme/DetectX), an open-source package.  
-The model is trained on the [SH17dataset](https://github.com/ahmadmughees/sh17dataset) dataset.  
+Detects various objects related tp PPE (Personal Protection Equipment) used to increase safty.  This ACAP is based on [DetectX](https://github.com/pandosme/DetectX), an open-source package. The model is trained on the [SH17dataset](https://github.com/ahmadmughees/sh17dataset) dataset.  
+
 *The model trained is mainly for inspiration and has not been validated for production depolyment.  Detection qulaity depnds on distance to workers, lighting conditions, etc*
 
 
