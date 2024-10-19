@@ -25,17 +25,27 @@ Additional filter to reduce the number of false detection. Click button and use 
 Additional filters to apply on the detection and output.
 
 ### Detection transition
-A minumum time that the detection must be stable before an event is fired.
+A minumum time that the detection must be stable before an event is fired.  It define how trigger-happy the evant shall be.
 
 ### Min event state duration
-The minumum event duration a detection may have.  The duration will be high from the lat detection of a gesture.
+The minumum event duration a detection may have.  
 
 ### Labels Processed
-Select labels to be processed.  Typically used to ignore selected labels detections.
+Enable or disable selected gestures.
 
 ## Integration
-An event (DetectX: State Change) is fired when a label is detected and will reamin high as long as the label is detected.  Min event state duration setting controls how long the event will remain high after the last detection.
-Each label detection has its own state.
+The service fires two different events targeting different use cases.  Service may monitor these event using camera event syste, ONVIF event stream and MQTT.
+## Label state
+A stateful event (high/low) for each detected label.  The event includes property state (true/false) and a label.  
+## Labels Counter
+An event fired everytime the number of different detected objects changed.  The event includes a property "json" that is a JSON object.  
+Example 
+```
+{
+  "label 1": 1,
+  "label 2": 2
+}
+```
 
 
 # History
@@ -66,3 +76,7 @@ Each label detection has its own state.
 ### 2.1.1	October 13, 2024
 - Fixed flawed event states
 - Fixed potential memoryleak
+
+### 2.2.0	October 19, 2024
+- Added event "Label Counter" for use cases needing to know how many objects are detected
+- Fixed flaw for Detection transition
