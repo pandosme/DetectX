@@ -2,7 +2,9 @@
 
 This ACAP is based on [DetectX](https://github.com/pandosme/DetectX), an open-source package.
 The model is trained on [Smart city pedestrian/bike detection](https://universe.roboflow.com/simone-bernabe/smart-city-pedestrian-bike-detection/dataset/23) dataset.  
-Labels: Cyclist, E-scooter, Person, Vehicle
+
+## Labels
+Cyclist, E-scooter, Person, Vehicle
 
 
 # Pre-requsite
@@ -27,19 +29,32 @@ Additional filter to reduce the number of false detection. Click button and use 
 Additional filters to apply on the detection and output.
 
 ### Detection transition
-A minumum time that the detection must be stable before an event is fired.
+A minumum time that the detection must be stable before an event is fired.  It define how trigger-happy the evant shall be.
 
 ### Min event state duration
-The minumum event duration a detection may have.  The duration will be high from the lat detection of a gesture.
+The minumum event duration a detection may have.  
 
 ### Labels Processed
 Enable or disable selected gestures.
 
 ## Integration
-Events will be fired when a hand gesture is detected and not.  The event includes the labal and it state.
-Trigger event ```DetectX State changed```.  If triggering on detection, use the event as a trigger, set ```state``` high and label to what ever label should trigger.  
+The service fires two different events targeting different use cases.  Service may monitor these event using camera event syste, ONVIF event stream and MQTT.
+## Label state
+A stateful event (high/low) for each detected label.  The event includes property state (true/false) and a label.  
+## Labels Counter
+An event fired everytime the number of different detected objects changed.  The event includes a property "json" that is a JSON object.  
+Example 
+```
+{
+  "label 1": 1,
+  "label 2": 2
+}
+```
 
 # History
+
+### 2.0.0	October 10, 2024
+- Updated model with training with selected labes from Hagrid V2
 
 ### 2.1.0	October 11, 2024
 - Added support for Detection transition
@@ -47,3 +62,10 @@ Trigger event ```DetectX State changed```.  If triggering on detection, use the 
 ### 2.1.1	October 13, 2024
 - Fixed flawed event states
 - Fixed potential memoryleak
+
+### 2.1.3	October 17, 2024
+- Fixed model tflite export that resulted in very high (2s) inference time
+
+### 2.2.0	October 19, 2024
+- Added event "Label Counter" for use cases needing to know how many objects are detected
+- Fixed flaw for Detection transition
