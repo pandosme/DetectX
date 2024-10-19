@@ -6,9 +6,9 @@ The model is trained on the [SH17dataset](https://github.com/ahmadmughees/sh17da
 
 ## Labels
 person, ear, ear-mufs, face, face-guard, face-mask-medical, foot, tools, glasses, gloves, helmet, hand, head, medical-suit, shoe, safety-suit, safety-vest
-[image1](https://raw.githubusercontent.com/pandosme/DetectX/PPE/pictures/PPE-Worker.jpg)
-[image2](https://raw.githubusercontent.com/pandosme/DetectX/PPE/pictures/PPE-medical.jpg)
-[image3](https://raw.githubusercontent.com/pandosme/DetectX/PPE/pictures/PPE-protection.jpg)
+![image1](https://raw.githubusercontent.com/pandosme/DetectX/PPE/pictures/PPE-Worker.jpg)
+![image2](https://raw.githubusercontent.com/pandosme/DetectX/PPE/pictures/PPE-medical.jpg)
+![image3](https://raw.githubusercontent.com/pandosme/DetectX/PPE/pictures/PPE-protection.jpg)
 
 # Pre-requsite
 - Axis Camera based on ARTPEC-8.  A special firmware for ARTPEC-7 having a TPU can be requested.
