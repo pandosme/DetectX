@@ -57,4 +57,4 @@ Example
 # History
 
 ### 2.2.0	October 19, 2024
-- Initial commit. Based on DeteX version 2.2.0
+- Initial commit. Based on DetectX version 2.2.0
