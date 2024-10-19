@@ -11,7 +11,7 @@ person, ear, ear-mufs, face, face-guard, face-mask-medical, foot, tools, glasses
 ![image3](https://raw.githubusercontent.com/pandosme/DetectX/PPE/pictures/PPE-protection.jpg)
 
 # Pre-requsite
-- Axis Camera based on ARTPEC-8.  A special firmware for ARTPEC-7 having a TPU can be requested.
+- Axis Camera based on ARTPEC-8.  It is possible to build firmware for products having ARTPEC-7 and a TPU (e.g. P3255-LVE).
 
 # User interface
 The user interface is designed to validate detection and apply various filters.
