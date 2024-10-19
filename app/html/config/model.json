@@ -12,7 +12,7 @@
   "videoWidth": 800,
   "videoHeight": 600,
   "videoAspect": "4:3",
-  "chip": "axis-a8-dlpu-tflite",
+  "chip": "google-edge-tpu-tflite",
   "labels": [
     "person",
     "ear",
