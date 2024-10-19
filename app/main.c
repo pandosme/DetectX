@@ -27,6 +27,7 @@
 cJSON* settings = 0;
 cJSON* model = 0;
 cJSON* eventsTransition = 0;
+cJSON* eventLabelCounter = 0;
 GTimer *cleanupTransitionTimer = 0;
 int SDCARD = 0;
 int captureSDCARD = 0;
@@ -138,18 +139,20 @@ label_event(const char *label) {
 	}
 
 	if( cJSON_GetObjectItem(lastDetection,"state")->type == cJSON_False ) {
-		if( cJSON_GetObjectItem(lastDetection,"timestamp")->type == cJSON_Number) {
+		if( cJSON_GetObjectItem(lastDetection,"timestamp")->type == cJSON_Number) { 
 			if( (now - cJSON_GetObjectItem(lastDetection,"timestamp")->valuedouble) < transitionTime )
 				return;
 		} else {
 			cJSON_GetObjectItem(lastDetection,"timestamp")->type = cJSON_Number;
 			cJSON_GetObjectItem(lastDetection,"timestamp")->valuedouble = now;
 			cJSON_GetObjectItem(lastDetection,"timestamp")->valueint = (int)now;
-			cJSON_GetObjectItem(lastDetection,"state")->type = cJSON_True;
+			cJSON_GetObjectItem(lastDetection,"state")->type = cJSON_False;
+			return;
 		}
 	}
+	cJSON_GetObjectItem(lastDetection,"state")->type = cJSON_True;
 
-	double timestamp = (cJSON_GetObjectItem(lastDetection,"timestamp")->type == cJSON_Number)?cJSON_GetObjectItem(lastDetection,"timestamp")->valuedouble:0;
+	double timestamp = cJSON_GetObjectItem(lastDetection,"timestamp")->valuedouble;
     guint interval = cJSON_GetObjectItem(settings, "eventTimer") ? cJSON_GetObjectItem(settings, "eventTimer")->valueint : 3;
 	double refreshTimer = ((double)interval * 1000) / 3.0;
 
@@ -226,9 +229,37 @@ Save_To_SDCARD(double timestamp, VdoBuffer* buffer, cJSON* detections ) {
 	LOG_TRACE("JPEG: %.0f.jpg\n",timestamp);
 }
 
+bool
+AreCountersEqual(cJSON *obj1, cJSON *obj2) {
+	
+    if (!cJSON_IsObject(obj1) || !cJSON_IsObject(obj2)) {
+        return false;
+    }
+
+    // Check if the number of items in both objects is the same
+    int count1 = cJSON_GetArraySize(obj1);
+    int count2 = cJSON_GetArraySize(obj2);
+    if (count1 != count2) {
+        return false;
+    }
+
+    cJSON *child1 = obj1->child;
+    while (child1) {
+        cJSON *child2 = cJSON_GetObjectItem(obj2, child1->string);
+        if (!child2 || !cJSON_IsNumber(child2) || child1->valuedouble != child2->valuedouble) {
+            return false;
+        }
+        child1 = child1->next;
+    }
+
+    return true;
+}
+
+
 
 gboolean
 ImageProcess(gpointer data) {
+	const char* label = "Undefined";
     struct timeval startTs, endTs;	
 
 	if( !settings || !model )
@@ -303,7 +334,7 @@ ImageProcess(gpointer data) {
 		unsigned width = 0;
 		unsigned height = 0;
 		unsigned c = 0;
-		const char* label = "Undefined";
+		label = "Undefined";
 		while(property) {
 			if( strcmp("c",property->string) == 0 ) {
 				property->valueint = property->valuedouble * 100;
@@ -337,7 +368,6 @@ ImageProcess(gpointer data) {
 			}
 			property = property->next;
 		}
-		
 
 		//FILTER DETECTIONS
 		int insert = 0;
@@ -365,10 +395,40 @@ ImageProcess(gpointer data) {
 		detection = detection->next;
 	}
 
+	//Label Event Counter
+	cJSON* labelCounter = cJSON_CreateObject();
+	cJSON* item = processedDetections->child;
+	while(item) {
+		label = cJSON_GetObjectItem(item,"label")->valuestring;
+		cJSON* eventState = cJSON_GetObjectItem(eventsTransition,label);
+		if( eventState && cJSON_GetObjectItem(eventState,"state")->type == cJSON_True ) {
+			cJSON* labelCount = cJSON_GetObjectItem(labelCounter,label);
+			if( !labelCount )
+				labelCount = cJSON_AddNumberToObject(labelCounter,label,0);
+			labelCount->valuedouble += 1.0;
+			labelCount->valueint += 1;
+		}
+		item = item->next;
+	}
+	if( !AreCountersEqual(eventLabelCounter, labelCounter ) ) {
+		cJSON_Delete(eventLabelCounter);
+		eventLabelCounter = labelCounter;
+		char* json = cJSON_PrintUnformatted(eventLabelCounter);
+		if( json ) {
+			cJSON* eventData = cJSON_CreateObject();
+			cJSON_AddStringToObject(eventData, "json", json);
+			ACAP_EVENTS_Fire_JSON( "counter", eventData );
+			cJSON_Delete(eventData);
+		}
+	} else {
+		cJSON_Delete(labelCounter);
+	}
 
+/*
 	Save_To_SDCARD( timestamp, jpegBuffer, processedDetections );
 	if( jpegBuffer )
 		g_object_unref(jpegBuffer);
+*/	
 
 	//Add code here if you want to create some specific output for the preocesses detection list
 	cJSON_Delete(processedDetections);
@@ -417,6 +477,8 @@ int main(void) {
 		return 1;
 	}
 
+	eventLabelCounter = cJSON_CreateObject();
+
 	model = Model_Setup();
 
 
@@ -425,7 +487,7 @@ int main(void) {
 
 	videoWidth = cJSON_GetObjectItem(model,"videoWidth")?cJSON_GetObjectItem(model,"videoWidth")->valueint:800;
 	videoHeight = cJSON_GetObjectItem(model,"videoHeight")?cJSON_GetObjectItem(model,"videoHeight")->valueint:600;
-	
+/*	
 	struct stat sb;
 	if (stat("/var/spool/storage/SD_DISK/DetectX", &sb) != 0) {  //Check if directory exists
 		if( mkdir("/var/spool/storage/SD_DISK/DetectX", 0777) < 0) {
@@ -447,7 +509,7 @@ int main(void) {
 		vdo_map_set_uint32(capture_VDO_map, "height", videoHeight);
 		LOG("JPEG capture %dx%d running to /var/spool/storage/SD_DISK/DetectX\n", videoWidth,videoHeight);
 	}
-
+*/
 	label_timers = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
 
 	if( model ) {
