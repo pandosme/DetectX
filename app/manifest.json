@@ -2,7 +2,7 @@
     "schemaVersion": "1.1",
     "acapPackageConf": {
         "setup": {
-            "friendlyName": "DetectX Hand Gesture",
+            "friendlyName": "DetectX PPE TPU",
             "appName": "detectx",
             "vendor": "Fred Juhlin",
             "embeddedSdkVersion": "3.0",
@@ -12,7 +12,7 @@
             },
             "vendorUrl": "https://pandosme.github.io",
             "runMode": "once",
-            "version": "2.1.3"
+            "version": "2.2.0"
         },
         "configuration": {
 			"settingPage": "index.html",
