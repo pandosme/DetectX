@@ -331,6 +331,7 @@ Model_Setup() {
 		return 0;
     }
     if (!larodMapSetStr(ppMap, "image.output.format", "rgb-interleaved", &error)) {
+//    if (!larodMapSetStr(ppMap, "image.output.format", "rgb-planar", &error)) {
         LOG_WARN("%s: Failed setting preprocessing parameters: %s\n", __func__,error->msg);
 		Model_Close();
 		return 0;
