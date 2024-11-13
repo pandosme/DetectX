@@ -16,6 +16,7 @@
 #include "Model.h"
 #include "Video.h"
 #include "cJSON.h"
+#include "custom_output.h"
 
 #define LOG(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args);}
 #define LOG_WARN(fmt, args...)    { syslog(LOG_WARNING, fmt, ## args); printf(fmt, ## args);}
@@ -361,7 +362,8 @@ ImageProcess(gpointer data) {
 		cJSON_Delete(labelCounter);
 	}
 
-	//Add code here if you want to create some specific output for the preocesses detection list
+	//Add custom detection logic and output
+    custom_output( 	processedDetections );
 	cJSON_Delete(processedDetections);
 
 	while( cJSON_GetArraySize( lastDetections ) > 10 )

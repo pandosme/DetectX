@@ -4,6 +4,7 @@
 #include <syslog.h>
 #include <signal.h>
 #include <unistd.h>
+#include <math.h>
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/time.h>

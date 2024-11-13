@@ -580,7 +580,7 @@ const char* ACAP_HTTP_Request_Param(const ACAP_HTTP_Request request, const char*
                 }
                 return param_value;
             } else {
-                LOG_WARN("%s: Query param %s not found\n",__func__,name);
+                LOG_TRACE("%s: Query param %s not found\n",__func__,name);
             }
         }
         return 0;
