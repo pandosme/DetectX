@@ -29,8 +29,6 @@ cJSON* model = 0;
 cJSON* eventsTransition = 0;
 cJSON* eventLabelCounter = 0;
 GTimer *cleanupTransitionTimer = 0;
-int SDCARD = 0;
-int captureSDCARD = 0;
 
 void
 ConfigUpdate( const char *service, cJSON* data) {
@@ -38,10 +36,6 @@ ConfigUpdate( const char *service, cJSON* data) {
 	cJSON* setting = data->child;
 	while(setting) {
 		LOG_TRACE("%s: Processing %s\n",__func__,setting->string);
-		if( strcmp( "capture", setting->string ) == 0 ) {
-			captureSDCARD = cJSON_GetObjectItem( settings, "capture" ) ? cJSON_GetObjectItem( settings, "capture" )->type == cJSON_True:0;
-			LOG("Updated capture to %d\n", setting->valueint);
-		}
 		if( strcmp( "eventTimer", setting->string ) == 0 ) {
 			LOG("Changed event state to %d\n", setting->valueint);
 		}
@@ -182,53 +176,6 @@ VdoMap *capture_VDO_map = NULL;
 int inferenceCounter = 0;
 unsigned int inferenceAverage = 0;
 
-void
-Save_To_SDCARD(double timestamp, VdoBuffer* buffer, cJSON* detections ) {
-	//Store image capture and update detections.txt on SD Card
-
-	if( !SDCARD || !captureSDCARD || !buffer || !detections || cJSON_GetArraySize(detections) == 0)
-		return;	
-		
-	FILE* fp_detection = fopen("/var/spool/storage/SD_DISK/DetectX/detections.txt", "a");
-	if( !fp_detection ) {
-		LOG_WARN("Unable to create detection file on SD Card\n");
-		return;	
-	}
-
-	cJSON* item = detections->child;
-	while( item ) {
-		char *json = cJSON_PrintUnformatted(item);
-		if( json ) {
-			fprintf(fp_detection, "%s\n", json);
-			free(json);
-		}
-		item = item->next;
-	}
-	fclose( fp_detection );
-
-	char filepath[128];
-	sprintf(filepath,"/var/spool/storage/SD_DISK/DetectX/%.0f.jpg",timestamp);
-	FILE* fp_image = fopen(filepath, "wb");
-	if( !fp_image ) {
-		LOG_WARN("Unable to create a jpeg file on SD Card\n");
-		return;	
-	}
-
-	VdoFrame*  frame = vdo_buffer_get_frame(buffer);
-	if (!frame) {
-		LOG_WARN("Unable to get frame for jpeg file\n");
-		fclose(fp_image);
-		return;	
-	}
-
-	void *jpegdata = (void *)vdo_buffer_get_data(buffer);
-	unsigned int size = vdo_frame_get_size(frame);
-	if( jpegdata && size )
-		fwrite(jpegdata, sizeof(char), size, fp_image);
-	fclose(fp_image);
-	LOG_TRACE("JPEG: %.0f.jpg\n",timestamp);
-}
-
 bool
 AreCountersEqual(cJSON *obj1, cJSON *obj2) {
 	
@@ -266,22 +213,11 @@ ImageProcess(gpointer data) {
 		return G_SOURCE_REMOVE;
 
 	VdoBuffer* buffer = Video_Capture_YUV();	
-	VdoBuffer* jpegBuffer = NULL;
-	if( SDCARD && captureSDCARD > 0 ) {
-		GError *error = NULL;
-		jpegBuffer = vdo_stream_snapshot(capture_VDO_map, &error);
-		if( !jpegBuffer ) {
-			LOG_WARN("%s: Capture failed. %s\n",__func__,error->message);
-			g_error_free( error );
-		}
-	}
 
 	if( !buffer ) {
 		ACAP_STATUS_SetString("model","status","Error. Check log");
 		ACAP_STATUS_SetBool("model","state", 0);
 		LOG_WARN("Image capture failed\n");
-		if( jpegBuffer )
-			g_object_unref(jpegBuffer);
 		return G_SOURCE_REMOVE;
 	}
 
@@ -368,6 +304,7 @@ ImageProcess(gpointer data) {
 			}
 			property = property->next;
 		}
+		
 
 		//FILTER DETECTIONS
 		int insert = 0;
@@ -424,12 +361,6 @@ ImageProcess(gpointer data) {
 		cJSON_Delete(labelCounter);
 	}
 
-/*
-	Save_To_SDCARD( timestamp, jpegBuffer, processedDetections );
-	if( jpegBuffer )
-		g_object_unref(jpegBuffer);
-*/	
-
 	//Add code here if you want to create some specific output for the preocesses detection list
 	cJSON_Delete(processedDetections);
 
@@ -481,35 +412,8 @@ int main(void) {
 
 	model = Model_Setup();
 
-
-	if( cJSON_GetObjectItem(settings,"capture") && cJSON_GetObjectItem(settings,"capture")->type == cJSON_True )
-		captureSDCARD = 1;
-
 	videoWidth = cJSON_GetObjectItem(model,"videoWidth")?cJSON_GetObjectItem(model,"videoWidth")->valueint:800;
 	videoHeight = cJSON_GetObjectItem(model,"videoHeight")?cJSON_GetObjectItem(model,"videoHeight")->valueint:600;
-/*	
-	struct stat sb;
-	if (stat("/var/spool/storage/SD_DISK/DetectX", &sb) != 0) {  //Check if directory exists
-		if( mkdir("/var/spool/storage/SD_DISK/DetectX", 0777) < 0) {
-			SDCARD = 0;
-			captureSDCARD = 0;
-			LOG_WARN("Unable to access SD Card\n");
-			
-		} else {
-			SDCARD = 1;
-		}
-	} else {
-		SDCARD = 1;
-	}
-
-	if( SDCARD ) {
-		capture_VDO_map = vdo_map_new();
-		vdo_map_set_uint32(capture_VDO_map, "format", VDO_FORMAT_JPEG);
-		vdo_map_set_uint32(capture_VDO_map, "width", videoWidth);
-		vdo_map_set_uint32(capture_VDO_map, "height", videoHeight);
-		LOG("JPEG capture %dx%d running to /var/spool/storage/SD_DISK/DetectX\n", videoWidth,videoHeight);
-	}
-*/
 	label_timers = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
 
 	if( model ) {
@@ -518,13 +422,12 @@ int main(void) {
 			LOG("Video %ux%u started\n",videoWidth,videoHeight);
 		} else {
 			LOG_WARN("Video stream for image capture failed\n");
-			captureSDCARD = 0;
 		}
 		g_idle_add(ImageProcess, NULL);
 	} else {
 		LOG_WARN("Model setup failed\n");
 	}
-
+	g_idle_add(ACAP_HTTP_Process, NULL);
     g_timeout_add_seconds(1, cleanupTransitionCallback, NULL);
 
 	main_loop = g_main_loop_new(NULL, FALSE);

@@ -1,57 +1,25 @@
 {
-    "schemaVersion": "1.1",
+    "schemaVersion": "1.7.1",
     "acapPackageConf": {
         "setup": {
             "friendlyName": "DetectX COCO",
             "appName": "detectx",
             "vendor": "Fred Juhlin",
             "embeddedSdkVersion": "3.0",
-            "user": {
-                "group": "sdk",
-                "username": "sdk"
-            },
             "vendorUrl": "https://pandosme.github.io",
             "runMode": "once",
-            "version": "2.2.0"
+            "version": "3.0.0"
         },
         "configuration": {
 			"settingPage": "index.html",
 			"httpConfig": [
-				{
-					"name": "app",
-					"access": "admin",
-					"type": "transferCgi"
-				},
-				{
-					"name": "settings",
-					"access": "admin",
-					"type": "transferCgi"
-				},
-				{
-					"name": "status",
-					"access": "admin",
-					"type": "transferCgi"
-				},
-				{
-					"name": "device",
-					"access": "admin",
-					"type": "transferCgi"
-				},
-				{
-					"name": "model",
-					"access": "admin",
-					"type": "transferCgi"
-				},
-				{
-					"name": "detections",
-					"access": "admin",
-					"type": "transferCgi"
-				},
-				{
-					"name": "eventsTransition",
-					"access": "admin",
-					"type": "transferCgi"
-				}
+				{"name": "app","access": "admin","type": "fastCgi"},
+				{"name": "settings","access": "admin","type": "fastCgi"},
+				{"name": "status","access": "admin","type": "fastCgi"},
+				{"name": "device","access": "admin","type": "fastCgi"},
+				{"name": "model","access": "admin","type": "fastCgi"},
+				{"name": "detections","access": "admin","type": "fastCgi"},
+				{"name": "eventsTransition","access": "admin","type": "fastCgi"}
 			]
 		}
     }

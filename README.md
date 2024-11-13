@@ -1,10 +1,13 @@
-# DetectX  
+# DetectX  - Default COCO
 
 Run custom trained data models.  This package includes MobileNet SSD COCO model.  The idea is to replace this model with your own.  
 Please read [Train-Build.md](https://github.com/pandosme/DetectX/blob/main/Train-Build.md) to understand how to train and build the package.
 
+
+**Breaking change:  You need to remove previous 2.x.x version before installing 3.x.x.**
+
 # Pre-requsite
-- Axis Camera based on ARTPEC-8.  By using edgetpu compiler it is possible to build for cameras based on ARTPEC-7 having a TPU (e.g. P3255).
+- Axis Camera based on ARTPEC-8. 
 
 # User interface
 The user interface is designed to validate detection and apply various filters.
@@ -47,7 +50,6 @@ Example
 }
 ```
 
-
 # History
 
 ### 1.0.0	September 5, 2024
@@ -80,3 +82,7 @@ Example
 ### 2.2.0	October 19, 2024
 - Added event "Label Counter" for use cases needing to know how many objects are detected
 - Fixed flaw for Detection transition
+
+### 3.0.0	October 19, 2024
+Breaking change:  You need to remove previous versions before installing this
+- Switched to lates ACAP SDK Version.  
