@@ -8,5 +8,6 @@
 #include "cJSON.h"
 
 void custom_output(cJSON* detectionList);
+void custom_output_reset();
 
 #endif

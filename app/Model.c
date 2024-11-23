@@ -4,8 +4,8 @@
 #include <syslog.h>
 #include <signal.h>
 #include <unistd.h>
-#include <math.h>
 #include <fcntl.h>
+#include <math.h>
 #include <sys/mman.h>
 #include <sys/time.h>
 #include <errno.h>
@@ -75,7 +75,7 @@ Model_Inference(VdoBuffer* image) {
 		return 0;
 	}
 
-	if( !ACAP_STATUS_Bool( "model", "state" ) ) {  //The Model Was not Loaded
+	if( ACAP_STATUS_Bool( "model", "state" ) == 0 ) {  //The Model Was not Loaded
 		LOG_TRACE("%s: Model not running\n",__func__);
 		return 0;
 	}
@@ -116,7 +116,7 @@ Model_Inference(VdoBuffer* image) {
 
 	for (int i = 0; i < boxes; i++) {
 		int box = i * (5 + classes);
-		float objectness = (output_tensor[box + 4] - quant_zero) * quant;
+		float objectness = 1.0f / (1.0f + exp(-(output_tensor[box + 4] - quant_zero) * quant) + 1e-10);
         if (objectness >= objectnessThreshold) {
             float x = (output_tensor[box + 0] - quant_zero) * quant;
             float y = (output_tensor[box + 1] - quant_zero) * quant;
@@ -125,14 +125,13 @@ Model_Inference(VdoBuffer* image) {
 			int classId = -1;
 			float maxConfidence = 0;
 			for( int c = 0; c < classes; c++ ) {
-				float confidence = (output_tensor[box + 5 + c] - quant_zero) * quant;
+				float confidence = 1.0f / ((1.0f + exp(-(output_tensor[box + 5 + c] - quant_zero) * quant)) * objectness);
 				if( confidence > maxConfidence ) {
 					classId = c;
 					maxConfidence = confidence;
 				}
 			}
-//			LOG("%f %f %f %f %f %d\n",x,y,w,h,maxConfidence,classId);
-			if( maxConfidence > objectness ) {
+			if( maxConfidence > objectnessThreshold ) {
 				const char* label = "Undefined";
 				cJSON* labels = cJSON_GetObjectItem(modelConfig,"labels");
 				if( labels && classId >= 0 && cJSON_GetArrayItem(labels, classId) )

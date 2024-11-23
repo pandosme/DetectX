@@ -10,13 +10,14 @@
 #include <sys/mman.h>
 #include <sys/time.h>
 #include <sys/stat.h>
+#include <signal.h>
+#include "custom_output.h"
 #include <errno.h>
 
 #include "ACAP.h"
 #include "Model.h"
 #include "Video.h"
 #include "cJSON.h"
-#include "custom_output.h"
 
 #define LOG(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args);}
 #define LOG_WARN(fmt, args...)    { syslog(LOG_WARNING, fmt, ## args); printf(fmt, ## args);}
@@ -25,11 +26,31 @@
 
 #define APP_PACKAGE	"detectx"
 
+static GMainLoop *main_loop = NULL;
+static volatile sig_atomic_t shutdown_flag = 0;
+
+void term_handler(int signum) {
+    if (signum == SIGTERM) {
+        shutdown_flag = 1;
+        if (main_loop) {
+            g_main_loop_quit(main_loop);
+        }
+    }
+}
+
+void cleanup_resources(void) {
+    LOG("Performing cleanup before shutdown\n");
+    ACAP_Cleanup();
+    closelog();
+}
+
 cJSON* settings = 0;
 cJSON* model = 0;
 cJSON* eventsTransition = 0;
 cJSON* eventLabelCounter = 0;
 GTimer *cleanupTransitionTimer = 0;
+int SDCARD = 0;
+int captureSDCARD = 0;
 
 void
 ConfigUpdate( const char *service, cJSON* data) {
@@ -37,6 +58,10 @@ ConfigUpdate( const char *service, cJSON* data) {
 	cJSON* setting = data->child;
 	while(setting) {
 		LOG_TRACE("%s: Processing %s\n",__func__,setting->string);
+		if( strcmp( "capture", setting->string ) == 0 ) {
+			captureSDCARD = cJSON_GetObjectItem( settings, "capture" ) ? cJSON_GetObjectItem( settings, "capture" )->type == cJSON_True:0;
+			LOG("Updated capture to %d\n", setting->valueint);
+		}
 		if( strcmp( "eventTimer", setting->string ) == 0 ) {
 			LOG("Changed event state to %d\n", setting->valueint);
 		}
@@ -177,6 +202,53 @@ VdoMap *capture_VDO_map = NULL;
 int inferenceCounter = 0;
 unsigned int inferenceAverage = 0;
 
+void
+Save_To_SDCARD(double timestamp, VdoBuffer* buffer, cJSON* detections ) {
+	//Store image capture and update detections.txt on SD Card
+
+	if( !SDCARD || !captureSDCARD || !buffer || !detections || cJSON_GetArraySize(detections) == 0)
+		return;	
+		
+	FILE* fp_detection = fopen("/var/spool/storage/SD_DISK/DetectX/detections.txt", "a");
+	if( !fp_detection ) {
+		LOG_WARN("Unable to create detection file on SD Card\n");
+		return;	
+	}
+
+	cJSON* item = detections->child;
+	while( item ) {
+		char *json = cJSON_PrintUnformatted(item);
+		if( json ) {
+			fprintf(fp_detection, "%s\n", json);
+			free(json);
+		}
+		item = item->next;
+	}
+	fclose( fp_detection );
+
+	char filepath[128];
+	sprintf(filepath,"/var/spool/storage/SD_DISK/DetectX/%.0f.jpg",timestamp);
+	FILE* fp_image = fopen(filepath, "wb");
+	if( !fp_image ) {
+		LOG_WARN("Unable to create a jpeg file on SD Card\n");
+		return;	
+	}
+
+	VdoFrame*  frame = vdo_buffer_get_frame(buffer);
+	if (!frame) {
+		LOG_WARN("Unable to get frame for jpeg file\n");
+		fclose(fp_image);
+		return;	
+	}
+
+	void *jpegdata = (void *)vdo_buffer_get_data(buffer);
+	unsigned int size = vdo_frame_get_size(frame);
+	if( jpegdata && size )
+		fwrite(jpegdata, sizeof(char), size, fp_image);
+	fclose(fp_image);
+	LOG_TRACE("JPEG: %.0f.jpg\n",timestamp);
+}
+
 bool
 AreCountersEqual(cJSON *obj1, cJSON *obj2) {
 	
@@ -203,8 +275,6 @@ AreCountersEqual(cJSON *obj1, cJSON *obj2) {
     return true;
 }
 
-
-
 gboolean
 ImageProcess(gpointer data) {
 	const char* label = "Undefined";
@@ -214,16 +284,29 @@ ImageProcess(gpointer data) {
 		return G_SOURCE_REMOVE;
 
 	VdoBuffer* buffer = Video_Capture_YUV();	
+	VdoBuffer* jpegBuffer = NULL;
+	if( SDCARD && captureSDCARD > 0 ) {
+		GError *error = NULL;
+		jpegBuffer = vdo_stream_snapshot(capture_VDO_map, &error);
+		if( !jpegBuffer ) {
+			LOG_WARN("%s: Capture failed. %s\n",__func__,error->message);
+			g_error_free( error );
+		}
+	}
 
 	if( !buffer ) {
 		ACAP_STATUS_SetString("model","status","Error. Check log");
 		ACAP_STATUS_SetBool("model","state", 0);
 		LOG_WARN("Image capture failed\n");
+		if( jpegBuffer )
+			g_object_unref(jpegBuffer);
 		return G_SOURCE_REMOVE;
 	}
 
     gettimeofday(&startTs, NULL);
 	cJSON* detections = Model_Inference(buffer);
+	if(!detections)
+		return G_SOURCE_CONTINUE;
     gettimeofday(&endTs, NULL);
 
 	unsigned int inferenceTime = (unsigned int)(((endTs.tv_sec - startTs.tv_sec) * 1000) + ((endTs.tv_usec - startTs.tv_usec) / 1000));
@@ -305,7 +388,6 @@ ImageProcess(gpointer data) {
 			}
 			property = property->next;
 		}
-		
 
 		//FILTER DETECTIONS
 		int insert = 0;
@@ -381,16 +463,14 @@ void HTTP_ENDPOINT_detections(const ACAP_HTTP_Response response,const ACAP_HTTP_
 	ACAP_HTTP_Respond_JSON(  response, lastDetections);
 }
 
-void HTTP_ENDPOINT_eventsTransition(const ACAP_HTTP_Response response,const ACAP_HTTP_Request request) {
-	if( !eventsTransition )
-		eventsTransition = cJSON_CreateObject();
-	ACAP_HTTP_Respond_JSON(  response, eventsTransition);
-}
-
-
 int main(void) {
-	static GMainLoop *main_loop = NULL;
-	setbuf(stdout, NULL);
+    
+    // Initialize signal handling
+    struct sigaction action;
+    memset(&action, 0, sizeof(struct sigaction));
+    action.sa_handler = term_handler;
+    sigaction(SIGTERM, &action, NULL);
+
 	unsigned int videoWidth = 800;
 	unsigned int videoHeight = 600;
 
@@ -399,10 +479,9 @@ int main(void) {
 	lastDetections = cJSON_CreateArray();
 	ACAP( APP_PACKAGE, ConfigUpdate );
 	ACAP_HTTP_Node( "detections", HTTP_ENDPOINT_detections );
-	ACAP_HTTP_Node( "eventsTransition", HTTP_ENDPOINT_eventsTransition );
 	ACAP_EVENTS();
 
-	settings = ACAP_Service("settings");
+	settings = ACAP_Get_Config("settings");
 	if(!settings) {
 		ACAP_STATUS_SetString("model","status","Error. Check log");
 		ACAP_STATUS_SetBool("model","state", 0);
@@ -412,28 +491,44 @@ int main(void) {
 
 	eventLabelCounter = cJSON_CreateObject();
 
+	custom_output_reset();
+
 	model = Model_Setup();
+
+	if( cJSON_GetObjectItem(settings,"capture") && cJSON_GetObjectItem(settings,"capture")->type == cJSON_True )
+		captureSDCARD = 1;
 
 	videoWidth = cJSON_GetObjectItem(model,"videoWidth")?cJSON_GetObjectItem(model,"videoWidth")->valueint:800;
 	videoHeight = cJSON_GetObjectItem(model,"videoHeight")?cJSON_GetObjectItem(model,"videoHeight")->valueint:600;
 	label_timers = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
 
 	if( model ) {
-		ACAP_Register("model", model );
+		ACAP_Set_Config("model", model );
 		if( Video_Start_YUV( videoWidth, videoHeight ) ) {
 			LOG("Video %ux%u started\n",videoWidth,videoHeight);
 		} else {
 			LOG_WARN("Video stream for image capture failed\n");
+			captureSDCARD = 0;
 		}
 		g_idle_add(ImageProcess, NULL);
 	} else {
 		LOG_WARN("Model setup failed\n");
 	}
+
 	g_idle_add(ACAP_HTTP_Process, NULL);
     g_timeout_add_seconds(1, cleanupTransitionCallback, NULL);
-
+    atexit(cleanup_resources);
+	
 	main_loop = g_main_loop_new(NULL, FALSE);
 	g_main_loop_run(main_loop);
+
+    if (shutdown_flag) {
+        LOG("Received SIGTERM signal, shutting down gracefully\n");
+    }
+    
+    if (main_loop) {
+        g_main_loop_unref(main_loop);
+    }
 	
     return 0;
 }

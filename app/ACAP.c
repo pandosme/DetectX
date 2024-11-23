@@ -1,7 +1,7 @@
-/*------------------------------------------------------------------
- *  Fred Juhlin (2024)
- * For ACAP SDK12
- *------------------------------------------------------------------*/
+/*
+ * Copyright (c) 2024 Fred Juhlin
+ * MIT License - See LICENSE file for details
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,165 +21,196 @@
 #include <axsdk/axevent.h>
 #include "ACAP.h"
 
-#define FCGI_SOCKET_NAME "FCGI_SOCKET_NAME"
+// Logging macros
+#define LOG(fmt, args...) { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args); }
+#define LOG_WARN(fmt, args...) { syslog(LOG_WARNING, fmt, ## args); printf(fmt, ## args); }
+//#define LOG_TRACE(fmt, args...) { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args); }
+#define LOG_TRACE(fmt, args...) {}
 
-#define LOG(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args);}
-#define LOG_WARN(fmt, args...)    { syslog(LOG_WARNING, fmt, ## args); printf(fmt, ## args);}
-//#define LOG_TRACE(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args); }
-#define LOG_TRACE(fmt, args...)    {}
+// Global variables
+static cJSON* app = NULL;
+static cJSON* status_container = NULL;
 
-#define MAX_HTTP_NODES 32
-#define MAX_PATH_LENGTH 128
+static char ACAP_package_name[ACAP_MAX_PACKAGE_NAME];
+static ACAP_Config_Update ACAP_UpdateCallback = NULL;
 
+// HTTP node structure
 typedef struct {
-    char path[MAX_PATH_LENGTH];
+    char path[ACAP_MAX_PATH_LENGTH];
     ACAP_HTTP_Callback callback;
 } HTTPNode;
 
-static HTTPNode http_nodes[MAX_HTTP_NODES];
+static HTTPNode http_nodes[ACAP_MAX_HTTP_NODES];
 static int http_node_count = 0;
 
-cJSON* app = 0;
-char ACAP_package_name[30];
-ACAP_Config_Update	ACAP_UpdateCallback = 0;
+/*-----------------------------------------------------
+ * Core Functions Implementation
+ *-----------------------------------------------------*/
+ 
+static void
+ACAP_ENDPOINT_app(const ACAP_HTTP_Response response, const ACAP_HTTP_Request request) {
+    // Check request method
+    const char* method = ACAP_HTTP_Get_Method(request);
+    
+    if (method && strcmp(method, "POST") == 0) {
+        // Return 405 Method Not Allowed for POST requests
+        ACAP_HTTP_Respond_Error(response, 405, "Method Not Allowed - Use GET");
+        return;
+    }
+    ACAP_HTTP_Respond_JSON(response, app);
+}
 
 static void
-ACAP_ENDPOINT_app(const ACAP_HTTP_Response response,const ACAP_HTTP_Request request) {
-	ACAP_HTTP_Respond_JSON( response, app );
-}	
+ACAP_ENDPOINT_settings(const ACAP_HTTP_Response response, const ACAP_HTTP_Request request) {
+    const char* method = ACAP_HTTP_Get_Method(request);
 
-static void
-ACAP_ENDPOINT_settings(const ACAP_HTTP_Response response,const ACAP_HTTP_Request request) {
-	
-	const char* json = ACAP_HTTP_Request_Param( request, "json");
-	if( !json )
-		json = ACAP_HTTP_Request_Param( request, "set");
-	if( !json ) {
-		ACAP_HTTP_Respond_JSON( response, cJSON_GetObjectItem(app,"settings") );
-		return;
-	}
+    if (!method) {
+        ACAP_HTTP_Respond_Error(response, 400, "Invalid Request Method");
+        return;
+    }
 
-	cJSON *params = cJSON_Parse(json);
-	if(!params) {
-		ACAP_HTTP_Respond_Error( response, 400, "Invalid JSON data");
-		return;
-	}
-	LOG_TRACE("%s: %s\n",__func__,json);
-	cJSON* settings = cJSON_GetObjectItem(app,"settings");
-	cJSON* param = params->child;
-	while(param) {
-		if( cJSON_GetObjectItem(settings,param->string ) )
-			cJSON_ReplaceItemInObject(settings,param->string,cJSON_Duplicate(param,1) );
-		param = param->next;
-	}
-	cJSON_Delete(params);
-	ACAP_FILE_Write( "localdata/settings.json", settings);	
-	ACAP_HTTP_Respond_Text( response, "OK" );
-	if( ACAP_UpdateCallback )
-		ACAP_UpdateCallback("settings",settings);
+    // Handle GET request - return current settings
+    if (strcmp(method, "GET") == 0) {
+        ACAP_HTTP_Respond_JSON(response, cJSON_GetObjectItem(app, "settings"));
+        return;
+    }
+
+    // Handle POST request - update settings
+    if (strcmp(method, "POST") == 0) {
+        // Verify content type
+        const char* contentType = ACAP_HTTP_Get_Content_Type(request);
+        if (!contentType || strcmp(contentType, "application/json") != 0) {
+            ACAP_HTTP_Respond_Error(response, 415, "Unsupported Media Type - Use application/json");
+            return;
+        }
+
+        // Check for POST data
+        if (!request->postData || request->postDataLength == 0) {
+            ACAP_HTTP_Respond_Error(response, 400, "Missing POST data");
+            return;
+        }
+
+        // Parse POST data
+        cJSON* params = cJSON_Parse(request->postData);
+        if (!params) {
+            ACAP_HTTP_Respond_Error(response, 400, "Invalid JSON data");
+            return;
+        }
+
+        LOG_TRACE("%s: %s\n", __func__, request->postData);
+
+        // Update settings
+        cJSON* settings = cJSON_GetObjectItem(app, "settings");
+        cJSON* param = params->child;
+        while (param) {
+            if (cJSON_GetObjectItem(settings, param->string)) {
+                cJSON_ReplaceItemInObject(settings, param->string, 
+                                        cJSON_Duplicate(param, 1));
+            }
+            param = param->next;
+        }
+
+        // Cleanup and save
+        cJSON_Delete(params);
+        ACAP_FILE_Write("localdata/settings.json", settings);
+
+        // Notify about update
+        if (ACAP_UpdateCallback) {
+            ACAP_UpdateCallback("settings", settings);
+        }
+
+        ACAP_HTTP_Respond_Text(response, "Settings updated successfully");
+        return;
+    }
+
+    // Handle unsupported methods
+    ACAP_HTTP_Respond_Error(response, 405, "Method Not Allowed - Use GET or POST");
 }
 
-
-cJSON*
-ACAP( const char *package, ACAP_Config_Update callback ) {
-	LOG_TRACE("%s: ENTRY\n",__func__);
-	sprintf(ACAP_package_name,"%s",package);
-	ACAP_FILE_Init();
-
-	cJSON* device = ACAP_DEVICE();
-
-	ACAP_UpdateCallback = callback;
-	
-	app = cJSON_CreateObject();
-
-	cJSON_AddItemToObject(app, "manifest", ACAP_FILE_Read( "manifest.json" ));
-
-	cJSON* settings = ACAP_FILE_Read( "html/config/settings.json" );
-	if(!settings)
-		settings = cJSON_CreateObject();
-
-	cJSON* savedSettings = ACAP_FILE_Read( "localdata/settings.json" );
-	if( savedSettings ) {
-		cJSON* prop = savedSettings->child;
-		while(prop) {
-			if( cJSON_GetObjectItem(settings,prop->string ) )
-				cJSON_ReplaceItemInObject(settings,prop->string,cJSON_Duplicate(prop,1) );
-			prop = prop->next;
-		}
-		cJSON_Delete(savedSettings);
-	}
-
-	cJSON_AddItemToObject(app, "settings",settings);
-
-	ACAP_HTTP();
-	ACAP_EVENTS();
-
-	ACAP_Register("status", ACAP_STATUS());
-	ACAP_Register("device", device);
-
-	
-	ACAP_HTTP_Node( "app", ACAP_ENDPOINT_app );	
-	ACAP_HTTP_Node( "settings", ACAP_ENDPOINT_settings );
-
-	if( ACAP_UpdateCallback )
-		ACAP_UpdateCallback("settings",settings);
-
-	LOG_TRACE("%s:Exit\n",__func__);
-	
-	return settings;
+const char* ACAP_Name(void) {
+	return ACAP_package_name;
 }
 
+ 
+cJSON* ACAP(const char* package, ACAP_Config_Update callback) {
+    if (!package) {
+        LOG_WARN("Invalid package name\n");
+        return NULL;
+    }
 
-const char* ACAP_Package() {
-	cJSON* manifest = cJSON_GetObjectItem(app,"manifest");
-	if(!manifest) {
-		LOG_WARN("%s: invalid manifest\n",__func__);
-		return "Undefined";
-	}
-	cJSON* acapPackageConf = cJSON_GetObjectItem(manifest,"acapPackageConf");
-	if(!acapPackageConf) {
-		LOG_WARN("%s: invalid acapPackageConf\n",__func__);
-		return "Undefined";
-	}
-	cJSON* setup = cJSON_GetObjectItem(acapPackageConf,"setup");
-	if(!setup) {
-		LOG_WARN("%s: invalid setup\n",__func__);
-		return "Undefined";
-	}
-	return cJSON_GetObjectItem(setup,"appName")->valuestring;
-}
-	
-const char* ACAP_Name() {
-	cJSON* manifest = cJSON_GetObjectItem(app,"manifest");
-	if(!manifest) {
-		LOG_WARN("%s: invalid manifest\n",__func__);
-		return "Undefined";
-	}
-	cJSON* acapPackageConf = cJSON_GetObjectItem(manifest,"acapPackageConf");
-	if(!acapPackageConf) {
-		LOG_WARN("%s: invalid acapPackageConf\n",__func__);
-		return "Undefined";
-	}
-	cJSON* setup = cJSON_GetObjectItem(acapPackageConf,"setup");
-	if(!setup) {
-		LOG_WARN("%s: invalid setup\n",__func__);
-		return "Undefined";
-	}
-	return cJSON_GetObjectItem(setup,"friendlyName")->valuestring;
-}
+    
+    LOG_TRACE("%s: Initializing ACAP for package %s\n", __func__, package);
+    
+    // Store package name
+    strncpy(ACAP_package_name, package, ACAP_MAX_PACKAGE_NAME - 1);
+    ACAP_package_name[ACAP_MAX_PACKAGE_NAME - 1] = '\0';
+    
+    // Initialize subsystems
+    if (!ACAP_FILE_Init()) {
+        LOG_WARN("Failed to initialize file system\n");
+        return NULL;
+    }
 
-cJSON*
-ACAP_Service(const char* service) {
-	cJSON* reqestedService = cJSON_GetObjectItem(app, service );
-	if( !reqestedService ) {
-		LOG_WARN("%s: %s is undefined\n",__func__,service);
-		return 0;
-	}
-	return reqestedService;
+    // Store callback
+    ACAP_UpdateCallback = callback;
+
+    // Create main app object
+    app = cJSON_CreateObject();
+    if (!app) {
+        LOG_WARN("Failed to create app object\n");
+        return NULL;
+    }
+
+    // Load manifest
+    cJSON* manifest = ACAP_FILE_Read("manifest.json");
+    if (manifest) {
+        cJSON_AddItemToObject(app, "manifest", manifest);
+    }
+
+    // Load and merge settings
+    cJSON* settings = ACAP_FILE_Read("html/config/settings.json");
+    if (!settings) {
+        settings = cJSON_CreateObject();
+    }
+    
+    cJSON* savedSettings = ACAP_FILE_Read("localdata/settings.json");
+    if (savedSettings) {
+        cJSON* prop = savedSettings->child;
+        while (prop) {
+            if (cJSON_GetObjectItem(settings, prop->string)) {
+                cJSON_ReplaceItemInObject(settings, prop->string, 
+                                        cJSON_Duplicate(prop, 1));
+            }
+            prop = prop->next;
+        }
+        cJSON_Delete(savedSettings);
+    }
+
+    cJSON_AddItemToObject(app, "settings", settings);
+
+    // Initialize subsystems
+    ACAP_HTTP();
+    ACAP_EVENTS();
+    
+    // Register core services
+    ACAP_Set_Config("status", ACAP_STATUS());
+    ACAP_Set_Config("device", ACAP_DEVICE());
+    
+    // Register core endpoints
+    ACAP_HTTP_Node("app", ACAP_ENDPOINT_app);
+    ACAP_HTTP_Node("settings", ACAP_ENDPOINT_settings);
+
+    // Notify about settings
+    if (ACAP_UpdateCallback) {
+        ACAP_UpdateCallback("settings", settings);
+    }
+
+    LOG_TRACE("%s: Initialization complete\n", __func__);
+    return settings;
 }
 
 int
-ACAP_Register(const char* service, cJSON* serviceSettings ) {
+ACAP_Set_Config(const char* service, cJSON* serviceSettings ) {
 	LOG_TRACE("%s: %s\n",__func__,service);
 	if( cJSON_GetObjectItem(app,service) ) {
 		LOG_TRACE("%s: %s already registered\n",__func__,service);
@@ -189,180 +220,99 @@ ACAP_Register(const char* service, cJSON* serviceSettings ) {
 	return 1;
 }
 
-
-char ACAP_FILE_Path[128] = "";
-
-const char*
-ACAP_FILE_AppPath() {
-	return ACAP_FILE_Path;
-}
-
-
-int
-ACAP_FILE_Init() {
-	LOG_TRACE("%s: ENTRY\n",__func__);
-	sprintf( ACAP_FILE_Path,"/usr/local/packages/%s/", ACAP_package_name );
-	return 1;
-}
-
-FILE*
-ACAP_FILE_Open( const char *filepath, const char *mode ) {
-	char   fullpath[128];
-	sprintf( fullpath, "%s", filepath );
-	FILE *file = fopen( fullpath , mode );;
-	if(file) {
-		LOG_TRACE("Opening File %s (%s)\n",fullpath, mode);
-	} else {
-		LOG_TRACE("Error opening file %s\n",fullpath);
-	}
-	return file;
-}
-
-int
-ACAP_FILE_Delete( const char *filepath ) {
-
-  char fullpath[128];
-
-  sprintf( fullpath, "%s%s", ACAP_FILE_Path, filepath );
-
-  if( remove ( fullpath ) != 0 ) {
-    LOG_WARN("ACAP_FILE_delete: Could not delete %s\n", fullpath);
-    return 0;
-  }
-  return 1;	
-}
-
 cJSON*
-ACAP_FILE_Read( const char* filepath ) {
-	FILE*   file;
-	char   *jsonString;
-	cJSON  *object;
-	size_t bytesRead, size;
-
-	LOG_TRACE("%s: %s\n",__func__,filepath);
-
-	file = ACAP_FILE_Open( filepath , "r");
-	if( !file ) {
-		//    LOG("%s does not exist\n", filepath);
+ACAP_Get_Config(const char* service) {
+	cJSON* reqestedService = cJSON_GetObjectItem(app, service );
+	if( !reqestedService ) {
+		LOG_WARN("%s: %s is undefined\n",__func__,service);
 		return 0;
 	}
-
-	fseek( file, 0, SEEK_END );
-	size = ftell( file );
-	fseek( file , 0, SEEK_SET);
-
-	if( size < 2 ) {
-		fclose( file );
-		LOG_WARN("ACAP_FILE_read: File size error in %s\n", filepath);
-		return 0;
-	}
-
-	jsonString = malloc( size + 1 );
-	if( !jsonString ) {
-		fclose( file );
-		LOG_WARN("ACAP_FILE_read: Memory allocation error\n");
-		return 0;
-	}
-
-	bytesRead = fread ( (void *)jsonString, sizeof(char), size, file );
-	fclose( file );
-	if( bytesRead != size ) {
-		free( jsonString );
-		LOG_WARN("ACAP_FILE_read: Read error in %s\n", filepath);
-	return 0;
-	}
-
-	jsonString[bytesRead] = 0;
-	object = cJSON_Parse( jsonString );
-	free( jsonString );
-	if( !object ) {
-		LOG_WARN("ACAP_FILE_read: JSON Parse error for %s\n", filepath);
-		return 0;
-	}
-	return object;
+	return reqestedService;
 }
 
-int
-ACAP_FILE_WriteData( const char *filepath, const char *data ) {
-  FILE *file;
-  if( !filepath || !data ) {
-    LOG_WARN("ACAP_FILE_write: Invalid input\n");
-    return 0;
-  }
-  
-  file = ACAP_FILE_Open( filepath, "w" );
-  if( !file ) {
-    LOG_WARN("ACAP_FILE_write: Error opening %s\n", filepath);
-    return 0;
-  }
-
-
-  if( !fputs( data,file ) ) {
-    LOG_WARN("ACAP_FILE_write: Could not save data to %s\n", filepath);
-    fclose( file );
-    return 0;
-  }
-  fclose( file );
-  return 1;
+/*------------------------------------------------------------------
+ * HTTP Request Processing Implementation
+ *------------------------------------------------------------------*/
+void
+ACAP_HTTP() {
 }
 
-int
-ACAP_FILE_Write( const char *filepath,  cJSON* object )  {
-  FILE *file;
-  char *jsonString;
-  if( !filepath || !object ) {
-    LOG_WARN("ACAP_FILE_write: Invalid input\n");
-    return 0;
-  }
-  
-  file = ACAP_FILE_Open( filepath, "w" );
-  if( !file ) {
-    LOG_WARN("ACAP_FILE_write: Error opening %s\n", filepath);
-    return 0;
-  }
-
-  jsonString = cJSON_Print( object );
-
-  if( !jsonString ) {
-    LOG_WARN("ACAP_FILE_write: JSON parse error for %s\n", filepath);
-    fclose( file );
-    return 0;
-  }
-
-  if( !fputs( jsonString,file ) ){
-    LOG_WARN("ACAP_FILE_write: Could not save data to %s\n", filepath);
-    free( jsonString );
-    fclose( file );
-    return 0;
-  }
-  free( jsonString );
-  fclose( file );
-  return 1;
+void
+ACAP_HTTP_Close() {
 }
 
-int
-ACAP_FILE_Exists( const char *filepath ) {
-  FILE *file;
-  file = ACAP_FILE_Open( filepath, "r");
-  if( file )
-    fclose( file );
-  return (file != 0 );
+static char* url_decode(const char* src) {
+    static char decoded[2048];
+    size_t src_len = strlen(src);
+    size_t i, j = 0;
+
+    for (i = 0; i < src_len && j < sizeof(decoded) - 1; i++) {
+        if (src[i] == '%' && i + 2 < src_len) {
+            char hex[3] = {src[i + 1], src[i + 2], 0};
+            decoded[j++] = (char)strtol(hex, NULL, 16);
+            i += 2;
+        } else if (src[i] == '+') {
+            decoded[j++] = ' ';
+        } else {
+            decoded[j++] = src[i];
+        }
+    }
+    decoded[j] = '\0';
+    return decoded;
 }
 
+static const char* get_path_without_query(const char* uri) {
+    static char path[ACAP_MAX_PATH_LENGTH];
+    const char* query = strchr(uri, '?');
+    
+    if (query) {
+        size_t path_length = query - uri;
+        if (path_length >= ACAP_MAX_PATH_LENGTH) {
+            path_length = ACAP_MAX_PATH_LENGTH - 1;
+        }
+        strncpy(path, uri, path_length);
+        path[path_length] = '\0';
+        return path;
+    }
+    return uri;
+}
+
+const char* ACAP_HTTP_Get_Method(const ACAP_HTTP_Request request) {
+    if (!request || !request->request) {
+        return NULL;
+    }
+    return FCGX_GetParam("REQUEST_METHOD", request->request->envp);
+}
+
+const char* ACAP_HTTP_Get_Content_Type(const ACAP_HTTP_Request request) {
+    if (!request || !request->request) {
+        return NULL;
+    }
+    return FCGX_GetParam("CONTENT_TYPE", request->request->envp);
+}
+
+size_t ACAP_HTTP_Get_Content_Length(const ACAP_HTTP_Request request) {
+    if (!request || !request->request) {
+        return 0;
+    }
+    const char* contentLength = FCGX_GetParam("CONTENT_LENGTH", request->request->envp);
+    return contentLength ? (size_t)atoll(contentLength) : 0;
+}
 
 int ACAP_HTTP_Node(const char *nodename, ACAP_HTTP_Callback callback) {
     // Prevent buffer overflow
-    if (http_node_count >= MAX_HTTP_NODES) {
+    if (http_node_count >= ACAP_MAX_HTTP_NODES) {
         LOG_WARN("Maximum HTTP nodes reached");
         return 0;
     }
-
+	LOG_TRACE("%s: %s\n",__func__,nodename);
+	
     // Construct full path
-    char full_path[MAX_PATH_LENGTH];
+    char full_path[ACAP_MAX_PATH_LENGTH];
     if (nodename[0] == '/') {
-        snprintf(full_path, sizeof(full_path), "/local/%s%s", ACAP_Package(), nodename);
+        snprintf(full_path, sizeof(full_path), "/local/%s%s", ACAP_Name(), nodename);
     } else {
-        snprintf(full_path, sizeof(full_path), "/local/%s/%s", ACAP_Package(), nodename);
+        snprintf(full_path, sizeof(full_path), "/local/%s/%s", ACAP_Name(), nodename);
     }
 
     // Check for duplicate paths
@@ -374,47 +324,34 @@ int ACAP_HTTP_Node(const char *nodename, ACAP_HTTP_Callback callback) {
     }
 
     // Add new node
-	snprintf(http_nodes[http_node_count].path, MAX_PATH_LENGTH, "%s", full_path);	
+    strncpy(http_nodes[http_node_count].path, full_path, ACAP_MAX_PATH_LENGTH - 1);
     http_nodes[http_node_count].callback = callback;
     http_node_count++;
 
     return 1;
 }
 
-static const char*
-get_path_without_query(const char* uri) {
-    static char path[MAX_PATH_LENGTH];
-    const char* query = strchr(uri, '?');
-    
-    if (query) {
-        size_t path_length = query - uri;
-        if (path_length >= MAX_PATH_LENGTH) {
-            path_length = MAX_PATH_LENGTH - 1;
-        }
-        strncpy(path, uri, path_length);
-        path[path_length] = '\0';
-        return path;
-    }
-    
-    return uri;
-}
 
-
-int ACAP_HTTP_Process() {
+int ACAP_HTTP_Process(void) {
+    
     FCGX_Request request;
+    ACAP_HTTP_Request_DATA requestData = {0};
     char* socket_path = NULL;
 
     // Initialize on first call
     static int initialized = 0;
     if (!initialized) {
-        FCGX_Init();
+        if (FCGX_Init() != 0) {
+            LOG_WARN("Failed to initialize FCGI\n");
+            return 0;
+        }
         initialized = 1;
     }
 
     // Get socket path
-    socket_path = getenv(FCGI_SOCKET_NAME);
+    socket_path = getenv("FCGI_SOCKET_NAME");
     if (!socket_path) {
-        LOG_WARN("Failed to get FCGI_SOCKET_NAME");
+        LOG_WARN("Failed to get FCGI_SOCKET_NAME\n");
         return 0;
     }
 
@@ -422,429 +359,501 @@ int ACAP_HTTP_Process() {
     static int fcgi_sock = -1;
     if (fcgi_sock == -1) {
         fcgi_sock = FCGX_OpenSocket(socket_path, 5);
-        chmod(socket_path, 0777);  // Simplified chmod
+        if (fcgi_sock < 0) {
+            LOG_WARN("Failed to open FCGI socket\n");
+            return 0;
+        }
+        chmod(socket_path, 0777);
     }
 
     // Initialize request
     if (FCGX_InitRequest(&request, fcgi_sock, 0) != 0) {
-        LOG_WARN("FCGX_InitRequest failed");
+        LOG_WARN("FCGX_InitRequest failed\n");
         return 0;
     }
 
     // Accept the request
     if (FCGX_Accept_r(&request) != 0) {
+        FCGX_Free(&request, 1);
         return 0;
     }
 
-    // Get the request URI
+    // Setup request data structure
+    requestData.request = &request;
+    requestData.method = FCGX_GetParam("REQUEST_METHOD", request.envp);
+    requestData.contentType = FCGX_GetParam("CONTENT_TYPE", request.envp);
+    
+    // Handle POST data
+    if (requestData.method && strcmp(requestData.method, "POST") == 0) {
+        size_t contentLength = ACAP_HTTP_Get_Content_Length(&requestData);
+        if (contentLength > 0 && contentLength < ACAP_MAX_BUFFER_SIZE) {
+            char* postData = malloc(contentLength + 1);
+				if (postData) {
+					size_t bytesRead = FCGX_GetStr(postData, contentLength, request.in);
+					if (bytesRead < contentLength) {
+						free(postData);
+						goto cleanup;
+					}
+					postData[bytesRead] = '\0';
+					requestData.postData = postData;
+					requestData.postDataLength = bytesRead;
+				}
+        }
+    }
+
+    // Process the request
     const char* uriString = FCGX_GetParam("REQUEST_URI", request.envp);
-
     if (!uriString) {
-        // Use FCGX_FPrintF for error response
-        FCGX_FPrintF(request.out, "Status: 400 Bad Request\r\n");
-        FCGX_FPrintF(request.out, "Content-Type: text/plain\r\n\r\n");
-        FCGX_FPrintF(request.out, "Invalid URI");
-        FCGX_Finish_r(&request);
-        return 0;
+        ACAP_HTTP_Respond_Error(&request, 400, "Invalid URI");
+        goto cleanup;
     }
 
-    LOG_TRACE("%s: %s\n", __func__, uriString);
+    //LOG_TRACE("%s: Processing URI: %s\n", __func__, uriString);
 
-
-    // Find matching callback
-	const char* pathOnly = get_path_without_query(uriString);	
+    // Find and execute matching callback
+    const char* pathOnly = get_path_without_query(uriString);
     ACAP_HTTP_Callback matching_callback = NULL;
+
     for (int i = 0; i < http_node_count; i++) {
-		LOG_TRACE("%s: %s %s\n",__func__,http_nodes[i].path,pathOnly);
         if (strcmp(http_nodes[i].path, pathOnly) == 0) {
             matching_callback = http_nodes[i].callback;
             break;
         }
     }
 
-    // Process the request
     if (matching_callback) {
-        matching_callback(&request, request);
+        matching_callback(&request, &requestData);
     } else {
-        // No matching handler found
-        FCGX_FPrintF(request.out, "Status: 404 Not Found\r\n");
-        FCGX_FPrintF(request.out, "Content-Type: text/plain\r\n\r\n");
-        FCGX_FPrintF(request.out, "Not Found");
+        ACAP_HTTP_Respond_Error(&request, 404, "Not Found");
     }
 
-    // Finish the request
+cleanup:
+    if (requestData.postData) {
+        free((void*)requestData.postData);
+    }
     FCGX_Finish_r(&request);
-
     return 1;
 }
 
-int
-ACAP_HTTP_Respond_String(ACAP_HTTP_Response response, const char *fmt, ...) {
-    va_list ap;
-    char tmp_str[4096];  // Allocate a fixed-size buffer instead of dynamic allocation
-
-    if (!response->out) {
-        LOG_WARN("ACAP_HTTP_Respond_String: Cannot send data to http. Handler = NULL\n");
-        return 0;
-    }
-    
-    va_start(ap, fmt);
-    // Use vsnprintf to prevent buffer overflow
-    vsnprintf(tmp_str, sizeof(tmp_str), fmt, ap);
-    va_end(ap);
-
-    // Use FCGX_FPrintF for writing to the FastCGI output stream
-    int result = FCGX_FPrintF(response->out, "%s", tmp_str);
-
-    return (result >= 0);
-}
-
-int
-ACAP_HTTP_Respond_Data(ACAP_HTTP_Response response, size_t count, void *data) {
-    if (count == 0 || data == 0) {
-        LOG_WARN("%s: Invalid data\n",__func__);
-        return 0;
-    }
-
-    int bytes_written = FCGX_PutStr((const char*)data, count, response->out);
-
-    if (bytes_written != count) {
-        LOG_WARN("%s: Error sending data. Wrote %d of %zu bytes\n", __func__, bytes_written, count);
-        return 0;
-    }
-    return 1;
-}
-
-static char* url_decode(const char* src) {
-    static char decoded[2048];  // Static buffer for the decoded string
-    int i, j = 0;
-    int len = strlen(src);
-    
-    for (i = 0; i < len && j < sizeof(decoded) - 1; i++) {
-        if (src[i] == '%' && i + 2 < len) {
-            char hex[3] = {src[i + 1], src[i + 2], 0};
-            decoded[j++] = (char)strtol(hex, NULL, 16);
-            i += 2;
-        } else if (src[i] == '+') {
-            decoded[j++] = ' ';
-        } else {
-            decoded[j++] = src[i];
-        }
-    }
-    decoded[j] = '\0';
-    
-    return decoded;
-}
+/*------------------------------------------------------------------
+ * HTTP Request Parameter Handling Implementation
+ *------------------------------------------------------------------*/
 
 const char* ACAP_HTTP_Request_Param(const ACAP_HTTP_Request request, const char* name) {
-    if (!request.envp) {
-        LOG_WARN("%s: Invalid request environment\n",__func__);
-        return 0;
+    if (!request || !request->request || !name) {
+        LOG_WARN("Invalid request parameters\n");
+        return NULL;
     }
 
-    // Use FCGX_GetParam to retrieve query parameters or form data
-    const char* value = FCGX_GetParam(name, request.envp);
-    LOG_TRACE("%s: Environment %s %s\n",__func__,name,value?value:"No value");
-    
-    if (!value) {
-        // If not found in environment, try parsing query string manually
-        const char* query_string = FCGX_GetParam("QUERY_STRING", request.envp);
-        if (query_string) {
-            // Use multiple static buffers for different parameters
-            static char param_values[10][1024];
-            static int buffer_index = 0;
-            
+    // First check POST data for parameters
+    if (request->method && strcmp(request->method, "POST") == 0 && 
+        request->contentType && strstr(request->contentType, "application/x-www-form-urlencoded")) {
+        
+        if (request->postData) {
             char search_param[512];
             snprintf(search_param, sizeof(search_param), "%s=", name);
-            
-            char* found = strstr(query_string, search_param);
+            char* found = strstr(request->postData, search_param);
             if (found) {
                 found += strlen(search_param);
                 char* end = strchr(found, '&');
+                size_t len = end ? (size_t)(end - found) : strlen(found);
                 
-                // Use the next buffer in rotation
-                char* param_value = param_values[buffer_index];
-                buffer_index = (buffer_index + 1) % 10;
-                
-                if (end) {
-                    strncpy(param_value, found, end - found);
-                    param_value[end - found] = '\0';
-                } else {
-                    strcpy(param_value, found);
+                // Allocate memory for the result
+                char* result = (char*)malloc(len + 1);
+                if (!result) {
+                    return NULL;
                 }
-                LOG_TRACE("%s: Query %s %s\n",__func__,name,param_value);
                 
-                // URL decode if it's the json parameter
-                if (strcmp(name, "json") == 0) {
-                    return url_decode(param_value);
-                }
-                return param_value;
-            } else {
-                LOG_TRACE("%s: Query param %s not found\n",__func__,name);
+                strncpy(result, found, len);
+                result[len] = '\0';
+                return result;  // Caller must free this
             }
         }
+    }
+
+    // Then check query string
+    const char* query_string = FCGX_GetParam("QUERY_STRING", request->request->envp);
+    if (query_string) {
+        char search_param[512];
+        snprintf(search_param, sizeof(search_param), "%s=", name);
+        
+        const char* start = query_string;
+        while ((start = strstr(start, search_param)) != NULL) {
+            // Make sure we found the parameter at the start of the string or after an &
+            if (start != query_string && *(start-1) != '&') {
+                start++;
+                continue;
+            }
+            
+            start += strlen(search_param);
+            char* end = strchr(start, '&');
+            size_t len = end ? (size_t)(end - start) : strlen(start);
+            
+            // Allocate memory for the result
+            char* result = (char*)malloc(len + 1);
+            if (!result) {
+                return NULL;
+            }
+            
+            strncpy(result, start, len);
+            result[len] = '\0';
+            return result;  // Caller must free this
+        }
+    }
+
+    return NULL;
+}
+
+
+/*------------------------------------------------------------------
+ * HTTP Response Implementation
+ *------------------------------------------------------------------*/
+
+int ACAP_HTTP_Header_XML(ACAP_HTTP_Response response) {
+    return ACAP_HTTP_Respond_String(response, 
+        "Content-Type: text/xml; charset=utf-8\r\n"
+        "Cache-Control: no-cache\r\n\r\n");
+}
+
+int ACAP_HTTP_Header_JSON(ACAP_HTTP_Response response) {
+    return ACAP_HTTP_Respond_String(response, 
+        "Content-Type: application/json; charset=utf-8\r\n"
+        "Cache-Control: no-cache\r\n\r\n");
+}
+
+int ACAP_HTTP_Header_TEXT(ACAP_HTTP_Response response) {
+    return ACAP_HTTP_Respond_String(response, 
+        "Content-Type: text/plain; charset=utf-8\r\n"
+        "Cache-Control: no-cache\r\n\r\n");
+}
+
+int ACAP_HTTP_Header_FILE(ACAP_HTTP_Response response, const char* filename, 
+                         const char* contenttype, unsigned filelength) {
+    if (!response || !filename || !contenttype) {
+        return 0;
+    }
+
+    return ACAP_HTTP_Respond_String(response,
+        "Content-Type: %s\r\n"
+        "Content-Disposition: attachment; filename=%s\r\n"
+        "Content-Transfer-Encoding: binary\r\n"
+        "Content-Length: %u\r\n"
+        "\r\n",
+        contenttype, filename, filelength);
+}
+
+int ACAP_HTTP_Respond_String(ACAP_HTTP_Response response, const char *fmt, ...) {
+    if (!response || !response->out || !fmt) {
+        return 0;
+    }
+
+    char buffer[4096];
+    va_list args;
+    va_start(args, fmt);
+    int written = vsnprintf(buffer, sizeof(buffer), fmt, args);
+    va_end(args);
+    
+    if (written < 0 || written >= (int)sizeof(buffer)) {
         return 0;
     }
     
-    // URL decode if it's the json parameter from environment
-    if (strcmp(name, "json") == 0) {
-        return url_decode(value);
-    }
-    return value;
+    return FCGX_PutStr(buffer, written, response->out) == written;
 }
 
-cJSON*
-ACAP_HTTP_Request_JSON( const ACAP_HTTP_Request request, const char *param ) {
-  const char *jsonstring;
-  cJSON *object;
-  jsonstring = ACAP_HTTP_Request_Param( request, param);
-  if( !jsonstring ) {
-    return 0;
-  }
-  object = cJSON_Parse(jsonstring);
-  if(!object) {
-    LOG_WARN("ACAP_HTTP_Request_JSON: Invalid JSON: %s",jsonstring);
-    return 0;
-  }
-  return object;
-}
-
-int
-ACAP_HTTP_Header_XML( ACAP_HTTP_Response response ) {
-  ACAP_HTTP_Respond_String( response,"Content-Type: text/xml; charset=utf-8; Cache-Control: no-cache\r\n\r\n");
-  ACAP_HTTP_Respond_String( response,"<?xml version=\"1.0\"?>\r\n");
-  return 1;
-}
-
-int
-ACAP_HTTP_Header_JSON( ACAP_HTTP_Response response ) {
-  ACAP_HTTP_Respond_String( response,"Content-Type: application/json; charset=utf-8; Cache-Control: no-cache\r\n\r\n");
-  return 1;
-}
-
-int
-ACAP_HTTP_Header_TEXT( ACAP_HTTP_Response response ) {
-  ACAP_HTTP_Respond_String( response,"Content-Type: text/plain; charset=utf-8; Cache-Control: no-cache\r\n\r\n");
-  return 1;
-}
-
-int
-ACAP_HTTP_Header_FILE( const ACAP_HTTP_Response response, const char *filename, const char *contenttype, unsigned filelength ) {
-  ACAP_HTTP_Respond_String( response, "HTTP/1.1 200 OK\r\n");
-  ACAP_HTTP_Respond_String( response, "Content-Description: File Transfer\r\n");
-  ACAP_HTTP_Respond_String( response, "Content-Type: %s\r\n", contenttype);
-  ACAP_HTTP_Respond_String( response, "Content-Disposition: attachment; filename=%s\r\n", filename);
-  ACAP_HTTP_Respond_String( response, "Content-Transfer-Encoding: binary\r\n");
-  ACAP_HTTP_Respond_String( response, "Content-Length: %u\r\n", filelength );
-  ACAP_HTTP_Respond_String( response, "\r\n");
-  return 1;
-}
-
-int
-ACAP_HTTP_Respond_Error( ACAP_HTTP_Response response, int code, const char *message ) {
-  ACAP_HTTP_Respond_String( response,"status: %d %s Error\r\nContent-Type: text/plain\r\n\r\n", code, (code < 500) ? "Client" : (code < 600) ? "Server":"");
-  if( code < 500 )
-    LOG_WARN("HTTP response %d: %s\n", code, message);
-  if( code >= 500 )
-    LOG_WARN("HTTP response %d: %s\n", code, message);
-  ACAP_HTTP_Respond_String( response,"%s", message);
-  return 1;
-}
-
-int
-ACAP_HTTP_Respond_Text( ACAP_HTTP_Response response, const char *message ) {
-  ACAP_HTTP_Header_TEXT( response );
-  ACAP_HTTP_Respond_String( response,"%s", message);
-  return 1;
-}
-
-int
-ACAP_HTTP_Respond_JSON( ACAP_HTTP_Response response, cJSON *object) {
-  char *jsonstring;
-  if( !object ) {
-    LOG_WARN("ACAP_HTTP_Respond_JSON: Invalid object");
-    return 0;
-  }
-  jsonstring = cJSON_Print( object );  
-  ACAP_HTTP_Header_JSON( response );
-  ACAP_HTTP_Respond_String( response, jsonstring );
-  free( jsonstring );
-  return 0;
-}
-
-
-void
-ACAP_ENDPOINT_license(const ACAP_HTTP_Response response,const ACAP_HTTP_Request request) {
-
-	FILE* f = ACAP_FILE_Open( "LICENSE", "r" );
-	if( !f ) {
-		ACAP_HTTP_Respond_Error( response, 500, "No license found");
-		return;
-	}
-	char* buffer = malloc(10000);
-	if(!buffer) {
-		ACAP_HTTP_Respond_Error( response, 500, "No license found");
-		return;
-	}
-	int bytes = fread(buffer, sizeof(char), 10000, f);
-	fclose(f);
-	if( !bytes ) {
-		free(buffer);
-		ACAP_HTTP_Respond_Error( response, 500, "No license found");
-		return;
-	}
-	ACAP_HTTP_Header_TEXT(response );	
-	ACAP_HTTP_Respond_Data( response, bytes, buffer );
-	free(buffer);
-}
-
-void
-ACAP_HTTP() {
-}
-
-
-void
-ACAP_HTTP_Close() {
-}
-
-cJSON *ACAP_DEVICE_Container = 0;
-AXParameter *ACAP_DEVICE_parameter_handler;
-
-char**
-string_split( char* a_str,  char a_delim) {
-    char** result    = 0;
-    size_t count     = 0;
-    const char* tmp  = a_str;
-    const char* last_comma = 0;
-    char delim[2];
-    delim[0] = a_delim;
-    delim[1] = 0;
-    /* Count how many elements will be extracted. */
-    while (*tmp)
-    {
-        if (a_delim == *tmp)
-        {
-            count++;
-            last_comma = tmp;
-        }
-        tmp++;
+int ACAP_HTTP_Respond_JSON(ACAP_HTTP_Response response, cJSON* object) {
+    if (!response || !object) {
+        LOG_WARN("Invalid response handle or JSON object\n");
+        return 0;
     }
 
-    /* Add space for trailing token. */
-    count += last_comma < (a_str + strlen(a_str) - 1);
-
-    /* Add space for terminating null string so caller
-       knows where the list of returned strings ends. */
-    count++;
-    result = malloc(sizeof(char*) * count);
-    if (result) {
-        size_t idx  = 0;
-        char* token = strtok(a_str, delim);
-        while (token) {
-//            assert(idx < count);
-            *(result + idx++) = strdup(token);
-            token = strtok(0, delim);
-        }
-//        assert(idx == count - 1);
-        *(result + idx) = 0;
+    char* jsonString = cJSON_Print(object);
+    if (!jsonString) {
+        LOG_WARN("Failed to serialize JSON\n");
+        return 0;
     }
+
+    int result = ACAP_HTTP_Header_JSON(response) &&
+                 ACAP_HTTP_Respond_String(response, "%s", jsonString);
+    
+    free(jsonString);
     return result;
 }
 
-const char* 
-ACAP_DEVICE_Prop( const char *attribute ) {
-	if( !ACAP_DEVICE_Container )
+int ACAP_HTTP_Respond_Data(ACAP_HTTP_Response response, size_t count, const void* data) {
+    if (!response || !response->out || !data || count == 0) {
+        LOG_WARN("Invalid response parameters\n");
+        return 0;
+    }
+
+    return FCGX_PutStr(data, count, response->out) == (int)count;
+}
+
+int ACAP_HTTP_Respond_Error(ACAP_HTTP_Response response, int code, const char* message) {
+    if (!response || !message) {
+        return 0;
+    }
+
+    const char* error_type = (code < 500) ? "Client" : 
+                            (code < 600) ? "Server" : "Unknown";
+
+    ACAP_HTTP_Respond_String(response, 
+        "Status: %d %s Error\r\n"
+        "Content-Type: text/plain\r\n"
+        "\r\n"
+        "%s", 
+        code, error_type, message);
+
+    LOG_WARN("HTTP Error %d: %s\n", code, message);
+    return 1;
+}
+
+int ACAP_HTTP_Respond_Text(ACAP_HTTP_Response response, const char* message) {
+    if (!response || !message) {
+        return 0;
+    }
+
+    return ACAP_HTTP_Header_TEXT(response) &&
+           ACAP_HTTP_Respond_String(response, "%s", message);
+}
+
+/*------------------------------------------------------------------
+ * Status Management Implementation
+ *------------------------------------------------------------------*/
+
+static void
+ACAP_ENDPOINT_status(const ACAP_HTTP_Response response, const ACAP_HTTP_Request request) {
+    const char* method = ACAP_HTTP_Get_Method(request);
+    
+    if (!method || strcmp(method, "GET") != 0) {
+        ACAP_HTTP_Respond_Error(response, 405, "Method Not Allowed - Only GET supported");
+        return;
+    }
+
+	if(!status_container)
+		status_container = cJSON_CreateObject();
+    
+    ACAP_HTTP_Respond_JSON(response, status_container);
+}
+
+cJSON* ACAP_STATUS(void) {
+    if (!status_container) {
+        status_container = cJSON_CreateObject();
+		ACAP_HTTP_Node("status",ACAP_ENDPOINT_status);
+	}
+    return status_container;
+}
+
+cJSON* ACAP_STATUS_Group(const char* name) {
+    if (!name || !status_container) {
+        return NULL;
+    }
+
+    cJSON* group = cJSON_GetObjectItem(status_container, name);
+    if (!group) {
+        group = cJSON_CreateObject();
+        if (!group) {
+            LOG_WARN("Failed to create status group: %s\n", name);
+            return NULL;
+        }
+        cJSON_AddItemToObject(status_container, name, group);
+    }
+    return group;
+}
+
+
+void ACAP_STATUS_SetBool(const char* group, const char* name, int state) {
+    if (!group || !name) {
+        LOG_WARN("%s: Invalid group or name parameter\n", __func__);
+        return;
+    }
+
+    cJSON* groupObj = ACAP_STATUS_Group(group);
+    if (!groupObj) {
+		LOG_TRACE("%s: Unknown %s\n",__func__,group);
+        return;
+    }
+
+    cJSON* item = cJSON_GetObjectItem(groupObj, name);
+    if (item) {
+        cJSON_ReplaceItemInObject(groupObj, name, cJSON_CreateBool(state));
+    } else {
+        cJSON_AddItemToObject(groupObj, name, cJSON_CreateBool(state));
+    }
+}
+
+void ACAP_STATUS_SetNumber(const char* group, const char* name, double value) {
+    if (!group || !name) {
+        LOG_WARN("Invalid group or name parameter\n");
+        return;
+    }
+
+    cJSON* groupObj = ACAP_STATUS_Group(group);
+    if (!groupObj) {
+        return;
+    }
+
+    cJSON* item = cJSON_GetObjectItem(groupObj, name);
+    if (item) {
+        cJSON_ReplaceItemInObject(groupObj, name, cJSON_CreateNumber(value));
+    } else {
+        cJSON_AddItemToObject(groupObj, name, cJSON_CreateNumber(value));
+    }
+}
+
+void ACAP_STATUS_SetString(const char* group, const char* name, const char* string) {
+    if (!group || !name || !string) {
+        LOG_WARN("Invalid parameters\n");
+        return;
+    }
+
+    cJSON* groupObj = ACAP_STATUS_Group(group);
+    if (!groupObj) {
+        return;
+    }
+
+    cJSON* item = cJSON_GetObjectItem(groupObj, name);
+    if (item) {
+        cJSON_ReplaceItemInObject(groupObj, name, cJSON_CreateString(string));
+    } else {
+        cJSON_AddItemToObject(groupObj, name, cJSON_CreateString(string));
+    }
+}
+
+void ACAP_STATUS_SetObject(const char* group, const char* name, cJSON* data) {
+    if (!group || !name || !data) {
+        LOG_WARN("Invalid parameters\n");
+        return;
+    }
+
+    cJSON* groupObj = ACAP_STATUS_Group(group);
+    if (!groupObj) {
+        return;
+    }
+
+    cJSON* item = cJSON_GetObjectItem(groupObj, name);
+    if (item) {
+        cJSON_ReplaceItemInObject(groupObj, name, cJSON_Duplicate(data, 1));
+    } else {
+        cJSON_AddItemToObject(groupObj, name, cJSON_Duplicate(data, 1));
+    }
+}
+
+void ACAP_STATUS_SetNull(const char* group, const char* name) {
+    if (!group || !name) {
+        LOG_WARN("Invalid group or name parameter\n");
+        return;
+    }
+
+    cJSON* groupObj = ACAP_STATUS_Group(group);
+    if (!groupObj) {
+        return;
+    }
+
+    cJSON* item = cJSON_GetObjectItem(groupObj, name);
+    if (item) {
+        cJSON_ReplaceItemInObject(groupObj, name, cJSON_CreateNull());
+    } else {
+        cJSON_AddItemToObject(groupObj, name, cJSON_CreateNull());
+    }
+}
+
+/*------------------------------------------------------------------
+ * Status Getters Implementation
+ *------------------------------------------------------------------*/
+
+int ACAP_STATUS_Bool(const char* group, const char* name) {
+	LOG_TRACE("%s: %s,%s\n",__func__,group,name);
+    cJSON* groupObj = ACAP_STATUS_Group(group);
+    if (!groupObj) {
+		LOG_TRACE("%s: Invalid group \n",__func__);
+        return 0;
+    }
+
+    cJSON* item = cJSON_GetObjectItem(groupObj, name);
+	if( !item ) {
+		LOG_TRACE("%s: %s is not part of status\n",__func__,name);
 		return 0;
-	return cJSON_GetObjectItem(ACAP_DEVICE_Container,attribute) ? cJSON_GetObjectItem(ACAP_DEVICE_Container,attribute)->valuestring : 0;
+	}
+    return item->type == cJSON_True?1:0;
 }
 
-int
-ACAP_DEVICE_Prop_Int( const char *attribute ) {
-  if( !ACAP_DEVICE_Container )
-    return 0;
-  return cJSON_GetObjectItem(ACAP_DEVICE_Container,attribute) ? cJSON_GetObjectItem(ACAP_DEVICE_Container,attribute)->valueint : 0;
+int ACAP_STATUS_Int(const char* group, const char* name) {
+    cJSON* groupObj = ACAP_STATUS_Group(group);
+    if (!groupObj) {
+        return 0;
+    }
+
+    cJSON* item = cJSON_GetObjectItem(groupObj, name);
+    return item && cJSON_IsNumber(item) ? item->valueint : 0;
 }
 
-cJSON* 
-ACAP_DEVICE_JSON( const char *attribute ) {
-  if( !ACAP_DEVICE_Container )
-    return 0;
-  return cJSON_GetObjectItem(ACAP_DEVICE_Container,attribute);
+double ACAP_STATUS_Double(const char* group, const char* name) {
+    cJSON* groupObj = ACAP_STATUS_Group(group);
+    if (!groupObj) {
+        return 0.0;
+    }
+
+    cJSON* item = cJSON_GetObjectItem(groupObj, name);
+    return item && cJSON_IsNumber(item) ? item->valuedouble : 0.0;
 }
 
+char* ACAP_STATUS_String(const char* group, const char* name) {
+    cJSON* groupObj = ACAP_STATUS_Group(group);
+    if (!groupObj) {
+        return NULL;
+    }
 
-int
-ACAP_DEVICE_Seconds_Since_Midnight() {
-	time_t t = time(NULL);
-	struct tm tm = *localtime(&t);
-	int seconds = tm.tm_hour * 3600;
-	seconds += tm.tm_min * 60;
-	seconds += tm.tm_sec;
-	return seconds;
+    cJSON* item = cJSON_GetObjectItem(groupObj, name);
+    return item && cJSON_IsString(item) ? item->valuestring : NULL;
 }
 
-char ACAP_DEVICE_date[128] = "2023-01-01";
-char ACAP_DEVICE_time[128] = "00:00:00";
+cJSON* ACAP_STATUS_Object(const char* group, const char* name) {
+    cJSON* groupObj = ACAP_STATUS_Group(group);
+    if (!groupObj) {
+        return NULL;
+    }
 
-const char*
-ACAP_DEVICE_Date() {
-	time_t t = time(NULL);
-	struct tm *tm = localtime(&t);
-	sprintf(ACAP_DEVICE_date,"%d-%02d-%02d",tm->tm_year + 1900,tm->tm_mon + 1, tm->tm_mday);
-	return ACAP_DEVICE_date;
+    return cJSON_GetObjectItem(groupObj, name);
 }
 
-const char*
-ACAP_DEVICE_Time() {
-	time_t t = time(NULL);
-	struct tm *tm = localtime(&t);
-	sprintf(ACAP_DEVICE_time,"%02d:%02d:%02d",tm->tm_hour,tm->tm_min,tm->tm_sec);
-	return ACAP_DEVICE_time;
-}
+/*------------------------------------------------------------------
+ * Device Information Implementation
+ *------------------------------------------------------------------*/
 
-char ACAP_DEVICE_timestring[128] = "2020-01-01 00:00:00";
-
-const char*
-ACAP_DEVICE_Local_Time() {
-	time_t t = time(NULL);
-	struct tm *tm = localtime(&t);
-	sprintf(ACAP_DEVICE_timestring,"%d-%02d-%02d %02d:%02d:%02d",tm->tm_year + 1900,tm->tm_mon + 1, tm->tm_mday,tm->tm_hour,tm->tm_min,tm->tm_sec);
-	LOG_TRACE("Local Time: %s\n",ACAP_DEVICE_timestring);
-	return ACAP_DEVICE_timestring;
-}
-
-char ACAP_DEVICE_isostring[128] = "2020-01-01T00:00:00+0000";
-
-const char*
-ACAP_DEVICE_ISOTime() {
-	time_t t = time(NULL);
-	struct tm *tm = localtime(&t);
-	strftime(ACAP_DEVICE_isostring, 50, "%Y-%m-%dT%T%z",tm);
-	return ACAP_DEVICE_isostring;
-}
-
-double
-ACAP_DEVICE_Timestamp(void) {
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    // Convert seconds and microseconds to milliseconds
-    return tv.tv_sec * 1000 + tv.tv_usec / 1000;
-}
+static cJSON* ACAP_DEVICE_Container = NULL;
+static AXParameter* ACAP_DEVICE_parameter_handler = NULL;
 
 static void
 ACAP_ENDPOINT_device(ACAP_HTTP_Response response, ACAP_HTTP_Request request) {
-	if( !ACAP_DEVICE_Container) {
-		ACAP_HTTP_Respond_Error( response, 500, "Device properties not initialized");
-		return;
-	}
-	cJSON_ReplaceItemInObject(ACAP_DEVICE_Container,"date", cJSON_CreateString(ACAP_DEVICE_Date()) );
-	cJSON_ReplaceItemInObject(ACAP_DEVICE_Container,"time", cJSON_CreateString(ACAP_DEVICE_Time()) );
-	ACAP_HTTP_Respond_JSON( response, ACAP_DEVICE_Container );
+    const char* method = ACAP_HTTP_Get_Method(request);
+    
+    // Verify method is GET
+    if (!method || strcmp(method, "GET") != 0) {
+        ACAP_HTTP_Respond_Error(response, 405, "Method Not Allowed - Only GET supported");
+        return;
+    }
+
+    // Check if device container is initialized
+    if (!ACAP_DEVICE_Container) {
+        ACAP_HTTP_Respond_Error(response, 500, "Device properties not initialized");
+        return;
+    }
+
+    // Update dynamic properties
+    cJSON_ReplaceItemInObject(ACAP_DEVICE_Container, "date", 
+                             cJSON_CreateString(ACAP_DEVICE_Date()));
+    cJSON_ReplaceItemInObject(ACAP_DEVICE_Container, "time", 
+                             cJSON_CreateString(ACAP_DEVICE_Time()));
+
+    // Send response
+    ACAP_HTTP_Respond_JSON(response, ACAP_DEVICE_Container);
 }
+
 
 double previousTransmitted = 0;
 double previousNetworkTimestamp = 0;
 double previousNetworkAverage = 0;
+char** string_split( char* a_str,  char a_delim);
 
 double
 ACAP_DEVICE_Network_Average() {
@@ -933,9 +942,29 @@ ACAP_DEVICE_Uptime() {
 	return (double)info.uptime; 
 };	
 
+const char* 
+ACAP_DEVICE_Prop( const char *attribute ) {
+	if( !ACAP_DEVICE_Container )
+		return 0;
+	return cJSON_GetObjectItem(ACAP_DEVICE_Container,attribute) ? cJSON_GetObjectItem(ACAP_DEVICE_Container,attribute)->valuestring : 0;
+}
 
-cJSON*
-ACAP_DEVICE() {
+int
+ACAP_DEVICE_Prop_Int( const char *attribute ) {
+  if( !ACAP_DEVICE_Container )
+    return 0;
+  return cJSON_GetObjectItem(ACAP_DEVICE_Container,attribute) ? cJSON_GetObjectItem(ACAP_DEVICE_Container,attribute)->valueint : 0;
+}
+
+cJSON* 
+ACAP_DEVICE_JSON( const char *attribute ) {
+  if( !ACAP_DEVICE_Container )
+    return 0;
+  return cJSON_GetObjectItem(ACAP_DEVICE_Container,attribute);
+}
+
+
+cJSON* ACAP_DEVICE(void) {
 	gchar *value = 0, *pHead,*pTail;
 
 	ACAP_DEVICE_Container = cJSON_CreateObject();
@@ -1095,217 +1124,210 @@ ACAP_DEVICE() {
 	return ACAP_DEVICE_Container;
 }
 
-cJSON *ACAP_STATUS_Container = 0;
 
-static void
-ACAP_ENDPOINT_status(const ACAP_HTTP_Response response,const ACAP_HTTP_Request request) {
-	if( ACAP_STATUS_Container == 0 ) {
-		ACAP_HTTP_Respond_Error( response, 500, "Status container not initialized");
-		return;
-	}
-	ACAP_HTTP_Respond_JSON( response, ACAP_STATUS_Container);	
-}
-
-cJSON*
-ACAP_STATUS_Group( const char *group ) {
-	if(!ACAP_STATUS_Container)
-		ACAP_STATUS_Container = cJSON_CreateObject();
-	cJSON* g = cJSON_GetObjectItem(ACAP_STATUS_Container, group );
-	return g;
-}
+/*------------------------------------------------------------------
+ * Time and System Information
+ *------------------------------------------------------------------*/
 
 int
-ACAP_STATUS_Bool( const char *group, const char *name ) {
-	cJSON* g = ACAP_STATUS_Group( group );
-	if(!g) {
-		LOG_WARN("%s: %s is undefined\n",__func__,group);
-		return 0;
-	}
-	cJSON *object = cJSON_GetObjectItem(g, name);
-	if( !object ) {
-		LOG_WARN("%s: %s/%s is undefined\n",__func__,group,name);
-		return 0;
-	}
-	if( !( object->type == cJSON_True || object->type == cJSON_False || object->type == cJSON_NULL)) {
-		LOG_WARN("%s: %s/%s is not bool (Type = %d)\n",__func__,group,name,object->type); 
-		return 0;
-	}
-	if( object->type == cJSON_True )
-		return 1;
-	return 0;
+ACAP_DEVICE_Seconds_Since_Midnight() {
+	time_t t = time(NULL);
+	struct tm tm = *localtime(&t);
+	int seconds = tm.tm_hour * 3600;
+	seconds += tm.tm_min * 60;
+	seconds += tm.tm_sec;
+	return seconds;
+}
+
+char ACAP_DEVICE_timestring[128] = "2020-01-01 00:00:00";
+char ACAP_DEVICE_date[128] = "2023-01-01";
+char ACAP_DEVICE_time[128] = "00:00:00";
+char ACAP_DEVICE_isostring[128] = "2020-01-01T00:00:00+0000";
+
+const char*
+ACAP_DEVICE_Date() {
+	time_t t = time(NULL);
+	struct tm *tm = localtime(&t);
+	sprintf(ACAP_DEVICE_date,"%d-%02d-%02d",tm->tm_year + 1900,tm->tm_mon + 1, tm->tm_mday);
+	return ACAP_DEVICE_date;
+}
+
+const char*
+ACAP_DEVICE_Time() {
+	time_t t = time(NULL);
+	struct tm *tm = localtime(&t);
+	sprintf(ACAP_DEVICE_time,"%02d:%02d:%02d",tm->tm_hour,tm->tm_min,tm->tm_sec);
+	return ACAP_DEVICE_time;
+}
+
+
+const char*
+ACAP_DEVICE_Local_Time() {
+	time_t t = time(NULL);
+	struct tm *tm = localtime(&t);
+	sprintf(ACAP_DEVICE_timestring,"%d-%02d-%02d %02d:%02d:%02d",tm->tm_year + 1900,tm->tm_mon + 1, tm->tm_mday,tm->tm_hour,tm->tm_min,tm->tm_sec);
+	LOG_TRACE("Local Time: %s\n",ACAP_DEVICE_timestring);
+	return ACAP_DEVICE_timestring;
+}
+
+
+
+const char*
+ACAP_DEVICE_ISOTime() {
+	time_t t = time(NULL);
+	struct tm *tm = localtime(&t);
+	strftime(ACAP_DEVICE_isostring, 50, "%Y-%m-%dT%T%z",tm);
+	return ACAP_DEVICE_isostring;
 }
 
 double
-ACAP_STATUS_Double( const char *group, const char *name ) {
-	cJSON* g = ACAP_STATUS_Group( group );
-	if(!g) {
-		LOG_WARN("%s: %s is undefined\n",__func__,group);
-		return 0;
-	}
-	cJSON *object = cJSON_GetObjectItem(g, name);
-	if( !object ) {
-		LOG_WARN("%s: %s/%s is undefined\n",__func__,group,name);
-		return 0;
-	}
-	if( object->type != cJSON_Number ) {
-		LOG_WARN("%s: %s/%s is not a number\n",__func__,group,name); 
-		return 0;
-	}
-	return object->valuedouble;
+ACAP_DEVICE_Timestamp(void) {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    // Convert seconds and microseconds to milliseconds
+    return tv.tv_sec * 1000 + tv.tv_usec / 1000;
 }
 
-int
-ACAP_STATUS_Int( const char *group, const char *name ) {
-	cJSON* g = ACAP_STATUS_Group( group );
-	if(!g) {
-		LOG_WARN("%s: %s is undefined\n",__func__,group);
-		return 0;
-	}
-	cJSON *object = cJSON_GetObjectItem(g, name);
-	if( !object ) {
-		LOG_WARN("%s: %s/%s is undefined\n",__func__,group,name);
-		return 0;
-	}
-	if( object->type != cJSON_Number ) {
-		LOG_WARN("%s: %s/%s is not a number\n",__func__,group,name); 
-		return 0;
-	}
-	return object->valueint;
+/*------------------------------------------------------------------
+ * File Operations Implementation
+ *------------------------------------------------------------------*/
+
+static char ACAP_FILE_Path[ACAP_MAX_PATH_LENGTH] = "";
+
+const char* ACAP_FILE_AppPath(void) {
+    return ACAP_FILE_Path;
 }
 
-char*
-ACAP_STATUS_String( const char *group, const char *name ) {
-	cJSON* g = ACAP_STATUS_Group(group);
-	if(!g) {
-		LOG_WARN("%s: %s is undefined\n",__func__,group);
-		return 0;
-	}
-	cJSON *object = cJSON_GetObjectItem(g, name);
-	if( !object ) {
-		LOG_WARN("%s: %s/%s is undefined\n",__func__,group,name);
-		return 0;
-	}
-	if( object->type != cJSON_String ) {
-		LOG_WARN("%s: %s/%s is not a string\n",__func__,group,name); 
-		return 0;
-	}
-	return object->valuestring;
+int ACAP_FILE_Init(void) {
+    if (!ACAP_package_name[0]) {
+        LOG_WARN("Package name not initialized\n");
+        return 0;
+    }
+
+    snprintf(ACAP_FILE_Path, sizeof(ACAP_FILE_Path), 
+             "/usr/local/packages/%s/", ACAP_package_name);
+    return 1;
 }
 
-cJSON*
-ACAP_STATUS_Object( const char *group, const char *name ) {
-	cJSON* g = ACAP_STATUS_Group(group);
-	if(!g) {
-		LOG_WARN("%s: %s is undefined\n",__func__,group);
-		return 0;
-	}
-	cJSON *object = cJSON_GetObjectItem(g, name);
-	if( !object ) {
-		LOG_WARN("%s: %s/%s is undefined\n",__func__,group,name);
-		return 0;
-	}
-	return object;
+FILE* ACAP_FILE_Open(const char* filepath, const char* mode) {
+    if (!filepath || !mode) {
+        LOG_WARN("Invalid parameters for file operation\n");
+        return NULL;
+    }
+
+    char fullpath[ACAP_MAX_PATH_LENGTH];
+    if (snprintf(fullpath, sizeof(fullpath), "%s%s", ACAP_FILE_Path, filepath) >= sizeof(fullpath)) {
+        LOG_WARN("Path too long\n");
+        return NULL;
+    }
+    
+    FILE* file = fopen(fullpath, mode);
+    if (!file) {
+        LOG_TRACE("%s: Opening file %s failed\n", __func__, fullpath);
+    }
+    return file;
 }
 
-void
-ACAP_STATUS_SetBool( const char *group, const char *name, int state ) {
-	LOG_TRACE("%s: %s.%s=%s \n",__func__, group, name, state?"true":"false" );
-	cJSON* g = ACAP_STATUS_Group(group);
-	if(!g) {
-		g = cJSON_CreateObject();
-		cJSON_AddItemToObject(ACAP_STATUS_Container, group, g);
-	}
-	cJSON *object = cJSON_GetObjectItem( g, name);
-	if( !object ) {
-		if( state )
-			cJSON_AddTrueToObject( g, name );
-		else
-			cJSON_AddFalseToObject( g, name );
-		return;
-	}
-	if( state )
-		cJSON_ReplaceItemInObject(g, name, cJSON_CreateTrue() );
-	else
-		cJSON_ReplaceItemInObject(g, name, cJSON_CreateFalse() );
+int ACAP_FILE_Delete(const char* filepath) {
+    if (!filepath) {
+        return 0;
+    }
+
+    char fullpath[ACAP_MAX_PATH_LENGTH];
+    snprintf(fullpath, sizeof(fullpath), "%s%s", ACAP_FILE_Path, filepath);
+    
+    if (remove(fullpath) != 0) {
+        LOG_WARN("Delete %s failed\n", fullpath);
+        return 0;
+    }
+    return 1;
 }
 
-void
-ACAP_STATUS_SetNumber( const char *group, const char *name, double value ) {
-	LOG_TRACE("%s: %s.%s=%f \n",__func__, group, name, value );
-	cJSON* g = ACAP_STATUS_Group(group);
-	if(!g) {
-		g = cJSON_CreateObject();
-		cJSON_AddItemToObject(ACAP_STATUS_Container, group, g);
-	}
-	cJSON *object = cJSON_GetObjectItem( g, name);
-	if( !object ) {
-		cJSON_AddNumberToObject( g, name, value );
-		return;
-	}
-	cJSON_ReplaceItemInObject(g, name, cJSON_CreateNumber( value ));
+cJSON* ACAP_FILE_Read(const char* filepath) {
+    if (!filepath) {
+        LOG_WARN("Invalid filepath\n");
+        return NULL;
+    }
+
+    FILE* file = ACAP_FILE_Open(filepath, "r");
+    if (!file) {
+        return NULL;
+    }
+
+    // Get file size
+    fseek(file, 0, SEEK_END);
+    long size = ftell(file);
+    fseek(file, 0, SEEK_SET);
+
+    if (size < 2) {
+        LOG_WARN("File size error in %s\n", filepath);
+        fclose(file);
+        return NULL;
+    }
+
+    // Allocate memory and read file
+    char* jsonString = malloc(size + 1);
+    if (!jsonString) {
+        LOG_WARN("Memory allocation error\n");
+        fclose(file);
+        return NULL;
+    }
+
+    size_t bytesRead = fread(jsonString, 1, size, file);
+    fclose(file);
+
+    if (bytesRead != (size_t)size) {
+        LOG_WARN("Read error in %s\n", filepath);
+        free(jsonString);
+        return NULL;
+    }
+
+    jsonString[bytesRead] = '\0';
+    cJSON* object = cJSON_Parse(jsonString);
+    free(jsonString);
+
+    if (!object) {
+        LOG_WARN("JSON Parse error for %s\n", filepath);
+        return NULL;
+    }
+
+    return object;
 }
 
-void
-ACAP_STATUS_SetString( const char *group, const char *name, const char *string ) {
-	LOG_TRACE("%s: %s.%s=%s \n",__func__, group, name, string );
-	cJSON* g = ACAP_STATUS_Group(group);
-	if(!g) {
-		g = cJSON_CreateObject();
-		cJSON_AddItemToObject(ACAP_STATUS_Container, group, g);
-	}
-	cJSON *object = cJSON_GetObjectItem( g, name);
-	if( !object ) {
-		cJSON_AddStringToObject( g, name, string );
-		return;
-	}
-	cJSON_ReplaceItemInObject(g, name, cJSON_CreateString( string ));
+int ACAP_FILE_Write(const char* filepath, cJSON* object) {
+    if (!filepath || !object) {
+        LOG_WARN("Invalid parameters for file write\n");
+        return 0;
+    }
+
+    FILE* file = ACAP_FILE_Open(filepath, "w");
+    if (!file) {
+        LOG_WARN("Error opening %s for writing\n", filepath);
+        return 0;
+    }
+
+    char* jsonString = cJSON_Print(object);
+    if (!jsonString) {
+        LOG_WARN("JSON serialization error for %s\n", filepath);
+        fclose(file);
+        return 0;
+    }
+
+    int result = fputs(jsonString, file);
+    free(jsonString);
+    fclose(file);
+
+    if (result < 0) {
+        LOG_WARN("Could not save data to %s\n", filepath);
+        return 0;
+    }
+
+    return 1;
 }
 
-void
-ACAP_STATUS_SetObject( const char *group, const char *name, cJSON* data ) {
-	LOG_TRACE("%s: %s.%s\n",__func__, group, name );
-	
-	cJSON* g = ACAP_STATUS_Group(group);
-	if(!g) {
-		g = cJSON_CreateObject();
-		cJSON_AddItemToObject(ACAP_STATUS_Container, group, g);
-	}
-
-	cJSON *object = cJSON_GetObjectItem( g, name);
-	if( !object ) {
-		cJSON_AddItemToObject( g, name, cJSON_Duplicate(data,1) );
-		return;
-	}
-	cJSON_ReplaceItemInObject(g, name, cJSON_Duplicate(data,1));
-}
-
-void
-ACAP_STATUS_SetNull( const char *group, const char *name ) {
-	LOG_TRACE("%s: %s.%s=NULL\n",__func__, group, name );
-	
-	cJSON* g = ACAP_STATUS_Group(group);
-	if(!g) {
-		g = cJSON_CreateObject();
-		cJSON_AddItemToObject(ACAP_STATUS_Container, group, g);
-	}
-
-	cJSON *object = cJSON_GetObjectItem( g, name);
-	if( !object ) {
-		cJSON_AddItemToObject( g, name, cJSON_CreateNull() );
-		return;
-	}
-	cJSON_ReplaceItemInObject(g, name, cJSON_CreateNull());
-}
-
-cJSON*
-ACAP_STATUS() {
-	if( ACAP_STATUS_Container != 0 )
-		return ACAP_STATUS_Container;
-	LOG_TRACE("%s:\n",__func__);
-	ACAP_STATUS_Container = cJSON_CreateObject();
-	ACAP_HTTP_Node( "status", ACAP_ENDPOINT_status );
-	return ACAP_STATUS_Container;
-}
+/*------------------------------------------------------------------
+ * Events System Implementation
+ *------------------------------------------------------------------*/
 
 ACAP_EVENTS_Callback EVENT_USER_CALLBACK = 0;
 static void ACAP_EVENTS_Main_Callback(guint subscription, AXEvent *axEvent, cJSON* event);
@@ -1926,7 +1948,7 @@ cJSON*
 ACAP_EVENTS() {
 	LOG_TRACE("%s:\n",__func__);
 	//Get the ACAP package ID and Nice Name
-	cJSON* manifest = ACAP_Service("manifest");
+	cJSON* manifest = ACAP_Get_Config("manifest");
 	if(!manifest)
 		return cJSON_CreateNull();
 	cJSON* acapPackageConf = cJSON_GetObjectItem(manifest,"acapPackageConf");
@@ -1953,4 +1975,97 @@ ACAP_EVENTS() {
 		event = event->next;
 	}
 	return events;
+}
+/*------------------------------------------------------------------
+ * Cleanup Implementation
+ *------------------------------------------------------------------*/
+
+void ACAP_Cleanup(void) {
+    if (app) {
+        cJSON_Delete(app);
+        app = NULL;
+    }
+    
+    if (ACAP_DEVICE_Container) {
+        cJSON_Delete(ACAP_DEVICE_Container);
+        ACAP_DEVICE_Container = NULL;
+    }
+    
+    // Clean up other resources
+    ACAP_HTTP_Close();
+    if (status_container) {
+        cJSON_Delete(status_container);
+        status_container = NULL;
+    }
+	
+    http_node_count = 0;
+    ACAP_UpdateCallback = NULL;
+}
+
+/*------------------------------------------------------------------
+ * Error Handling Implementation
+ *------------------------------------------------------------------*/
+
+const char* ACAP_Get_Error_String(ACAP_Status status) {
+    switch (status) {
+        case ACAP_SUCCESS:
+            return "Success";
+        case ACAP_ERROR_INIT:
+            return "Initialization error";
+        case ACAP_ERROR_PARAM:
+            return "Invalid parameter";
+        case ACAP_ERROR_MEMORY:
+            return "Memory allocation error";
+        case ACAP_ERROR_IO:
+            return "I/O error";
+        case ACAP_ERROR_HTTP:
+            return "HTTP error";
+        default:
+            return "Unknown error";
+    }
+}
+
+/*------------------------------------------------------------------
+ * Helper functions
+ *------------------------------------------------------------------*/
+
+char**
+string_split( char* a_str,  char a_delim) {
+    char** result    = 0;
+    size_t count     = 0;
+    const char* tmp  = a_str;
+    const char* last_comma = 0;
+    char delim[2];
+    delim[0] = a_delim;
+    delim[1] = 0;
+    /* Count how many elements will be extracted. */
+    while (*tmp)
+    {
+        if (a_delim == *tmp)
+        {
+            count++;
+            last_comma = tmp;
+        }
+        tmp++;
+    }
+
+    /* Add space for trailing token. */
+    count += last_comma < (a_str + strlen(a_str) - 1);
+
+    /* Add space for terminating null string so caller
+       knows where the list of returned strings ends. */
+    count++;
+    result = malloc(sizeof(char*) * count);
+    if (result) {
+        size_t idx  = 0;
+        char* token = strtok(a_str, delim);
+        while (token) {
+//            assert(idx < count);
+            *(result + idx++) = strdup(token);
+            token = strtok(0, delim);
+        }
+//        assert(idx == count - 1);
+        *(result + idx) = 0;
+    }
+    return result;
 }

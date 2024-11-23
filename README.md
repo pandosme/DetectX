@@ -86,3 +86,9 @@ Example
 ### 3.0.0	October 19, 2024
 Breaking change:  You need to remove previous versions before installing this
 - Switched to lates ACAP SDK Version.  
+
+### 3.0.0	October 19, 2024
+Breaking change:  You need to remove previous versions before installing this
+- Added sigterm management to main
+- Fixed confidence value with a SIGMOID function
+

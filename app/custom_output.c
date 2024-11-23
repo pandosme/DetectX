@@ -63,3 +63,12 @@ custom_output( cJSON* detectionList ) {
 */	
 }
 
+
+/*
+	Reset local varibles used for custom logic, filters and output.
+	Custom reset is called when ACAP initializes and may also be called when specific settings change.
+*/
+void
+custom_output_reset() {
+
+}
