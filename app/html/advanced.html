@@ -11,238 +11,215 @@
 </head>
 
 <body>
-    <div class="d-flex" id="wrapper">
-        <!-- Sidebar -->
-        <div class="bg-light border-right" id="sidebar-wrapper">
-            <div class="sidebar-heading">Custom Model</div>
-            <div class="list-group list-group-flush">
-                <a href="index.html" class="list-group-item list-group-item-action">Detections</a>
-                <a href="advanced.html" class="list-group-item list-group-item-action active">Advanced</a>
-                <a href="about.html" class="list-group-item list-group-item-action">About</a>
-            </div>
-        </div>
-        <!-- /#sidebar-wrapper -->
+<div class="d-flex" id="wrapper">
+	<!-- Sidebar -->
+	<div class="bg-light border-right" id="sidebar-wrapper">
+		<div class="sidebar-heading">Custom Model</div>
+		<div class="list-group list-group-flush">
+			<a href="index.html" class="list-group-item list-group-item-action">Detections</a>
+			<a href="advanced.html" class="list-group-item list-group-item-action active">Advanced</a>
+			<a href="about.html" class="list-group-item list-group-item-action">About</a>
+		</div>
+	</div>
+	<!-- /#sidebar-wrapper -->
 
-        <!-- Page Content -->
-        <div id="page-content-wrapper">
-            <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
-                <button class="btn btn-link" id="menu-toggle">
-                    <i class="fas fa-bars"></i>
-                </button>
-                <span class="navbar-text" id="model_status">Loading...</span>
-            </nav>
+	<!-- Page Content -->
+	<div id="page-content-wrapper">
+		<nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
+			<button class="btn btn-link" id="menu-toggle">
+				<i class="fas fa-bars"></i>
+			</button>
+			<span class="navbar-text" id="model_status">Loading...</span>
+		</nav>
 
-			<div class="container-fluid">
-				<div class="row">
-					<div class="col-md-12">
-						<br>
-						<div class="container">
-							<div class="row align-items-center">
-								<div class="col-auto">
-									<h3 id="debug-heading">Settings</h3>
-								</div>
-							</div>
-							<div class="row align-items-center mt-2">
-								<div class="col-auto">
-									<label for="eventsTransition" class="col-form-label">Detection transition</label>
-								</div>
-								<div class="col-3">
-									<select class="form-control" id="eventsTransition">
-										<option value="0">Immediately</option>
-										<option value="300">300 ms</option>
-										<option value="600">600 ms</option>
-										<option value="900">900 ms</option>
-										<option value="1200">1.2 s</option>
-										<option value="1200">1.5 s</option>
-										<option value="1800">1.8 s</option>
-										<option value="2500">2.5 s</option>
-										<option value="3000">3.0 s</option>
-										<option value="4000">4.0 s</option>
-									</select>
-								</div>
-							</div>
-							<div class="row align-items-center mt-2">
-								<div class="col-auto">
-									<label for="stateDuration" class="col-form-label">Min event state duration</label>
-								</div>
-								<div class="col-3">
-									<select class="form-control" id="stateDuration">
-										<option value="2">2 seconds</option>
-										<option value="3">3 seconds</option>
-										<option value="5">5 seconds</option>
-										<option value="10">10 seconds</option>
-										<option value="15">15 seconds</option>
-										<option value="30">30 seconds</option>
-									</select>
-								</div>
+		<div class="container-fluid">
+			<div class="row">
+				<div class="col-md-12">
+					<br>
+					<div class="container">
+						<div class="row align-items-center">
+							<div class="col-auto">
+								<h3 id="debug-heading">Settings</h3>
 							</div>
 						</div>
-						<br><br>						
-						<h3 id="labels-heading">Labels Processed</h3>
-						<table class="table" id="labelsTable">
-							<!-- Checkboxes will be dynamically inserted here -->
-						</table>
+						<div class="row align-items-center mt-2">
+							<div class="col-auto">
+								<label for="stabelizeTransition" class="col-form-label">Stabilize transition time</label>
+							</div>
+							<div class="col-3">
+								<select class="form-control" id="stabelizeTransition">
+									<option value="0">Immidiate</option>
+									<option value="300">300 ms</option>
+									<option value="600">600 ms</option>
+									<option value="900">900 ms</option>
+									<option value="1200">1.2 s</option>
+									<option value="1500">1.5 s</option>
+									<option value="2000">2 s</option>
+									<option value="2000">4 s</option>
+								</select>
+							</div>
+						</div>
+						<div class="row align-items-center mt-2">
+							<div class="col-auto">
+								<label for="minEventDuration" class="col-form-label">Min event state duration</label>
+							</div>
+							<div class="col-3">
+								<select class="form-control" id="minEventDuration">
+									<option value="2000">2 seconds</option>
+									<option value="3000">3 seconds</option>
+									<option value="5000">5 seconds</option>
+									<option value="10000">10 seconds</option>
+									<option value="15000">15 seconds</option>
+									<option value="30000">30 seconds</option>
+								</select>
+							</div>
+						</div>
 					</div>
+					<br><br>						
+					<h3 id="labels-heading">Labels Processed</h3>
+					<table class="table" id="labelsTable">
+						<!-- Checkboxes will be dynamically inserted here -->
+					</table>
 				</div>
 			</div>
-        </div>
-    </div>
+		</div>
+	</div>
+</div>
 
-    <script>
-        var App = 0;
-		
-        $(document).ready(function() {
-            $.ajax({
-                type: "GET",
-                url: 'app',
-                dataType: 'json',
-                cache: false,
-                success: function(data) {
-                    App = data;
-                    // Update UI elements
-                    document.title = App.manifest.acapPackageConf.setup.friendlyName;
-                    $(".acapName").html(App.manifest.acapPackageConf.setup.friendlyName);
-                    $("#sidebar-wrapper .sidebar-heading").html(App.manifest.acapPackageConf.setup.friendlyName);
-                    $("#model_status").text("Status: " + App.status.model.status);
-					// Create checkboxes for labels
-					$('#storeImagesCheckbox').prop('checked', App.settings.capture);
-					createLabelCheckboxes(App.model.labels, App.settings.ignore);
-					$("#stateDuration").val(App.settings.eventTimer);
-					$("#eventsTransition").val(App.settings.eventsTransition);
-                },
-                error: function(response) {
-                    alert(response.statusText);
-                }
-            });
+<script>
+var App = 0;
 
-			// Function to create label checkboxes
-			function createLabelCheckboxes(labels, ignoreList) {
-				const table = $('#labelsTable');
-				const columns = 10; // Number of columns
+$(document).ready(function() {
+	$.ajax({
+		type: "GET",
+		url: 'app',
+		dataType: 'json',
+		cache: false,
+		success: function(data) {
+			App = data;
+			// Update UI elements
+			document.title = App.manifest.acapPackageConf.setup.friendlyName;
+			$(".acapName").html(App.manifest.acapPackageConf.setup.friendlyName);
+			$("#sidebar-wrapper .sidebar-heading").html(App.manifest.acapPackageConf.setup.friendlyName);
+			$("#model_status").text("Status: " + App.status.model.status);
+			// Create checkboxes for labels
+			$('#storeImagesCheckbox').prop('checked', App.settings.capture);
+			createLabelCheckboxes(App.model.labels, App.settings.ignore);
+			$("#stabelizeTransition").val(App.settings.stabelizeTransition);
+			$("#minEventDuration").val(App.settings.minEventDuration);
+		},
+		error: function(response) {
+			alert(response.statusText);
+		}
+	});
 
-				for (let i = 0; i < labels.length; i += columns) {
-					const row = $('<tr></tr>');
-
-					for (let j = 0; j < columns; j++) {
-						const index = i + j;
-						const label = labels[index];
-						if (index >= labels.length) break;
-
-						const isChecked = !ignoreList.includes(label);
-
-						const cell = $(`
-							<td>
-								<div class="form-check">
-									<input type="checkbox" class="form-check-input label-checkbox" id="label-${index}" data-label="${label}" ${isChecked ? 'checked' : ''}>
-									<label class="form-check-label" for="label-${index}">${label}</label>
-								</div>
-							</td>
-						`);
-
-						row.append(cell);
-					}
-
-					table.append(row);
-				}
-
-				// Add event listeners to checkboxes
-				$('.label-checkbox').change(function() {
-					const label = $(this).data('label');
-
-					if (this.checked) {
-						// Remove label from ignore list
-						App.settings.ignore = App.settings.ignore.filter(item => item !== label);
-					} else {
-						// Add label to ignore list
-						if (!App.settings.ignore.includes(label)) {
-							App.settings.ignore.push(label);
-						}
-					}
-
-					// Send updated ignore list to server
-					const jsonData = JSON.stringify({"ignore": App.settings.ignore});
-					const urlEncodedJSON = encodeURIComponent(jsonData);
-
-					$.ajax({
-						type: "GET",
-						url: 'settings?json=' + urlEncodedJSON,
-						success: function(response) {
-							console.log("Settings updated successfully");
-						},
-						error: function(response) {
-							console.error("Error updating settings: " + response.statusText);
-						}
-					});
-				});
+	setInterval( function(){
+		$.ajax({type: "GET",url: 'status',dataType: 'json',cache: false,
+			success: function( data ) {
+				$("#model_status").text("Status: " + data.model.status);
+			},
+			error(){
+				$("#model_status").text("Status: No response");
 			}
+		});
+	},300);
+});
 
-            $('#stateDuration').change(function() {
-				const jsonData = JSON.stringify({ "eventTimer": parseInt($(this).val()) });
-				const urlEncodedJSON = encodeURIComponent(jsonData);
-				$.ajax({
-					type: "GET",
-					url: 'settings?json=' + urlEncodedJSON,
-					success: function(response) {
-						console.log("Settings updated successfully");
-					},
-					error: function(response) {
-						console.error("Error updating settings: " + response.statusText);
-					}
-				});
-            });
 
-            $('#eventsTransition').change(function() {
-				const jsonData = JSON.stringify({ "eventsTransition": parseInt($(this).val()) });
-				const urlEncodedJSON = encodeURIComponent(jsonData);
-				$.ajax({
-					type: "GET",
-					url: 'settings?json=' + urlEncodedJSON,
-					success: function(response) {
-						console.log("Settings updated successfully");
-					},
-					error: function(response) {
-						console.error("Error updating settings: " + response.statusText);
-					}
-				});
-            });
+$('.label-checkbox').change(function() {
+	const label = $(this).data('label');
 
-			$('#storeImagesCheckbox').change(function() {
-				App.settings.capture = this.checked;
+	if (this.checked) {
+		// Remove label from ignore list
+		App.settings.ignore = App.settings.ignore.filter(item => item !== label);
+	} else {
+		// Add label to ignore list
+		if (!App.settings.ignore.includes(label)) {
+			App.settings.ignore.push(label);
+		}
+	}
+	$.ajax({
+		type: "POST",
+		url: "settings",
+		contentType: 'application/json',
+		data: JSON.stringify({"ignore": App.settings.ignore}),
+		success: function(response) {
+			console.log("AOI updated successfully.");
+		},
+		error: function(response) {
+			alert("Failed to update AOI: " + response.statusText);
+		}
+	});
+});
 
-				// Prepare the JSON data
-				var jsonData = JSON.stringify({"capture": App.settings.capture});
-				var urlEncodedJSON = encodeURIComponent(jsonData);
+$('#minEventDuration').change(function() {
+	$.ajax({
+		type: "POST",
+		url: "settings",
+		contentType: 'application/json',
+		data: JSON.stringify({ "minEventDuration": parseInt($(this).val()) }),
+		success: function(response) {
+			console.log("Settings updated successfully");
+		},
+		error: function(response) {
+			alert("Failed to update setting: " + response.statusText);
+		}
+	});
+});
 
-				// Send the HTTP GET request
-				$.ajax({
-					type: "GET",
-					url: 'settings?json=' + urlEncodedJSON,
-					success: function(response) {
-					},
-					error: function(response) {
-						console.error("Error updating settings: " + response.statusText);
-					}
-				});
-			});
+$('#stabelizeTransition').change(function() {
+	$.ajax({
+		type: "POST",
+		url: "settings",
+		contentType: 'application/json',
+		data: JSON.stringify({ "stabelizeTransition": parseInt($(this).val()) }),
+		success: function(response) {
+			console.log("Settings updated successfully");
+		},
+		error: function(response) {
+			alert("Failed to update setting: " + response.statusText);
+		}
+	});
+});
 
-			setInterval( function(){
-				$.ajax({type: "GET",url: 'status',dataType: 'json',cache: false,
-					success: function( data ) {
-						$("#model_status").text("Status: " + data.model.status);
-					},
-					error(){
-						$("#model_status").text("Status: No response");
-					}
-				});
-			
-			},4000);
-        });
 
-        $("#menu-toggle").click(function(e) {
-            e.preventDefault();
-            $("#wrapper").toggleClass("toggled");
-        });
-    </script>
+$("#menu-toggle").click(function(e) {
+	e.preventDefault();
+	$("#wrapper").toggleClass("toggled");
+});
+
+function createLabelCheckboxes(labels, ignoreList) {
+	const table = $('#labelsTable');
+	const columns = 10; // Number of columns
+
+	for (let i = 0; i < labels.length; i += columns) {
+		const row = $('<tr></tr>');
+
+		for (let j = 0; j < columns; j++) {
+			const index = i + j;
+			const label = labels[index];
+			if (index >= labels.length) break;
+
+			const isChecked = !ignoreList.includes(label);
+			var td = '<td>';
+			td += '<div class="form-check">';
+			td += '<input type="checkbox" class="form-check-input label-checkbox" id="label-' + index + '" data-label=" ' + label + '"';
+			if( isChecked )
+				td += 'checked';
+			td += '>';
+			td += '<label class="form-check-label" for="label-' + index + '">' + label + '</label>';
+			td += '</div>';
+			td += '</td>';
+			row.append(td);
+		}
+
+		table.append(row);
+	}
+
+}
+
+
+</script>
 </body>
 
 </html>

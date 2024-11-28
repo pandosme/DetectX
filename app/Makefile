@@ -1,5 +1,5 @@
 PROG1	= detectx
-OBJS1	= main.c ACAP.c cJSON.c Model.c Video.c imgprovider.c custom_output.c
+OBJS1	= main.c ACAP.c cJSON.c Model.c Video.c Output.c imgprovider.c 
 PROGS	= $(PROG1)
 
 PKGS = gio-2.0 gio-unix-2.0 liblarod vdostream fcgi axevent

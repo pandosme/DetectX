@@ -21,55 +21,55 @@
 
 static bool createAndMapTmpFile(char* fileName, size_t fileSize, void** mappedAddr, int* convFd);
 float iou(float x1, float y1, float w1, float h1, float x2, float y2, float w2, float h2);
-void Model_Close();
+void Model_Cleanup();
 cJSON* non_maximum_suppression(cJSON* list);
 
-unsigned int modelWidth = 640;
-unsigned int modelHeight = 640;
-size_t inputs = 1;
-size_t outputs = 1;
-size_t ppInputs = 1;
-size_t ppOutputs = 1;
-unsigned int videoWidth = 1280;
-unsigned int videoHeight = 720;
-unsigned int channels = 3;
-unsigned int boxes = 0;
-unsigned int classes = 0;
-float quant = 1.0;
-float quant_zero = 0;
-float objectnessThreshold = 0;
-float nms = 0.05;
-int larodModelFd = -1;
-larodConnection* conn = NULL;
-larodModel* InfModel = NULL;
-larodModel* ppModel = NULL;
-larodJobRequest* ppReq = NULL;
-larodMap* ppMap;
-larodJobRequest* infReq;
-void* ppInputAddr = MAP_FAILED;
-void* larodInputAddr = MAP_FAILED;
-void* larodOutput1Addr = MAP_FAILED;
-int ppInputFd = -1;
-int larodInputFd = -1;
-int larodOutput1Fd = -1;
-larodTensor** inputTensors = NULL;
-larodTensor** outputTensors = NULL;
-larodTensor** ppInputTensors = NULL;
-larodTensor** ppOutputTensors = 0;
-size_t yuyvBufferSize = 0;
+static unsigned int modelWidth = 640;
+static unsigned int modelHeight = 640;
+static size_t inputs = 1;
+static size_t outputs = 1;
+static size_t ppInputs = 1;
+static size_t ppOutputs = 1;
+static unsigned int videoWidth = 1280;
+static unsigned int videoHeight = 720;
+static unsigned int channels = 3;
+static unsigned int boxes = 0;
+static unsigned int classes = 0;
+static float quant = 1.0;
+static float quant_zero = 0;
+static float objectnessThreshold = 0.25;
+static float confidenceThreshold = 0.30;
+static float nms = 0.05;
+static int larodModelFd = -1;
+static larodConnection* conn = NULL;
+static larodModel* InfModel = NULL;
+static larodModel* ppModel = NULL;
+static larodJobRequest* ppReq = NULL;
+static larodMap* ppMap;
+static larodJobRequest* infReq;
+static void* ppInputAddr = MAP_FAILED;
+static void* larodInputAddr = MAP_FAILED;
+static void* larodOutput1Addr = MAP_FAILED;
+static int ppInputFd = -1;
+static int larodInputFd = -1;
+static int larodOutput1Fd = -1;
+static larodTensor** inputTensors = NULL;
+static larodTensor** outputTensors = NULL;
+static larodTensor** ppInputTensors = NULL;
+static larodTensor** ppOutputTensors = 0;
+static size_t yuyvBufferSize = 0;
 
-cJSON* modelConfig = 0;
+static  cJSON* modelConfig = 0;
 
-char PP_SD_INPUT_FILE_PATTERN[] = "/tmp/larod.pp.test-XXXXXX";
-char OBJECT_DETECTOR_INPUT_FILE_PATTERN[] = "/tmp/larod.in.test-XXXXXX";
-char OBJECT_DETECTOR_OUT1_FILE_PATTERN[]  = "/tmp/larod.out1.test-XXXXXX";
+static char PP_SD_INPUT_FILE_PATTERN[] = "/tmp/larod.pp.test-XXXXXX";
+static char OBJECT_DETECTOR_INPUT_FILE_PATTERN[] = "/tmp/larod.in.test-XXXXXX";
+static char OBJECT_DETECTOR_OUT1_FILE_PATTERN[]  = "/tmp/larod.out1.test-XXXXXX";
 
 int inferenceErrors = 5;
 
 cJSON*
 Model_Inference(VdoBuffer* image) {
     larodError* error = NULL;
-
 	if(!image) {
 		LOG_TRACE("%s: No image\n",__func__);
 		return 0;
@@ -82,7 +82,7 @@ Model_Inference(VdoBuffer* image) {
 
 	if( inferenceErrors <= 0 ) {
 		LOG_WARN("Too many inference errors.  Model stopped\n" );
-		Model_Close();
+		Model_Cleanup();
 		return 0;
 	}
 
@@ -116,7 +116,8 @@ Model_Inference(VdoBuffer* image) {
 
 	for (int i = 0; i < boxes; i++) {
 		int box = i * (5 + classes);
-		float objectness = 1.0f / (1.0f + exp(-(output_tensor[box + 4] - quant_zero) * quant) + 1e-10);
+		//SIGMOID Activation
+		float objectness = (float)(output_tensor[box + 4] - quant_zero) * quant;
         if (objectness >= objectnessThreshold) {
             float x = (output_tensor[box + 0] - quant_zero) * quant;
             float y = (output_tensor[box + 1] - quant_zero) * quant;
@@ -125,13 +126,13 @@ Model_Inference(VdoBuffer* image) {
 			int classId = -1;
 			float maxConfidence = 0;
 			for( int c = 0; c < classes; c++ ) {
-				float confidence = 1.0f / ((1.0f + exp(-(output_tensor[box + 5 + c] - quant_zero) * quant)) * objectness);
+				float confidence = (float)(output_tensor[box + 5 + c] - quant_zero) * quant * objectness;
 				if( confidence > maxConfidence ) {
 					classId = c;
 					maxConfidence = confidence;
 				}
 			}
-			if( maxConfidence > objectnessThreshold ) {
+			if( maxConfidence > confidenceThreshold ) {
 				const char* label = "Undefined";
 				cJSON* labels = cJSON_GetObjectItem(modelConfig,"labels");
 				if( labels && classId >= 0 && cJSON_GetArrayItem(labels, classId) )
@@ -146,6 +147,11 @@ Model_Inference(VdoBuffer* image) {
 				cJSON_AddItemToArray(list,detection);
 			}
 		}
+	}
+	if( cJSON_GetArraySize(list) > 500) {
+		LOG_WARN("Detection list is too big");
+		cJSON_Delete(list);
+		list = cJSON_CreateArray();
 	}
 	return non_maximum_suppression( list );
 }
@@ -163,14 +169,18 @@ float iou(float x1, float y1, float w1, float h1, float x2, float y2, float w2, 
 }
 
 cJSON* non_maximum_suppression(cJSON* list) {
+	if(!list) {
+		LOG_WARN("%s: Invalid list\n",__func__);
+		return 0;
+	}
+
     int items = cJSON_GetArraySize(list);
-    
-    if (items < 2)
+    if (items < 2) {
         return list;
-    
-    int keep[items];
-    memset(keep, 1, items * sizeof(int));
-    
+	}
+	int keep[items];
+	memset(keep, 1, items * sizeof(int));
+
     for (int i = 0; i < items; i++) {
         if (keep[i]) {
             cJSON* detection = cJSON_GetArrayItem(list, i);
@@ -211,7 +221,6 @@ cJSON* non_maximum_suppression(cJSON* list) {
             cJSON_AddItemToArray(result, cJSON_Duplicate(detection, 1));
         }
     }
-    
     cJSON_Delete(list);
     return result;
 }
@@ -252,7 +261,7 @@ createAndMapTmpFile(char* fileName, size_t fileSize, void** mappedAddr, int* con
 
 
 void
-Model_Close() {
+Model_Cleanup() {
     // Only the model handle is released here. We count on larod service to
     // release the privately loaded model when the session is disconnected in
     // larodDisconnect().
@@ -308,37 +317,39 @@ Model_Setup() {
 	objectnessThreshold = cJSON_GetObjectItem(modelConfig,"objectness")->valuedouble;
 	nms = cJSON_GetObjectItem(modelConfig,"nms")->valuedouble;
 
+	LOG_TRACE("Boxes: %d Classes: %d Objectness: %f Confidence:%f",boxes,classes,objectnessThreshold,confidenceThreshold);
+
 	char* json = cJSON_PrintUnformatted(modelConfig);
 	if(json) {
-		LOG("%s\n", json);
+		LOG_TRACE("%s\n", json);
 		free(json);
 	}
 
     ppMap = larodCreateMap(&error);
     if (!ppMap) {
         LOG_WARN("%s: Could not create preprocessing larodMap %s\n",__func__, error->msg);
-		Model_Close();
+		Model_Cleanup();
 		return 0;
     }
     if (!larodMapSetStr(ppMap, "image.input.format", "nv12", &error)) {
         LOG_WARN("%s: Failed setting preprocessing parameters: %s\n", __func__, error->msg);
-		Model_Close();
+		Model_Cleanup();
 		return 0;
     }
     if (!larodMapSetIntArr2(ppMap, "image.input.size", videoWidth, videoHeight, &error)) {
         LOG_WARN("%s: Failed setting preprocessing parameters: %s\n", __func__, error->msg);
-		Model_Close();
+		Model_Cleanup();
 		return 0;
     }
     if (!larodMapSetStr(ppMap, "image.output.format", "rgb-interleaved", &error)) {
         LOG_WARN("%s: Failed setting preprocessing parameters: %s\n", __func__,error->msg);
-		Model_Close();
+		Model_Cleanup();
 		return 0;
     }
 
     if (!larodMapSetIntArr2(ppMap, "image.output.size", modelWidth, modelHeight, &error)) {
         LOG_WARN("%s: Failed setting preprocessing parameters: %s\n", __func__,error->msg);
-		Model_Close();
+		Model_Cleanup();
 		return 0;
     }
 
@@ -346,21 +357,21 @@ Model_Setup() {
     const char* modelPath = cJSON_GetObjectItem(modelConfig,"path")?cJSON_GetObjectItem(modelConfig,"path")->valuestring:0;
 	if(!modelPath) {
         LOG_WARN("%s: Could not find model path\n", __func__);
-		Model_Close();
+		Model_Cleanup();
 		return 0;
 	}
 
 	larodModelFd = open(modelPath, O_RDONLY,modelPath);
 	if(larodModelFd < 0) {
         LOG_WARN("%s: Could not open model %s\n", __func__,modelPath);
-		Model_Close();
+		Model_Cleanup();
 		return 0;
 	}
 
 	//Connect to larod
     if (!larodConnect(&conn, &error)) {
         LOG_WARN("%s: Could not connect to larod: %s\n", __func__, error->msg);
-		Model_Close();
+		Model_Cleanup();
 		return 0;
     }
 
@@ -368,13 +379,13 @@ Model_Setup() {
 	cJSON* chip = cJSON_GetObjectItem(modelConfig,"chip");
 	if( chip && chip->type == cJSON_String ) 
 		chipString = chip->valuestring;
-	LOG("Loading model for %s\n",chipString);
+	LOG_TRACE("Loading model for %s\n",chipString);
 	
     const larodDevice* device = larodGetDevice(conn, chipString, 0, &error);
     if (!device) {
         LOG_WARN("%s: Could not get device %s: %s\n", __func__, chipString, error->msg);
         larodClearError(&error);
-		Model_Close();
+		Model_Cleanup();
         return 0;
     }
 
@@ -382,7 +393,7 @@ Model_Setup() {
     if (!InfModel) {
         LOG_WARN("%s: Unable to load model: %s\n", __func__, error->msg);
         larodClearError(&error);
-        Model_Close();
+        Model_Cleanup();
         return 0;
     }
 
@@ -392,14 +403,14 @@ Model_Setup() {
 	if(!device_prePros) {
         LOG_WARN("%s: Could not get device %s: %s\n", __func__, larodLibyuvPP, error->msg);
         larodClearError(&error);
-		Model_Close();
+		Model_Cleanup();
         return 0;
 	}
     ppModel = larodLoadModel(conn, -1, device_prePros, LAROD_ACCESS_PRIVATE, "", ppMap, &error);
     if (!ppModel) {
         LOG_WARN("%s: Unable to load preprocessing model with chip %s: %s",__func__,larodLibyuvPP, error->msg);
         larodClearError(&error);
-		Model_Close();
+		Model_Cleanup();
         return 0;
     } else {
 //		LOG("Loading preprocessing model with chip %s\n", larodLibyuvPP);
@@ -410,14 +421,14 @@ Model_Setup() {
     if (!ppInputTensors) {
         LOG_WARN("%s: Failed retrieving input tensors: %s\n",__func__,error->msg);
         larodClearError(&error);
-		Model_Close();
+		Model_Cleanup();
         return 0;
     }
     ppOutputTensors = larodCreateModelOutputs(ppModel, &ppOutputs, &error);
     if (!ppOutputTensors) {
         LOG_WARN("%s: Failed retrieving output tensors: %s\n",__func__, error->msg);
         larodClearError(&error);
-		Model_Close();
+		Model_Cleanup();
         return 0;
     }
 
@@ -425,7 +436,7 @@ Model_Setup() {
     if (!inputTensors) {
         LOG_WARN("%s: Failed retrieving input tensors: %s\n",__func__, error->msg);
         larodClearError(&error);
-		Model_Close();
+		Model_Cleanup();
         return 0;
     }
 
@@ -433,7 +444,7 @@ Model_Setup() {
     if (!outputTensors) {
         LOG_WARN("%s: Failed retrieving output tensors: %s\n", __func__, error->msg);
         larodClearError(&error);
-		Model_Close();
+		Model_Cleanup();
         return 0;
     }
 
@@ -442,17 +453,17 @@ Model_Setup() {
     if (!ppInputPitches) {
         LOG_WARN("%s: Could not get pitches of tensor: %s\n",__func__, error->msg);
         larodClearError(&error);
-		Model_Close();
+		Model_Cleanup();
         return 0;
     }
 
     yuyvBufferSize = ppInputPitches->pitches[0];
-	LOG("Buffer size: %zu\n",yuyvBufferSize);
+	LOG_TRACE("Buffer size: %zu\n",yuyvBufferSize);
     const larodTensorPitches* ppOutputPitches = larodGetTensorPitches(ppOutputTensors[0], &error);
     if (!ppOutputPitches) {
         LOG_WARN("%s: Could not get pitches of tensor: %s\n",__func__, error->msg);
         larodClearError(&error);
-		Model_Close();
+		Model_Cleanup();
         return 0;
     }
 
@@ -460,31 +471,31 @@ Model_Setup() {
     size_t expectedSize  = modelWidth * modelHeight * channels;
     if (expectedSize != rgbBufferSize) {
         LOG_WARN("%s: Expected video output size %zu, actual %zu\n", __func__, expectedSize, rgbBufferSize);
-		Model_Close();
+		Model_Cleanup();
         return 0;
     }
     const larodTensorPitches* outputPitches = larodGetTensorPitches(outputTensors[0], &error);
     if (!outputPitches) {
         LOG_WARN("%s: Could not get pitches of tensor: %s\n",__func__, error->msg);
-		Model_Close();
+		Model_Cleanup();
         return 0;
     }
 	
     // Allocate space for input tensor
     if (!createAndMapTmpFile(PP_SD_INPUT_FILE_PATTERN, yuyvBufferSize, &ppInputAddr, &ppInputFd)) {
         LOG_WARN("%s: Could not allocate pre-processor tensor\n",__func__);
-		Model_Close();
+		Model_Cleanup();
         return 0;
     }
     if (!createAndMapTmpFile(OBJECT_DETECTOR_INPUT_FILE_PATTERN, modelWidth * modelHeight * channels, &larodInputAddr, &larodInputFd)) {
         LOG_WARN("%s: Could not allocate input tensor\n",__func__);
-		Model_Close();
+		Model_Cleanup();
         return 0;
     }
 
     if (!createAndMapTmpFile(OBJECT_DETECTOR_OUT1_FILE_PATTERN, boxes * (classes + 5), &larodOutput1Addr, &larodOutput1Fd)) {
         LOG_WARN("%s: Could not allocate output tenso\n",__func__);
-		Model_Close();
+		Model_Cleanup();
         return 0;
     }
 
@@ -492,26 +503,26 @@ Model_Setup() {
     if (!larodSetTensorFd(ppInputTensors[0], ppInputFd, &error)) {
         LOG_WARN("%s: Failed setting input tensor fd: %s\n",__func__, error->msg);
         larodClearError(&error);
-		Model_Close();
+		Model_Cleanup();
         return 0;
     }
     if (!larodSetTensorFd(ppOutputTensors[0], larodInputFd, &error)) {
         LOG_WARN("%s: Failed setting input tensor fd: %s\n", __func__, error->msg);
         larodClearError(&error);
-		Model_Close();
+		Model_Cleanup();
         return 0;
     }
 
     if (!larodSetTensorFd(inputTensors[0], larodInputFd, &error)) {
         LOG_WARN("%s: Failed setting input tensor fd: %s\n", __func__, error->msg);
         larodClearError(&error);
-		Model_Close();
+		Model_Cleanup();
         return 0;
     }
 
     if (!larodSetTensorFd(outputTensors[0], larodOutput1Fd, &error)) {
         LOG_WARN("%s: Failed setting output tensor fd: %s\n", __func__, error->msg);
-		Model_Close();
+		Model_Cleanup();
         return 0;
     }
 
@@ -525,7 +536,7 @@ Model_Setup() {
                                   &error);
     if (!ppReq) {
         LOG_WARN("%s: Failed creating preprocessing job request: %s\n", __func__,error->msg);
-		Model_Close();
+		Model_Cleanup();
         return 0;
     }
 
@@ -538,11 +549,9 @@ Model_Setup() {
                                    &error);
     if (!infReq) {
         LOG_WARN("%s: Failed creating inference request: %s\n", __func__,error->msg);
-		Model_Close();
+		Model_Cleanup();
         return 0;
     }
-//	LOG("Success loding model to %s\n",chipString);
-//	LOG("%s: Objectness = %f\n",__func__, objectnessThreshold );
 	
 	ACAP_STATUS_SetString("model","status","Model OK.");
 	ACAP_STATUS_SetBool("model","state", 1);

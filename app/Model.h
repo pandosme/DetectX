@@ -8,7 +8,8 @@
 #include "vdo-types.h"
 #include "cJSON.h"
 
-cJSON* Model_Setup();
-cJSON* Model_Inference(VdoBuffer* image);
+cJSON*	Model_Setup();
+cJSON*	Model_Inference(VdoBuffer* image);
+void 	Model_Cleanup();
 
 #endif

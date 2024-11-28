@@ -39,16 +39,7 @@ Enable or disable selected gestures.
 ## Integration
 The service fires two different events targeting different use cases.  Service may monitor these event using camera event syste, ONVIF event stream and MQTT.
 ## Label state
-A stateful event (high/low) for each detected label.  The event includes property state (true/false) and a label.  
-## Labels Counter
-An event fired everytime the number of different detected objects changed.  The event includes a property "json" that is a JSON object.  
-Example 
-```
-{
-  "label 1": 1,
-  "label 2": 2
-}
-```
+A stateful event (high/low) for each detected label.
 
 # History
 
@@ -83,12 +74,9 @@ Example
 - Added event "Label Counter" for use cases needing to know how many objects are detected
 - Fixed flaw for Detection transition
 
-### 3.0.0	October 19, 2024
-Breaking change:  You need to remove previous versions before installing this
-- Switched to lates ACAP SDK Version.  
-
-### 3.0.0	October 19, 2024
-Breaking change:  You need to remove previous versions before installing this
-- Added sigterm management to main
-- Fixed confidence value with a SIGMOID function
+### 3.1.0	November 27, 2024
+- Switched to latest ACAP SDK.  Please remove previous version if they are below 3.0.0.
+  * Refactoring on various files
+- Modified events to give all labels its own event
+- Updated visualization in user interface
 

@@ -18,8 +18,7 @@
 				{"name": "status","access": "admin","type": "fastCgi"},
 				{"name": "device","access": "admin","type": "fastCgi"},
 				{"name": "model","access": "admin","type": "fastCgi"},
-				{"name": "detections","access": "admin","type": "fastCgi"},
-				{"name": "eventsTransition","access": "admin","type": "fastCgi"}
+				{"name": "detections","access": "admin","type": "fastCgi"}
 			]
 		}
     }

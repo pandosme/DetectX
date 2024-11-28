@@ -90,6 +90,7 @@ git clone https://github.com/pandosme/DetectX.git
 
 You do not need to alter any C or H files. However, to create a custom ACAP, you may want to alter:
 
+- `Output.c`
 - `main.c`
 - `manifest.json`
 - `Makefile`
@@ -102,7 +103,6 @@ You do not need to alter any C or H files. However, to create a custom ACAP, you
 You should now have a new EAP file ready for installation on your camera.
 
 Remember, tools like Perplexity or other LLMs can assist you with any challenges you encounter.
-
 
 ## Running and configuring the ACAP
 Install the EAP in your Camera.

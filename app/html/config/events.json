@@ -1,20 +1,2 @@
-[	
-	{
-		"id": "label",
-		"name": "DetectX: Label State",
-		"state": true,
-		"show": true,
-		"data": [
-			{"label":"string"}
-		]
-	},
-	{
-		"id": "counter",
-		"name": "DetectX: Labels Counter",
-		"state": false,
-		"show": true,
-		"data": [
-			{"json":"string"}
-		]
-	}
+[
 ]
