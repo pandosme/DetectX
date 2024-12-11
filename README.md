@@ -80,3 +80,5 @@ A stateful event (high/low) for each detected label.
 - Modified events to give all labels its own event
 - Updated visualization in user interface
 
+### 3.1.5	December 11, 2024
+- Fixed a flaw that impact events.

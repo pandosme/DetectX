@@ -298,7 +298,7 @@ Model_Setup() {
 	ACAP_STATUS_SetString("model","status","Model initialization failed.  Check log file");
 	ACAP_STATUS_SetBool("model","state", 0);	
 	
-	modelConfig = ACAP_FILE_Read( "html/config/model.json" );
+	modelConfig = ACAP_FILE_Read( "model/model.json" );
 	if( !modelConfig ) {
         LOG_WARN("%s: Unabel to read model.json\n", __func__);
 		return 0;

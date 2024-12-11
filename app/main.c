@@ -252,7 +252,8 @@ int main(void) {
 	}
 	ACAP_Set_Config("model",model);
 	Output_reset();
-	g_idle_add(ACAP_Process, NULL);
+
+    LOG("Entering main loop\n");
 	main_loop = g_main_loop_new(NULL, FALSE);
     GSource *signal_source = g_unix_signal_source_new(SIGTERM);
     if (signal_source) {
@@ -261,10 +262,11 @@ int main(void) {
 	} else {
 		LOG_WARN("Signal detection failed");
 	}
-
-	g_main_loop_run(main_loop);
+	
+    g_main_loop_run(main_loop);
 	LOG("Terminating and cleaning up %s\n",APP_PACKAGE);
-	ACAP_Cleanup();
-    closelog();	
+    ACAP_Cleanup();
+	Model_Cleanup();
+    closelog();
     return 0;
 }

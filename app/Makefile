@@ -4,11 +4,9 @@ PROGS	= $(PROG1)
 
 PKGS = gio-2.0 gio-unix-2.0 liblarod vdostream fcgi axevent
 
-LDFLAGS += -L./$(LIBDIR) -Wl,-rpath,'$$ORIGIN/$(LIBDIR)'
-
 CFLAGS += $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --cflags $(PKGS))
 LDLIBS += $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(PKGS))
-LDLIBS  += -s -lm -ldl -laxparameter
+LDLIBS  += -s -lm -ldl -laxparameter -lpthread
 
 CFLAGS += -Wall -DLAROD_API_VERSION_3
 

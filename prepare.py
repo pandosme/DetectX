@@ -79,9 +79,9 @@ def generate_json(platform="A8", image_size=480):
     if len(data["labels"]) != data["classes"]:
         print(f"Warning: Number of labels ({len(data['labels'])}) does not match number of classes ({data['classes']}).")
 
-    os.makedirs('./app/html/config', exist_ok=True)
+    os.makedirs('./app/model', exist_ok=True)
 
-    file_path = './app/html/config/model.json'
+    file_path = './app/model/model.json'
     with open(file_path, 'w') as json_file:
         json.dump(data, json_file, indent=2)
 
