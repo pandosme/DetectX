@@ -29,7 +29,8 @@ Configure the MQTT Broker to connect to.
 Properties names name & location are properties targeting systems with many devices in order to identify who sent the message.
 ### Topics & Payload
 **Detections**  
-[pretopic]/detection
+[pretopic]/detection  
+```
 {
 	"detections":[
 		{"label":"car","c":50,"x":530,"y":146,"w":46,"h":50,"timestamp":1734820170032},
@@ -38,9 +39,10 @@ Properties names name & location are properties targeting systems with many devi
 	"name":"Parking 3",
 	"location":"Site 4"
 }
-
+```
 **Events**  
-[pretopic]/event/B8A44F000000/car/true
+[pretopic]/event/B8A44F000000/car/true  
+```
 {
 	"state": true,
 	"label": "car",
@@ -53,8 +55,9 @@ Properties names name & location are properties targeting systems with many devi
 	"name":"Parking 3",
 	"location":"Site 4"
 }
-
-[pretopic]/event/B8A44F000000/car/false
+```
+[pretopic]/event/B8A44F000000/car/false  
+```
 {
 	"label": "car",
 	"state": false,
@@ -62,6 +65,7 @@ Properties names name & location are properties targeting systems with many devi
 	"name":"Parking 3",
 	"location":"Site 4"
 }
+```
 
 ## Advanced
 Additional filters to apply on the detection and output.
