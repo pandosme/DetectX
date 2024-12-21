@@ -24,6 +24,45 @@ Additional filter to reduce the number of false detection. Click button and use 
 ### Set Minimum Size
 Additional filter to reduce the number of false detection. Click button and use mouse to define a minimum width and height that the detection must have.
 
+## MQTT
+Configure the MQTT Broker to connect to.  
+Properties names name & location are properties targeting systems with many devices in order to identify who sent the message.
+### Topics & Payload
+**Detections**  
+[pretopic]/detection
+{
+	"detections":[
+		{"label":"car","c":50,"x":530,"y":146,"w":46,"h":50,"timestamp":1734820170032},
+		{"label":"car","c":69,"x":222,"y":203,"w":150,"h":96,"timestamp":1734820170032}
+	],
+	"name":"Parking 3",
+	"location":"Site 4"
+}
+
+**Events**  
+[pretopic]/event/B8A44F000000/car/true
+{
+	"state": true,
+	"label": "car",
+	"c": 50,
+	"x": 530,
+	"y": 146,
+	"w": 46,
+	"h": 50,
+	"timestamp": 1734820051124,
+	"name":"Parking 3",
+	"location":"Site 4"
+}
+
+[pretopic]/event/B8A44F000000/car/false
+{
+	"label": "car",
+	"state": false,
+	"timestamp": 1734820051124,
+	"name":"Parking 3",
+	"location":"Site 4"
+}
+
 ## Advanced
 Additional filters to apply on the detection and output.
 
@@ -83,5 +122,9 @@ A stateful event (high/low) for each detected label.
 ### 3.1.5	December 11, 2024
 - Fixed a flaw that impact events.
 
-### 3.2.0	December 11, 2024
+### 3.2.0	December 20, 2024
 - Bumbed ACAP wrapper up to 3.2.0
+
+### 3.3.0	December 21, 2024
+- Added support for MQTT
+

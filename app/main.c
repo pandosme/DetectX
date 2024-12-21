@@ -18,6 +18,8 @@
 #include "Video.h"
 #include "cJSON.h"
 #include "Output.h"
+#include "MQTT.h"
+
 
 #define LOG(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args);}
 #define LOG_WARN(fmt, args...)    { syslog(LOG_WARNING, fmt, ## args); printf(fmt, ## args);}
@@ -214,6 +216,21 @@ signal_handler(gpointer user_data) {
     return G_SOURCE_REMOVE;
 }
 
+void 
+MAIN_MQTT_Conection_Status (int state) {
+	switch( state ) {
+		case MQTT_CONNECT:
+			LOG_TRACE("%s: Connect\n",__func__);
+			break;
+		case MQTT_RECONNECT:
+			LOG("%s: Reconnect\n",__func__);
+			break;
+		case MQTT_DISCONNECT:
+			LOG("%s: Disconnect\n",__func__);
+			break;
+	}
+}
+
 
 int main(void) {
 	setbuf(stdout, NULL);
@@ -252,6 +269,7 @@ int main(void) {
 	}
 	ACAP_Set_Config("model",model);
 	Output_reset();
+	MQTT_Init( APP_PACKAGE, MAIN_MQTT_Conection_Status );	
 
     LOG("Entering main loop\n");
 	main_loop = g_main_loop_new(NULL, FALSE);

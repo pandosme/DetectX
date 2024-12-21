@@ -8,7 +8,7 @@
             "embeddedSdkVersion": "3.0",
             "vendorUrl": "https://pandosme.github.io",
             "runMode": "once",
-            "version": "3.2.0"
+            "version": "3.3.0"
         },
         "configuration": {
 			"settingPage": "index.html",
@@ -17,7 +17,9 @@
 				{"name": "settings","access": "admin","type": "fastCgi"},
 				{"name": "status","access": "admin","type": "fastCgi"},
 				{"name": "device","access": "admin","type": "fastCgi"},
-				{"name": "model","access": "admin","type": "fastCgi"}
+				{"name": "model","access": "admin","type": "fastCgi"},
+				{"name": "mqtt","access": "admin","type": "fastCgi"},
+				{"name": "certs","access": "admin","type": "fastCgi"}
 			]
 		}
     },

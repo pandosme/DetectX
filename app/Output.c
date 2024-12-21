@@ -26,6 +26,7 @@
 #include <syslog.h>
 
 #include "ACAP.h"
+#include "MQTT.h"
 
 #define LOG(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args);}
 #define LOG_WARN(fmt, args...)    { syslog(LOG_WARNING, fmt, ## args); printf(fmt, ## args);}
@@ -35,15 +36,30 @@
 
 cJSON* lastTriggerTime = 0;
 cJSON* firstTriggerTime = 0;
+int lastDetectionsWhereEmpty = 0;
 
 void
 Output( cJSON* detections ) {
 	ACAP_STATUS_SetObject("labels","detections",detections);
-
 	double now = ACAP_DEVICE_Timestamp();
 	cJSON* settings = ACAP_Get_Config("settings");
 	if(!settings)
 		return;
+	char topic[256];
+	sprintf(topic,"detection/%s", ACAP_DEVICE_Prop("serial"));
+
+	cJSON* mqttPayload = cJSON_CreateObject();
+	cJSON_AddItemReferenceToObject(mqttPayload, "detections", detections);
+	if( cJSON_GetArraySize(detections) ) {
+		MQTT_Publish_JSON( topic, mqttPayload, 0 ,0 );
+		lastDetectionsWhereEmpty = 0;
+	} else {
+		if( !lastDetectionsWhereEmpty )
+			MQTT_Publish_JSON( topic, mqttPayload, 0, 0 );
+		lastDetectionsWhereEmpty = 1;
+	}
+	cJSON_Delete(mqttPayload);
+	
 	if( !lastTriggerTime )
 		lastTriggerTime = cJSON_CreateObject();
 	if( !firstTriggerTime )
@@ -66,6 +82,9 @@ Output( cJSON* detections ) {
 			if( (now - timestamp) >= stabelizeTransition ) {
 				LOG_TRACE("%s: Label %s set to high",__func__,label);
 				ACAP_EVENTS_Fire_State( label, 1 );
+				sprintf(topic,"event/%s/%s/true", ACAP_DEVICE_Prop("serial"),label);
+				cJSON_AddTrueToObject( detection,"state");
+				MQTT_Publish_JSON( topic, detection, 0, 0 );
 				cJSON_DeleteItemFromObject( firstTriggerTime,label);
 			}
  		}
@@ -83,7 +102,14 @@ Output( cJSON* detections ) {
 		if( ACAP_STATUS_Bool("events", lastTrigger->string) ) {
 			if( (now - lastTrigger->valuedouble) > minEventDuration ) {
 				ACAP_EVENTS_Fire_State( lastTrigger->string , 0 );
-				LOG_TRACE("%s: Label %s set to Low",__func__,label);
+				sprintf(topic,"event/%s/%s/false", ACAP_DEVICE_Prop("serial"),lastTrigger->string);
+				cJSON* statePayload = cJSON_CreateObject();
+				cJSON_AddStringToObject( statePayload,"label", lastTrigger->string);
+				cJSON_AddFalseToObject( statePayload,"state");
+				cJSON_AddNumberToObject( statePayload,"timestamp", ACAP_DEVICE_Timestamp());
+				MQTT_Publish_JSON( topic, statePayload, 0, 0 );
+				cJSON_Delete(statePayload);
+				LOG_TRACE("%s: Label %s set to Low",__func__,lastTrigger->string);
 			}
 		}
 		lastTrigger = lastTrigger->next;
