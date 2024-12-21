@@ -82,3 +82,6 @@ A stateful event (high/low) for each detected label.
 
 ### 3.1.5	December 11, 2024
 - Fixed a flaw that impact events.
+
+### 3.2.0	December 11, 2024
+- Bumbed ACAP wrapper up to 3.2.0
