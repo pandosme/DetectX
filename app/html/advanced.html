@@ -143,31 +143,61 @@ $(document).ready(function() {
 });
 
 
-$('.label-checkbox').change(function() {
-	const label = $(this).data('label');
+function createLabelCheckboxes(labels, ignoreList) {
+    const table = $('#labelsTable');
+    const columns = 10; // Number of columns
 
-	if (this.checked) {
-		// Remove label from ignore list
-		App.settings.ignore = App.settings.ignore.filter(item => item !== label);
-	} else {
-		// Add label to ignore list
-		if (!App.settings.ignore.includes(label)) {
-			App.settings.ignore.push(label);
-		}
-	}
-	$.ajax({
-		type: "POST",
-		url: "settings",
-		contentType: 'application/json',
-		data: JSON.stringify({"ignore": App.settings.ignore}),
-		success: function(response) {
-			console.log("AOI updated successfully.");
-		},
-		error: function(response) {
-			alert("Failed to update AOI: " + response.statusText);
-		}
-	});
-});
+    for (let i = 0; i < labels.length; i += columns) {
+        const row = $('<tr></tr>');
+
+        for (let j = 0; j < columns; j++) {
+            const index = i + j;
+            const label = labels[index];
+            if (index >= labels.length) break;
+
+            // Check if the label is in the ignore list
+            const isChecked = !ignoreList.includes(label);
+            var td = '<td>';
+            td += '<div class="form-check">';
+            td += '<input type="checkbox" class="form-check-input label-checkbox" id="label-' + index + '" data-label="' + label + '"';
+            if (isChecked) td += ' checked'; // Set checked if not in ignore list
+            td += '>';
+            td += '<label class="form-check-label" for="label-' + index + '">' + label + '</label>';
+            td += '</div>';
+            td += '</td>';
+            row.append(td);
+        }
+
+        table.append(row);
+    }
+
+    // Rebind change event to new checkboxes
+    $('.label-checkbox').change(function() {
+        const label = $(this).data('label');
+
+        if (this.checked) {
+            // Remove label from ignore list
+            App.settings.ignore = App.settings.ignore.filter(item => item !== label);
+        } else {
+            // Add label to ignore list
+            if (!App.settings.ignore.includes(label)) {
+                App.settings.ignore.push(label);
+            }
+        }
+        $.ajax({
+            type: "POST",
+            url: "settings",
+            contentType: 'application/json',
+            data: JSON.stringify({ "ignore": App.settings.ignore }),
+            success: function(response) {
+                console.log("AOI updated successfully.");
+            },
+            error: function(response) {
+                alert("Failed to update AOI: " + response.statusText);
+            }
+        });
+    });
+}
 
 $('#minEventDuration').change(function() {
 	$.ajax({
@@ -204,37 +234,6 @@ $("#menu-toggle").click(function(e) {
 	e.preventDefault();
 	$("#wrapper").toggleClass("toggled");
 });
-
-function createLabelCheckboxes(labels, ignoreList) {
-	const table = $('#labelsTable');
-	const columns = 10; // Number of columns
-
-	for (let i = 0; i < labels.length; i += columns) {
-		const row = $('<tr></tr>');
-
-		for (let j = 0; j < columns; j++) {
-			const index = i + j;
-			const label = labels[index];
-			if (index >= labels.length) break;
-
-			const isChecked = !ignoreList.includes(label);
-			var td = '<td>';
-			td += '<div class="form-check">';
-			td += '<input type="checkbox" class="form-check-input label-checkbox" id="label-' + index + '" data-label=" ' + label + '"';
-			if( isChecked )
-				td += 'checked';
-			td += '>';
-			td += '<label class="form-check-label" for="label-' + index + '">' + label + '</label>';
-			td += '</div>';
-			td += '</td>';
-			row.append(td);
-		}
-
-		table.append(row);
-	}
-
-}
-
 
 </script>
 </body>
