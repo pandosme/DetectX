@@ -28,6 +28,8 @@ Additional filter to reduce the number of false detection. Click button and use 
 Configure the MQTT Broker to connect to.  
 Properties names name & location are properties targeting systems with many devices in order to identify who sent the message.
 ### Topics & Payload
+The coordinate system is relative [0..1000][0..1000] regardless of resolution and aspect ratio.  The origo is in the top-left corner.  
+
 **Detections**  
 [pretopic]/detection  
 ```
@@ -132,3 +134,5 @@ A stateful event (high/low) for each detected label.
 ### 3.3.0	December 21, 2024
 - Added support for MQTT
 
+### 3.3.5	December 22, 2024
+- Restructured and added more information on the About page

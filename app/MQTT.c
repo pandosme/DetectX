@@ -18,8 +18,8 @@
 
 #define LOG(fmt, args...)    { syslog(LOG_INFO, fmt, ## args);  printf(fmt, ## args); }
 #define LOG_WARN(fmt, args...)    { syslog(LOG_WARNING, fmt, ## args); printf(fmt, ## args);}
-#define LOG_TRACE(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args); }
-//#define LOG_TRACE(fmt, args...)    {}
+//#define LOG_TRACE(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args); }
+#define LOG_TRACE(fmt, args...)    {}
 #define URL_SIZE	256
 
 int MQTT_LoadLib();
@@ -73,7 +73,7 @@ static  gboolean MQTT_Timer();
 
 cJSON*
 MQTT_Settings() {
-	return  MQTTSettings = 0;
+	return  MQTTSettings;
 }
 
 int
@@ -633,10 +633,8 @@ MQTT_Publish_JSON( const char *topic, cJSON* payload, int qos, int retained ) {
 		return 0;
 	}
 	
-	LOG_TRACE("%s: Debug 0\n",__func__);
 	cJSON* publish = cJSON_Duplicate(payload, 1);
 	cJSON* userProperties = cJSON_GetObjectItem(MQTTSettings,"payload");
-	LOG_TRACE("%s: Debug 1\n",__func__);
 
 	if( userProperties ) {
 		const char* name = cJSON_GetObjectItem(userProperties,"name")?cJSON_GetObjectItem(userProperties,"name")->valuestring:0;
@@ -647,8 +645,6 @@ MQTT_Publish_JSON( const char *topic, cJSON* payload, int qos, int retained ) {
 			cJSON_AddStringToObject(publish,"location",location);
 	}
 
-	LOG_TRACE("%s: Debug 2\n",__func__);
-
 	char *json = cJSON_PrintUnformatted(publish);
 	if(!json) {
 		LOG("%s: Unable to format JSON\n",__func__);
@@ -656,7 +652,6 @@ MQTT_Publish_JSON( const char *topic, cJSON* payload, int qos, int retained ) {
 		return 0;
 	}
 	cJSON_Delete(publish);
-	LOG_TRACE("%s: Debug 3\n",__func__);
 	
 	int result = MQTT_Publish(topic, json, qos, retained );
 	free(json);
@@ -771,17 +766,6 @@ MQTT_Timer() {
 		ACAP_STATUS_SetString("mqtt","status", "Connected" );
 		ACAP_STATUS_SetBool("mqtt","connected", TRUE );
 	}
-	
-/*
-	if( !(*f_MQTTClient_isConnected)(client) ) {
-		if( cJSON_GetObjectItem(MQTTSettings,"connect")->type == cJSON_True ) {
-			LOG_TRACE("%s: Disconnected.  Trying to reconnect\n",__func__);
-			if( MQTT_Connect() )
-				MQTT_ACAP_Connection_Callback( MQTT_RECONNECT );
-		}
-		return TRUE;
-	} 
-*/	
 	(*f_MQTTClient_yield)();
 	return TRUE;
 }

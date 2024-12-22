@@ -106,5 +106,5 @@
     "toothbrush",
     "hair_brush"
   ],
-  "description": "Trained on standrd COCO model"
+  "description": "Trained on COCO model"
 }

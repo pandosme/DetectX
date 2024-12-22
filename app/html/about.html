@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Custom Model</title>
+    <title>DetectX</title>
     <link rel="stylesheet" href="css/bootstrap.min.css">
     <link rel="stylesheet" href="css/app.css">
     <script src="js/jquery-3.7.1.min.js"></script>
@@ -17,107 +17,173 @@
             <div class="sidebar-heading">Custom Model</div>
             <div class="list-group list-group-flush">
                 <a href="index.html" class="list-group-item list-group-item-action">Detections</a>
-				<a href="mqtt.html" class="list-group-item list-group-item-action">MQTT</a>
-				<a href="advanced.html" class="list-group-item list-group-item-action">Advanced</a>
+                <a href="mqtt.html" class="list-group-item list-group-item-action">MQTT</a>
+                <a href="advanced.html" class="list-group-item list-group-item-action">Advanced</a>
                 <a href="about.html" class="list-group-item list-group-item-action active">About</a>
             </div>
         </div>
         <!-- /#sidebar-wrapper -->
 
         <!-- Page Content -->
-        <div id="page-content">
-            <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
-                <button class="btn btn-link" id="menu-toggle">
-                    <i class="fas fa-bars"></i>
-                </button>
-                <span class="navbar-text" id="model_status">Loading...</span>
-            </nav>
-
-			<div class="container">
-				<div class="row">
-					<div class="col-12">
-						<br>
-						<h2>Application</h2>
-						<p>Version: <span class="version"></span></p>
-						<p>Vendor: <span class="vendor"></span></p>
-						<p>URL: <a href="" class="vendorUrl"></a></p>
-						<p>Model: <span class="model"></span></p>
-						<p>Firmware: <span class="firmware"></span></p>
-						<p>Serial: <span class="serial"></span></p>
+		<div id="page-content">
+			<div class="container mt-4">
+				<div class="row g-4">
+					<!-- Model Card -->
+					<div class="col-md-6">
+						<div class="card h-100">
+							<div class="card-header bg-success text-white">
+								<h5 class="mb-0">Model</h5>
+							</div>
+							<div class="card-body" style="font-size: 1.2rem;">
+								<p><strong>Description:</strong> <span class="modelDescription"></span></p>
+								<p><strong>Status:</strong> <span class="model_status"></span></p>
+								<p><strong>Size:</strong> <span class="modelSize"></span></p>
+								<p><strong>Inference:</strong> <span class="averageInference"></span> ms</p>
+								<p><strong>DLPU:</strong> <span class="dlpu"></span></p>
+							</div>
+						</div>
 					</div>
-				</div>
-				<br><br>
-				<div class="row">
-					<div class="col-12">
-						<h2>Model</h2>
-						<p>Description: <span class="modelDescription"></span></p>
-						<p>Model Size: <span class="modelSize"></span></p>
-						<p>Image input size: <span class="imageSize"></span></p>
-						<p>Avg inference: <span class="averageInference"></span>ms</p>
-						<p>Labels: <span class="labels"></span></p>
-						<p>DLPU: <span class="dlpu"></span></p>
-						<p>Quantization: <span class="quantization"></span></p>
+
+					<!-- Device Card -->
+					<div class="col-md-6">
+						<div class="card h-100">
+							<div class="card-header bg-secondary text-white">
+								<h5 class="mb-0">Device</h5>
+							</div>
+							<div class="card-body" style="font-size: 1.2rem;">
+								<p><strong>Model:</strong> <span class="model"></span></p>
+								<p><strong>Firmware:</strong> <span class="firmware"></span></p>
+								<p><strong>Serial:</strong> <span class="serial"></span></p>
+								<p><strong>CPU Load:</strong> <span class="cpuLoad"></span>% (load avg 15 min)</p>
+								<p><strong>Network:</strong> <span class="bandwidth"></span> (1 min average)</p>
+							</div>
+						</div>
+					</div>
+
+					<!-- MQTT Card -->
+					<div class="col-md-6">
+						<div class="card h-100">
+							<div class="card-header bg-info text-white">
+								<h5 class="mb-0">MQTT</h5>
+							</div>
+							<div class="card-body" style="font-size: 1.2rem;">
+								<p><strong>Status:</strong> <span class="mqttStatus"></span></p>
+								<p><strong>Broker:</strong> <span class="mqttBroker"></span></p>
+								<p><strong>Port:</strong> <span class="mqttPort"></span></p>
+								<p><strong>Client ID:</strong> <span class="mqttClientId"></span></p>
+								<p><strong>Pre-topic:</strong> <span class="mqttPreTopic"></span></p>
+							</div>
+						</div>
+					</div>
+
+					<!-- Application Card -->
+					<div class="col-md-6">
+						<div class="card h-100">
+							<div class="card-header bg-primary text-white">
+								<h5 class="mb-0">Application</h5>
+							</div>
+							<div class="card-body" style="font-size: 1.2rem;">
+								<p><strong>Name:</strong> <span class="acapName"></span></p>
+								<p><strong>Version:</strong> <span class="version"></span></p>
+								<p><strong>Vendor:</strong> <span class="vendor"></span></p>
+								<p><strong>URL:</strong> 
+									<a href="" target="_blank" style="word-break: break-word;" 
+									   class="vendorUrl"></a>
+								</p>
+							</div>
+						</div>
 					</div>
 				</div>
 			</div>
-        </div>
+		</div>
     </div>
 
+    <!-- JavaScript -->
     <script>
-        $(document).ready(function() {
-            $.ajax({
-                type: "GET",
-                url: 'app',
-                dataType: 'json',
-                cache: false,
-                success: function(data) {
-                    App = data;
-                    // Update UI elements
-                    document.title = App.manifest.acapPackageConf.setup.friendlyName;
-                    $(".acapName").html(App.manifest.acapPackageConf.setup.friendlyName);
-                    $("#sidebar-wrapper .sidebar-heading").html(App.manifest.acapPackageConf.setup.friendlyName);
-                    $("#model_status").text("Status: " + App.status.model.status);
-                    $('.version').text(data.manifest.acapPackageConf.setup.version);
-                    $('.vendor').text(data.manifest.acapPackageConf.setup.vendor);
-                    $('.vendorUrl').attr('href', data.manifest.acapPackageConf.setup.vendorUrl).text(data.manifest.acapPackageConf.setup.vendorUrl);
-                    $('.serial').text(data.device.serial);
-                    $('.model').text(data.device.model);
-                    $('.firmware').text(data.device.firmware);
-                    $('.modelDescription').text(data.model.description);
-                    $('.modelSize').text(data.model.modelWidth + 'x' + data.model.modelHeight);
-                    $('.labels').text(data.model.labels.length);
-                    $('.dlpu').text(data.model.chip);
-                    $('.quantization').text(data.model.quant);
-                    $('.imageSize').text(data.model.videoWidth + 'x' + data.model.videoHeight);
-					$('.averageInference').text(App.status.model.averageTime.toString());
-                    $('#model_status').text('Status: ' + data.status.model.status);
-                },
-                error: function(response) {
-                    alert(response.statusText);
-                }
-            });
+$(document).ready(function() {
+	// Fetch application data
+	$.ajax({
+		type: "GET",
+		url: 'app',
+		dataType: 'json',
+		cache: false,
+		success: function(data) {
+			App = data;
 
-            setInterval(function() {
-                $.ajax({
-                    type: "GET",
-                    url: 'status',
-                    dataType: 'json',
-                    cache: false,
-                    success: function(data) {
-                        $('#model_status').text('Status: ' + data.model.status);
-						$('.averageInference').text(data.model.averageTime.toString());
-                    },
-                    error() {
-                        $('#model_status').text('Status: No response');
-                    }
-                });
-            }, 4000);
-        });
+			// Update UI elements
+			document.title = App.manifest.acapPackageConf.setup.friendlyName;
+			$(".sidebar-heading").html(App.manifest.acapPackageConf.setup.friendlyName);
 
-        $("#menu-toggle").click(function(e) {
-            e.preventDefault();
-            $("#wrapper").toggleClass("toggled");
-        });
+			// Application
+			$('.acapName').text(App.manifest.acapPackageConf.setup.friendlyName);
+			$('.version').text(data.manifest.acapPackageConf.setup.version);
+			$('.vendor').text(data.manifest.acapPackageConf.setup.vendor);
+			$('.vendorUrl').attr('href', data.manifest.acapPackageConf.setup.vendorUrl).text(data.manifest.acapPackageConf.setup.vendorUrl);
+
+			// Device
+			$('.serial').text(data.device.serial);
+			$('.model').text(data.device.model);
+			$('.firmware').text(data.device.firmware);
+			$('.cpuLoad').text(parseInt(data.status.device.cpu * 100));
+			$('.bandwidth').text(formatBandwidth(data.status.device.network));
+			
+
+			// Model
+			$('.modelDescription').text(data.model.description);
+			$('.model_status').text(data.status.model.status);
+			$('.modelSize').text(data.model.modelWidth + 'x' + data.model.modelHeight);
+			$('.averageInference').text(App.status.model.averageTime.toString());
+			$('.dlpu').text(data.model.chip);
+
+			// MQTT
+			$('.mqttStatus').text(App.status.mqtt.status);
+			$('.mqttBroker').text(App.mqtt.address);
+			$('.mqttPort').text(App.mqtt.port);
+			$('.mqttClientId').text(App.mqtt.clientID);
+			$('.mqttPreTopic').text(App.mqtt.preTopic);
+		},
+		error: function(response) {
+			alert(response.statusText);
+		}
+	});
+
+	// Periodic status update
+	setInterval(function() {
+		$.ajax({
+			type: "GET",
+			url: 'status',
+			dataType: 'json',
+			cache: false,
+			success: function(data) {
+				$('#model_status').text('Status: ' + data.model.status);
+				$('.averageInference').text(data.model.averageTime.toString());
+				$('.mqttStatus').text(data.mqtt.status);
+				$('.cpuLoad').text(parseInt(data.device.cpu * 100));
+				$('.bandwidth').text(formatBandwidth(data.device.network));
+			},
+			error() {
+				$('#model_status').text('Status: No response');
+				$('.mqttStatus').text('No response');
+			}
+		});
+	}, 4000);
+
+	// Sidebar toggle
+	$("#menu-toggle").click(function(e) {
+		e.preventDefault();
+		$("#wrapper").toggleClass("toggled");
+	});
+});
+
+function formatBandwidth(valueKbps) {
+	if (valueKbps < 1000) {
+		return `${valueKbps.toFixed(1)} Kbps`;
+	} else {
+		const valueMbps = valueKbps / 1000;
+		return `${valueMbps.toFixed(1)} Mbps`;
+	}
+}
+
     </script>
 </body>
 </html>

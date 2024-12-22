@@ -231,6 +231,13 @@ MAIN_MQTT_Conection_Status (int state) {
 	}
 }
 
+static gboolean
+MAIN_STATUS_Timer() {
+	ACAP_STATUS_SetNumber("device", "cpu", ACAP_DEVICE_CPU_Average());	
+	ACAP_STATUS_SetNumber("device", "network", ACAP_DEVICE_Network_Average());
+	return TRUE;
+}
+
 
 int main(void) {
 	setbuf(stdout, NULL);
@@ -270,6 +277,11 @@ int main(void) {
 	ACAP_Set_Config("model",model);
 	Output_reset();
 	MQTT_Init( APP_PACKAGE, MAIN_MQTT_Conection_Status );	
+	ACAP_Set_Config("mqtt", MQTT_Settings() );
+	
+	ACAP_DEVICE_CPU_Average();
+	ACAP_DEVICE_Network_Average();
+	g_timeout_add_seconds( 60 , MAIN_STATUS_Timer, NULL );
 
     LOG("Entering main loop\n");
 	main_loop = g_main_loop_new(NULL, FALSE);
