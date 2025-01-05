@@ -11,7 +11,7 @@
   "scaleMode": 0,
   "videoWidth": 640,
   "videoHeight": 480,
-  "videoAspect": "16:9",
+  "videoAspect": "4:3",
   "chip": "axis-a8-dlpu-tflite",
   "labels": [
     "person",
@@ -106,5 +106,5 @@
     "toothbrush",
     "hair_brush"
   ],
-  "description": "Trained on COCO model"
+  "description": ""
 }

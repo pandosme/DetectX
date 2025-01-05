@@ -1394,7 +1394,7 @@ FILE* ACAP_FILE_Open(const char* filepath, const char* mode) {
     
     FILE* file = fopen(fullpath, mode);
     if (!file) {
-        LOG_WARN("%s: Opening file %s failed: %s\n", __func__, fullpath, strerror(errno));
+        LOG_TRACE("%s: Opening file %s failed: %s\n", __func__, fullpath, strerror(errno));
     }
     return file;
 }
@@ -1423,7 +1423,7 @@ cJSON* ACAP_FILE_Read(const char* filepath) {
 
     FILE* file = ACAP_FILE_Open(filepath, "r");
     if (!file) {
-		LOG_WARN("%s: File open error %s\n",__func__,filepath);
+		LOG_TRACE("%s: File open error %s\n",__func__,filepath);
         return NULL;
     }
 
