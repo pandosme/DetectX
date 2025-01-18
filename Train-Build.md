@@ -31,7 +31,7 @@ To ensure the model is compatible with the camera, follow steps:
 git clone https://github.com/ultralytics/yolov5
 cd yolov5
 git checkout 95ebf68f92196975e53ebc7e971d0130432ad107
-curl -L https://acap-ml-model-storage.s3.amazonaws.com/yolov5/yolov5-axis-A8.patch | git apply
+curl -L https://acap-ml-model-storage.s3.amazonaws.com/yolov5/A9/yolov5-axis-A9.patch | git apply
 pip install -r requirements.txt
 ```
 
