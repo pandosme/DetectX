@@ -88,36 +88,20 @@ A stateful event (high/low) for each detected label.
 
 # History
 
-### 1.0.0	September 5, 2024
-- Initial commit
+### 3.3.5	February 6, 2025
+- Fixed a serious memory leak
 
-### 1.0.1	Septeber 6, 2024
-- Restructured SD Card image store on detect images. Fix a flaw that could result in error "Too many files open...".
-- Fixed so Reset button cleared all bounding boxes and table
+### 3.3.5	December 22, 2024
+- Restructured and added more information on the About page
 
-### 1.0.2	September 7, 2024
-- Fixed flaw that prevented detections
-- Fixed flaw that did not store images on SD Card when users enabled this feature
+### 3.3.0	December 21, 2024
+- Added support for MQTT
 
-### 1.0.3	September 15, 2024
-- Restructures the model.json and settings.json and code realted to those config files including prepare.py
+### 3.2.0	December 20, 2024
+- Bumbed ACAP wrapper up to 3.2.0
 
-
-### 1.2.0	October 7, 2024
-- Added support fo filter minimum size
-- Fixed a flaw that preventet detecting mutliple detections in the same scene.
-
-### 2.1.0 October 11, 2024
-- Added support for Detection transition
-- Removed ability to store detectection images on SD Card
-
-### 2.1.1	October 13, 2024
-- Fixed flawed event states
-- Fixed potential memoryleak
-
-### 2.2.0	October 19, 2024
-- Added event "Label Counter" for use cases needing to know how many objects are detected
-- Fixed flaw for Detection transition
+### 3.1.5	December 11, 2024
+- Fixed a flaw that impact events.
 
 ### 3.1.0	November 27, 2024
 - Switched to latest ACAP SDK.  Please remove previous version if they are below 3.0.0.
@@ -125,14 +109,42 @@ A stateful event (high/low) for each detected label.
 - Modified events to give all labels its own event
 - Updated visualization in user interface
 
-### 3.1.5	December 11, 2024
-- Fixed a flaw that impact events.
+### 2.2.0	October 19, 2024
+- Added event "Label Counter" for use cases needing to know how many objects are detected
+- Fixed flaw for Detection transition
 
-### 3.2.0	December 20, 2024
-- Bumbed ACAP wrapper up to 3.2.0
+### 2.1.1	October 13, 2024
+- Fixed flawed event states
+- Fixed potential memoryleak
 
-### 3.3.0	December 21, 2024
-- Added support for MQTT
+### 2.1.0 October 11, 2024
+- Added support for Detection transition
+- Removed ability to store detectection images on SD Card
 
-### 3.3.5	December 22, 2024
-- Restructured and added more information on the About page
+### 1.2.0	October 7, 2024
+- Added support fo filter minimum size
+- Fixed a flaw that preventet detecting mutliple detections in the same scene.
+
+### 1.0.3	September 15, 2024
+- Restructures the model.json and settings.json and code realted to those config files including prepare.py
+
+### 1.0.2	September 7, 2024
+- Fixed flaw that prevented detections
+- Fixed flaw that did not store images on SD Card when users enabled this feature
+
+### 1.0.1	Septeber 6, 2024
+- Restructured SD Card image store on detect images. Fix a flaw that could result in error "Too many files open...".
+- Fixed so Reset button cleared all bounding boxes and table
+
+### 1.0.0	September 5, 2024
+- Initial commit
+
+
+
+
+
+
+
+
+
+
