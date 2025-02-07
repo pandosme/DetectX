@@ -35,29 +35,14 @@ cJSON* eventLabelCounter = 0;
 GTimer *cleanupTransitionTimer = 0;
 
 void
-ConfigUpdate( const char *service, cJSON* data) {
-	LOG_TRACE("%s: %s\n",__func__,service);
-	cJSON* setting = data->child;
-	while(setting) {
-		LOG_TRACE("%s: Processing %s\n",__func__,setting->string);
-		if( strcmp( "eventTimer", setting->string ) == 0 ) {
-			LOG("Changed event state to %d\n", setting->valueint);
-		}
-		if( strcmp( "eventsTransition", setting->string ) == 0 ) {
-			LOG("Changed event transition to %d\n", setting->valueint);
-		}
-		if( strcmp( "aoi", setting->string ) == 0 ) {
-			LOG("Updated area of intrest\n");
-		}
-		if( strcmp( "ignore", setting->string ) == 0 ) {
-			LOG("Update labels to be processed\n");
-		}
-		if( strcmp( "confidence", setting->string ) == 0 ) {
-			LOG("Updated confidence threshold to %d\n", setting->valueint);
-		}
-		setting = setting->next;
+ConfigUpdate( const char *setting, cJSON* data) {
+	if(!setting || !data)
+		return;
+	char *json = cJSON_PrintUnformatted(data);
+	if( json ) {
+		LOG("Config: %s = %s\n",setting, json);
+		free(json);
 	}
-	LOG_TRACE("%s: Exit\n",__func__);
 }
 
 

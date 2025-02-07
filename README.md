@@ -88,6 +88,10 @@ A stateful event (high/low) for each detected label.
 
 # History
 
+### 3.3.6	February 7. 2025
+- Fixed a bug that could crash the application if the user interface is active for a longer period of time.
+  (Credit to Fredrik Lax, Sundsvall-IT who found it)
+
 ### 3.3.5	February 6, 2025
 - Fixed a serious memory leak
 
