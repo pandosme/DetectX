@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2025 Fred Juhlin
  * MIT License - See LICENSE file for details
- * Version 3.5
+ * Version 3.6
  */
 
 #include <stdio.h>
@@ -1774,12 +1774,16 @@ ACAP_EVENTS_Main_Callback(guint subscription, AXEvent *axEvent, gpointer user_da
 	LOG_TRACE("%s:\n",__func__);
 
 	cJSON* eventData = ACAP_EVENTS_Parse(axEvent);
-	if( !eventData )
+	if( !eventData ) {
+		ax_event_free(axEvent);	
 		return;
+	}
+
 	cJSON_AddItemReferenceToObject(eventData, "source", (cJSON*)user_data);	
 	if( EVENT_USER_CALLBACK )
 		EVENT_USER_CALLBACK( eventData, (void*)user_data );
 	cJSON_Delete(eventData);
+	ax_event_free(axEvent);	
 }
 
 /*

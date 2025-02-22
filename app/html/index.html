@@ -148,11 +148,35 @@ var viewWidth = 800;
 var viewHeight = 450;
 var inferenceTimer = 0;
 var imgAreaSelectInstance = null;
-var modelRunning = false;
 var selectionMode = "aoi";
 var setupComplete = false;
 		
 $(document).ready(function() {
+	$.ajax({
+		type: "POST",
+		url: '/axis-cgi/basicdeviceinfo.cgi',
+		dataType: 'json',
+		data: '{"apiVersion": "1.0","context": "DetectX","method": "getAllProperties"}',
+		cache: false,
+		success: function( response ) {
+			if( response.data.propertyList.Soc !== "Axis Artpec-8" ) {
+				$(".modal-body").html('<b>This camera is not supported.<br/>The camera needs to be based on ARTPEC-8</b>');
+				$('#errorModal').modal('show');
+				return;
+			}
+			if( !app.status.model || !app.status.model.state ) {
+				$(".modal-body").html('The model is loading...');
+				$('#errorModal').modal('show');
+			}
+			initializePage();
+		},
+		error: function(response) {
+			$('#errorModal').modal('show');
+		}
+	});
+});
+
+function initializePage() {	
 	$.ajax({type: "GET",url: 'app',dataType: 'json',cache: false,
 		success: function(data) {
 			App = data;
@@ -203,6 +227,7 @@ $(document).ready(function() {
 			imgAreaSelectInstance.setOptions({hide:true});
 		},
 		error: function(response) {
+			$(".modal-body").html('<b>The application is not responding<b/>');
 			$('#errorModal').modal('show');
 		}
 	});
@@ -272,14 +297,14 @@ $(document).ready(function() {
 	setInterval( function(){
 		$.ajax({type: "GET",url: 'status',dataType: 'json',cache: false,
 			success: function( status ) {
+				if( !status.model || !status.model.state )
+					return;
+
+				if ($('.modal:visible').length && $('body').hasClass('modal-open')) {
+					$('#errorModal').modal('hide');
+				};
+				
 				$("#model_status").text("Status: " + status.model.status);
-				modelRunning = status.model.state;
-			   // Show or hide the modal based on data.model.status
-				if (!status.model.status) {
-					$('#modal').show();
-				} else {
-					$('#modal').hide();
-				}
 
 				$('#events-table').empty();
 				if( !status.hasOwnProperty("labels") )
@@ -316,13 +341,13 @@ $(document).ready(function() {
 				};
 			},
 			error(){
-				$('#modal').show();
-				$("#model_status").text("Status: Loading...");
+				$(".modal-body").html('<b>The application is not responding<b/>');
+				$('#errorModal').modal('show');
 			}
 		});
 	},300);
-
-});			
+};			
+	  
 
 function SetupView(aspect) {
 	switch (aspect) {

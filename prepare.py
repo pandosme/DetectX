@@ -13,10 +13,21 @@ def get_chip_name(platform):
 def get_video_dimensions(image_size):
     video_mapping = {
         480: 640,
+        640: 800,  # New mapping for 640
         768: 1024,
         960: 1280
     }
-    return video_mapping.get(image_size, 640)
+    video_height_mapping = {
+        640: 600  # Special case for height when image_size is 640
+    }
+    
+    # Get video width from mapping or default to 640
+    video_width = video_mapping.get(image_size, 640)
+    
+    # Get video height from special mapping or use image_size as default
+    video_height = video_height_mapping.get(image_size, image_size)
+    
+    return video_width, video_height
 
 def parse_labels_file(file_path):
     try:
@@ -28,6 +39,9 @@ def parse_labels_file(file_path):
         return ["label1", "label2"]
 
 def generate_json(platform="A8", image_size=480):
+    # Get video dimensions
+    video_width, video_height = get_video_dimensions(image_size)
+    
     # Default values
     data = {
         "modelWidth": image_size,
@@ -40,8 +54,8 @@ def generate_json(platform="A8", image_size=480):
         "nms": 0.05,
         "path": "model/model.tflite",
         "scaleMode": 0,
-        "videoWidth": get_video_dimensions(image_size),
-        "videoHeight": image_size,
+        "videoWidth": video_width,
+        "videoHeight": video_height,
         "videoAspect": "4:3",
         "chip": get_chip_name(platform),
         "labels": ["label1", "label2"],
@@ -95,9 +109,8 @@ def generate_settings_json():
     pass
 
 if __name__ == "__main__":
-    # Example usage with platform and image size parameters
     platform = input("Enter platform (A8/A9/TPU): ")
-    image_size = int(input("Enter image size (480/768/960): "))
+    image_size = int(input("Enter image size (480/640/768/960): "))
     
     generate_json(platform, image_size)
     
@@ -105,3 +118,4 @@ if __name__ == "__main__":
     labels = parse_labels_file(labels_path)
     
     generate_settings_json()
+    

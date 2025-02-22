@@ -88,6 +88,14 @@ A stateful event (high/low) for each detected label.
 
 # History
 
+### 3.3.7	February 22, 2025
+- Fixed MQTT stability (recurring disconnects)
+- Improved behaviour in GUI
+	* Display error when not running on ARTPEC-8 (e.g. Ambarella CV25)
+	* Display info when model is loading
+	* Display info when application not responding
+
+
 ### 3.3.6	February 7. 2025
 - Fixed a bug that could crash the application if the user interface is active for a longer period of time.  
   (Credit to Fredrik Lax, Sundsvall-IT who found it)
