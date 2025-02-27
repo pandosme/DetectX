@@ -164,10 +164,6 @@ $(document).ready(function() {
 				$('#errorModal').modal('show');
 				return;
 			}
-			if( !app.status.model || !app.status.model.state ) {
-				$(".modal-body").html('The model is loading...');
-				$('#errorModal').modal('show');
-			}
 			initializePage();
 		},
 		error: function(response) {

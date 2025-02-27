@@ -1,7 +1,8 @@
 /*------------------------------------------------------------------
- *  Fred Juhlin 2024
+ *  Fred Juhlin 2025
+ *  For ACAP SDK 12.x
  *------------------------------------------------------------------*/
-
+ 
 #include <stdlib.h>
 #include <glib.h>
 #include <stdio.h> 
@@ -17,8 +18,8 @@
 
 #define LOG(fmt, args...)    { syslog(LOG_INFO, fmt, ## args);  printf(fmt, ## args); }
 #define LOG_WARN(fmt, args...)    { syslog(LOG_WARNING, fmt, ## args); printf(fmt, ## args);}
-//#define LOG_TRACE(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args); }
-#define LOG_TRACE(fmt, args...)    {}
+#define LOG_TRACE(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args); }
+//#define LOG_TRACE(fmt, args...)    {}
 #define URL_SIZE	256
 
 int MQTT_LoadLib();
@@ -71,25 +72,15 @@ static  gboolean MQTT_Timer();
 int		MQTT_Connected();
 
 
-// Add at the top of the file
-static time_t lastActivityTime = 0;
-
-// Update activity time on any message send/receive
-void UpdateActivityTime() {
-    lastActivityTime = time(NULL);
-}
-
 cJSON*
 MQTT_Settings() {
-	if( !MQTTSettings )
-		MQTTSettings = cJSON_CreateObject();
 	return  MQTTSettings;
 }
 
-static gboolean MQTT_Yield_Handler() {
+static gboolean
+MQTT_Yield_Handler() {
     if (MQTT_Connected()) {
         (*f_MQTTClient_yield)();
-        UpdateActivityTime();
     }
     return TRUE;  // Continue the timer
 }
@@ -172,7 +163,7 @@ MQTT_Init( const char* acapname, MQTT_Callback_Connection callback ) {
 		MQTT_Connect();
 	cJSON_Delete(settings);
 	g_timeout_add_seconds( 30, MQTT_Timer, NULL );
-	g_timeout_add(100, MQTT_Yield_Handler, NULL);
+	g_timeout_add(100, MQTT_Yield_Handler, NULL);	
 	ACAP_STATUS_SetString("mqtt", "status", "Not connected" );
 	LOG_TRACE("%s: Exit\n",__func__);
 	return 1;
@@ -189,67 +180,95 @@ MQTT_HTTP_callback(const ACAP_HTTP_Response response, const ACAP_HTTP_Request re
         LOG_WARN("%s: Invalid settings not initialized\n", __func__);
         return;
     }
-	
-	LOG_TRACE("%s:\n",__func__);
 
-	const char* json = ACAP_HTTP_Request_Param(request, "json");
-	if(!json)
-		json = ACAP_HTTP_Request_Param(request, "set");
+    const char* method = ACAP_HTTP_Get_Method(request);
+    if (!method) {
+        ACAP_HTTP_Respond_Error(response, 400, "Invalid Request Method");
+        return;
+    }
 
-    if (!json) {
-		const char* action = ACAP_HTTP_Request_Param(request, "action");
-		if( action ) {
-			cJSON_ReplaceItemInObject(MQTTSettings,"connected",cJSON_CreateFalse());
-			ACAP_FILE_Write( "localdata/mqtt.json", MQTTSettings );
-			if( MQTT_Disconnect() )
-				ACAP_HTTP_Respond_Text( response, "OK" );
-			else
-				ACAP_HTTP_Respond_Error( response, 400, ACAP_STATUS_String("mqtt","status" ));
-			return;
-		}
-		
+    // Handle GET requests
+    if (strcmp(method, "GET") == 0) {
+        const char* action = ACAP_HTTP_Request_Param(request, "action");
+        if (action) {
+            if (strcmp(action, "disconnect") == 0) {
+                cJSON_ReplaceItemInObject(MQTTSettings, "connected", cJSON_CreateFalse());
+                ACAP_FILE_Write("localdata/mqtt.json", MQTTSettings);
+                
+                if (MQTT_Disconnect())
+                    ACAP_HTTP_Respond_Text(response, "OK");
+                else
+                    ACAP_HTTP_Respond_Error(response, 400, ACAP_STATUS_String("mqtt", "status"));
+                return;
+            }
+            
+            ACAP_HTTP_Respond_Error(response, 400, "Invalid action");
+            return;
+        }
+        // Return current settings if no action specified
         ACAP_HTTP_Respond_JSON(response, MQTTSettings);
         return;
     }
 
-    cJSON* settings = cJSON_Parse(json);
-    if (!settings) {
-        ACAP_HTTP_Respond_Error(response, 400, "Invalid JSON");
-        LOG_WARN("Unable to parse json for MQTT settings\n");
+    // Handle POST requests
+    if (strcmp(method, "POST") == 0) {
+        // Verify content type for configuration updates
+        const char* contentType = ACAP_HTTP_Get_Content_Type(request);
+        if (!contentType || strcmp(contentType, "application/json") != 0) {
+            ACAP_HTTP_Respond_Error(response, 415, "Unsupported Media Type - Use application/json");
+            return;
+        }
+
+        // Handle actions
+
+        // Handle configuration update
+        if (!request->postData || request->postDataLength == 0) {
+            ACAP_HTTP_Respond_Error(response, 400, "Missing POST data");
+            return;
+        }
+
+        cJSON* settings = cJSON_Parse(request->postData);
+        if (!settings) {
+            ACAP_HTTP_Respond_Error(response, 400, "Invalid JSON");
+            LOG_WARN("Unable to parse json for MQTT settings\n");
+            return;
+        }
+
+		cJSON* payload = cJSON_GetObjectItem(settings,"payload");
+
+		if( payload ) {  //Just update the helper pyaload properties
+			const char* name = cJSON_GetObjectItem(payload,"name")?cJSON_GetObjectItem(payload,"name")->valuestring:"";
+			const char* location = cJSON_GetObjectItem(payload,"location")?cJSON_GetObjectItem(payload,"location")->valuestring:"";
+			cJSON* mqttPayload = cJSON_GetObjectItem(MQTTSettings,"payload");
+			if(!mqttPayload) {
+				mqttPayload = cJSON_CreateObject();
+				cJSON_AddStringToObject( payload,"name",name);
+				cJSON_AddStringToObject( payload,"location",location);
+				cJSON_AddItemToObject(MQTTSettings,"payload",mqttPayload);
+			}
+			cJSON_ReplaceItemInObject(mqttPayload,"name",cJSON_CreateString(name));	
+			cJSON_ReplaceItemInObject(mqttPayload,"location",cJSON_CreateString(location));	
+			ACAP_FILE_Write( "localdata/mqtt.json", MQTTSettings );
+			ACAP_HTTP_Respond_Text(response,"Payload properties updated");
+			return;
+		}
+
+        LOG_TRACE("%s: %s\n", __func__, request->postData);
+        
+        if (MQTT_Set(settings)) {
+            ACAP_HTTP_Respond_Text(response, "MQTT Updated");
+            MQTT_Connect();
+        } else {
+            ACAP_HTTP_Respond_Error(response, 400, ACAP_STATUS_String("mqtt", "status"));
+            LOG_WARN("Unable to update MQTT settings\n");
+        }
+        
+        cJSON_Delete(settings);
         return;
     }
 
-	cJSON* payload = cJSON_GetObjectItem(settings,"payload");
-
-	if( payload ) {  //Just update the helper pyaload properties
-		const char* name = cJSON_GetObjectItem(payload,"name")?cJSON_GetObjectItem(payload,"name")->valuestring:"";
-		const char* location = cJSON_GetObjectItem(payload,"location")?cJSON_GetObjectItem(payload,"location")->valuestring:"";
-		cJSON* mqttPayload = cJSON_GetObjectItem(MQTTSettings,"payload");
-		if(!mqttPayload) {
-			mqttPayload = cJSON_CreateObject();
-			cJSON_AddStringToObject( payload,"name",name);
-			cJSON_AddStringToObject( payload,"location",location);
-			cJSON_AddItemToObject(MQTTSettings,"payload",mqttPayload);
-		}
-		cJSON_ReplaceItemInObject(mqttPayload,"name",cJSON_CreateString(name));	
-		cJSON_ReplaceItemInObject(mqttPayload,"location",cJSON_CreateString(location));	
-		ACAP_FILE_Write( "localdata/mqtt.json", MQTTSettings );
-		ACAP_HTTP_Respond_Text(response,"Payload properties updated");
-		return;
-	}
-
-    LOG_TRACE("%s: %s\n", __func__, json);
-        
-    if (!MQTT_Set(settings)) {
-        ACAP_HTTP_Respond_Error(response, 400, ACAP_STATUS_String("mqtt", "status"));
-        LOG_WARN("Unable to update MQTT settings\n");
-        cJSON_Delete(settings);
-		return;
-	}
-
-    cJSON_Delete(settings);
-    ACAP_HTTP_Respond_Text(response, "MQTT Updated");
-    MQTT_Connect();
+    // Handle unsupported methods
+    ACAP_HTTP_Respond_Error(response, 405, "Method Not Allowed - Use GET or POST");
 }
 
 int
@@ -423,13 +442,29 @@ MQTT_Connect() {
 		sprintf(LastWillTopic,"%s/connect/%s",preTopic,ACAP_DEVICE_Prop("serial"));
 	else
 		sprintf(LastWillTopic,"connect/%s",ACAP_DEVICE_Prop("serial"));
-	sprintf(LastWillMessage,"{\"device\":\"%s\",\"connected\":false}",ACAP_DEVICE_Prop("serial"));
+	cJSON* lwt = cJSON_CreateObject();
+	cJSON_AddFalseToObject(lwt,"connected");
+	cJSON_AddStringToObject(lwt,"address", ACAP_DEVICE_Prop("IPv4"));
+	cJSON* helperProperties = cJSON_GetObjectItem(MQTTSettings,"payload");
+	if( helperProperties ) {
+		const char* name = cJSON_GetObjectItem(helperProperties,"name")?cJSON_GetObjectItem(helperProperties,"name")->valuestring:0;
+		const char* location = cJSON_GetObjectItem(helperProperties,"location")?cJSON_GetObjectItem(helperProperties,"location")->valuestring:0;
+		if( name && strlen(name) > 0 )
+			cJSON_AddStringToObject(lwt,"name",name);
+		if( location && strlen(location) > 0 )
+			cJSON_AddStringToObject(lwt,"location",location);
+	}
+	cJSON_AddStringToObject(lwt,"serial", ACAP_DEVICE_Prop("serial"));
 	
-	LastWill.topicName = LastWillTopic;
-	LastWill.message = LastWillMessage;
-	LastWill.retained = 1;
-	mqttOptions.will = &LastWill;
-
+	char *lwtJSON = cJSON_PrintUnformatted(lwt);
+	if( lwtJSON ) {
+		LastWill.topicName = LastWillTopic;
+		LastWill.message = LastWillMessage;
+		LastWill.retained = 1;
+		mqttOptions.will = &LastWill;
+		free(lwtJSON);
+	}
+	cJSON_Delete(lwt);
 
 	sslOptions.keyStore = 0;
 	sslOptions.privateKey = 0;
@@ -562,6 +597,7 @@ MQTT_ClientID() {
 
 int
 MQTT_Publish( const char *topic, const char *payload, int qos, int retained ) {
+	LOG_TRACE("%s: Entry: Topic = %s\n",__func__,topic);
 	if( client == 0 ) {
 //		LOG_TRACE("%s: Invalid client\n",__func__);
 		return 0;
@@ -583,7 +619,6 @@ MQTT_Publish( const char *topic, const char *payload, int qos, int retained ) {
 	else
 		sprintf(fullTopic,"%s", topic);
 
-	LOG_TRACE("%s: %s %s\n",__func__,fullTopic, payload);
 
 	MQTTClient_message pubmsg = MQTTClient_message_initializer;
 	MQTTClient_deliveryToken mqtt_token;
@@ -597,8 +632,6 @@ MQTT_Publish( const char *topic, const char *payload, int qos, int retained ) {
 	if( status != MQTTCLIENT_SUCCESS ) {
 		LOG_WARN("%s: Error code %d\n", __func__,status);
 		return 0;
-	} else {
-		UpdateActivityTime();
 	}
 	return 1;
 }
@@ -627,18 +660,16 @@ MQTT_Publish_JSON( const char *topic, cJSON* payload, int qos, int retained ) {
 	}
 	
 	cJSON* publish = cJSON_Duplicate(payload, 1);
-	cJSON* helperProperties = cJSON_GetObjectItem(MQTTSettings,"payload");
+	cJSON* userProperties = cJSON_GetObjectItem(MQTTSettings,"payload");
 
-	if( helperProperties ) {
-		const char* name = cJSON_GetObjectItem(helperProperties,"name")?cJSON_GetObjectItem(helperProperties,"name")->valuestring:0;
-		const char* location = cJSON_GetObjectItem(helperProperties,"location")?cJSON_GetObjectItem(helperProperties,"location")->valuestring:0;
+	if( userProperties ) {
+		const char* name = cJSON_GetObjectItem(userProperties,"name")?cJSON_GetObjectItem(userProperties,"name")->valuestring:0;
+		const char* location = cJSON_GetObjectItem(userProperties,"location")?cJSON_GetObjectItem(userProperties,"location")->valuestring:0;
 		if( name && strlen(name) > 0 )
 			cJSON_AddStringToObject(publish,"name",name);
 		if( location && strlen(location) > 0 )
 			cJSON_AddStringToObject(publish,"location",location);
-		cJSON_AddStringToObject(publish,"serial",ACAP_DEVICE_Prop("serial"));
 	}
-
 
 	char *json = cJSON_PrintUnformatted(publish);
 	if(!json) {
@@ -738,21 +769,33 @@ MQTT_Unsubscribe( const char *topic ) {
 	return 1;
 }
 
-
 void
 MQTT_Disconnected(void *context, char *cause) {
-	LOG_WARN("MQTT client disconnected from broker: %s", cause?cause:"Unknown");
+	LOG_WARN("MQTT client disconnected from broker");
 	ACAP_STATUS_SetString("mqtt","status", "Reconnecting" );
 	ACAP_STATUS_SetBool("mqtt","connected", FALSE );
 }
 
-
-static gboolean MQTT_Timer() {
-    if (!MQTT_Connected() && cJSON_GetObjectItem(MQTTSettings,"connect")->type == cJSON_True) {
-        MQTT_Connect();
-    }
-    return TRUE;
+static gboolean
+MQTT_Timer() {
+//	LOG_TRACE("%s\n",__func__);
+	if( !client || !MQTTSettings )
+		return TRUE;
+	if( !MQTT_Connected() && cJSON_GetObjectItem(MQTTSettings,"connect")->type == cJSON_True ) {
+		LOG("Trying to reconnect\n");
+		ACAP_STATUS_SetString("mqtt","status", "Reconnecting" );
+		ACAP_STATUS_SetBool("mqtt","connected", FALSE );
+		MQTT_Connect();
+		return TRUE;
+	}
+	if(MQTT_Connected() ) {
+		ACAP_STATUS_SetString("mqtt","status", "Connected" );
+		ACAP_STATUS_SetBool("mqtt","connected", TRUE );
+	}
+	(*f_MQTTClient_yield)();
+	return TRUE;
 }
+
 
 int MQTT_LoadLib() {
 	DIR *dir;

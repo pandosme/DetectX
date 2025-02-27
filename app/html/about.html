@@ -150,7 +150,10 @@ $(document).ready(function() {
 			$('.modelDescription').text(data.model.description);
 			$('.model_status').text(data.status.model.status);
 			$('.modelSize').text(data.model.modelWidth + 'x' + data.model.modelHeight);
-			$('.averageInference').text(App.status.model.averageTime.toString());
+			var inference = "";
+			if( App.status.model.averageTime )
+				inference = App.status.model.averageTime.toString();
+			$('.averageInference').text(inference);
 			$('.dlpu').text(data.model.chip);
 
 			// MQTT
@@ -174,7 +177,10 @@ $(document).ready(function() {
 			cache: false,
 			success: function(data) {
 				$('#model_status').text('Status: ' + data.model.status);
-				$('.averageInference').text(data.model.averageTime.toString());
+				var inference = "";
+				if( App.status.model.averageTime )
+					inference = App.status.model.averageTime.toString();
+				$('.averageInference').text(inference);
 				$('.mqttStatus').text(data.mqtt.status);
 				$('.cpuLoad').text(parseInt(data.device.cpu * 100));
 				$('.bandwidth').text(formatBandwidth(data.device.network));

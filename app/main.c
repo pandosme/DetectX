@@ -216,6 +216,13 @@ MAIN_MQTT_Conection_Status (int state) {
 	switch( state ) {
 		case MQTT_CONNECT:
 			LOG_TRACE("%s: Connect\n",__func__);
+			cJSON* payload = cJSON_CreateObject();
+			cJSON_AddTrueToObject(payload,"connected");
+			cJSON_AddStringToObject(payload,"address",ACAP_DEVICE_Prop("IPv4"));
+			char topic[128];
+			sprintf(topic,"connect/%s",ACAP_DEVICE_Prop("serial"));
+			MQTT_Publish_JSON(topic,payload,0,0);
+			cJSON_Delete(payload);
 			break;
 		case MQTT_RECONNECT:
 			LOG("%s: Reconnect\n",__func__);

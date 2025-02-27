@@ -88,13 +88,18 @@ A stateful event (high/low) for each detected label.
 
 # History
 
+### 3.3.8	February 27, 2025
+- Fixed a flaw in html that crashed the detections page
+  (stupid bug introduced in previous version)
+- Fixed MQTT stability (recurring disconnects)
+- Added MQTT connect message and more properties in LWT
+
 ### 3.3.7	February 22, 2025
 - Fixed MQTT stability (recurring disconnects)
 - Improved behaviour in GUI
 	* Display error when not running on ARTPEC-8 (e.g. Ambarella CV25)
 	* Display info when model is loading
 	* Display info when application not responding
-
 
 ### 3.3.6	February 7. 2025
 - Fixed a bug that could crash the application if the user interface is active for a longer period of time.  
