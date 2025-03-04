@@ -88,6 +88,9 @@ A stateful event (high/low) for each detected label.
 
 # History
 
+### 3.3.10	March 04, 2025
+- MQTT Refactoring
+
 ### 3.3.8	February 27, 2025
 - Fixed a flaw in html that crashed the detections page
   (stupid bug introduced in previous version)

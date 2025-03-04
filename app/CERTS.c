@@ -8,7 +8,12 @@
 #define LOG(fmt, args...)    { syslog(LOG_INFO, fmt, ## args);  printf(fmt, ## args); }
 #define LOG_WARN(fmt, args...)    { syslog(LOG_WARNING, fmt, ## args); printf(fmt, ## args);}
 //#define LOG_TRACE(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args); }
-#define LOG_TRACE(fmt, args...) {}
+#define LOG_TRACE(fmt, args...)    {}
+
+#define CERTS_MAX_PATH_LENGTH 256
+#define CA_FILE "localdata/ca.pem"
+#define CERT_FILE "localdata/cert.pem"
+#define KEY_FILE "localdata/key.pem"
 
 static cJSON* CERTS_SETTINGS = NULL;
 static const char CERTS_CA_STORE[] = "/etc/ssl/certs/ca-certificates.crt";
@@ -79,6 +84,24 @@ static int save_certificate(const char* type, const char* pem) {
 
     return 1;
 }
+
+const char* get_file_path(const char* type) {
+    if (strcmp(type, "ca") == 0) {
+        return CA_FILE;
+    } else if (strcmp(type, "cert") == 0) {
+        return CERT_FILE;
+    } else {
+        return KEY_FILE;
+    }
+}
+
+void construct_full_path(const char* type, char* fullpath, size_t fullpath_size) {
+    const char* app_path = ACAP_FILE_AppPath();
+    const char* file_path = get_file_path(type);
+    
+    snprintf(fullpath, fullpath_size, "%s%s", app_path, file_path);
+}
+
 
 void CERTS_HTTP_Callback(const ACAP_HTTP_Response response, const ACAP_HTTP_Request request) {
     if (!CERTS_SETTINGS) {
@@ -238,10 +261,8 @@ void CERTS_HTTP_Callback(const ACAP_HTTP_Response response, const ACAP_HTTP_Requ
 
     // Update settings
     char fullpath[CERTS_MAX_PATH_LENGTH];
-    snprintf(fullpath, sizeof(fullpath), "%s%s", ACAP_FILE_AppPath(), 
-             (strcmp(type,"ca") == 0) ? "localdata/ca.pem" :
-             (strcmp(type,"cert") == 0) ? "localdata/cert.pem" : "localdata/key.pem");
-
+    construct_full_path(type, fullpath, sizeof(fullpath));
+	
     if (strcmp(type, "ca") == 0) {
         if (cJSON_GetObjectItem(CERTS_SETTINGS, "cafile")) {
             cJSON_ReplaceItemInObject(CERTS_SETTINGS, "cafile", cJSON_CreateString(fullpath));

@@ -142,22 +142,39 @@ $(document).ready(function() {
 			$('.serial').text(data.device.serial);
 			$('.model').text(data.device.model);
 			$('.firmware').text(data.device.firmware);
-			$('.cpuLoad').text(parseInt(data.status.device.cpu * 100));
-			$('.bandwidth').text(formatBandwidth(data.status.device.network));
-			
-
+			if( data.status.device.cpu )
+				$('.cpuLoad').text(parseInt(data.status.device.cpu * 100));
+			else
+				$('.cpuLoad').text('-');
+			if( data.status.device.network )
+				$('.bandwidth').text(formatBandwidth(data.status.device.network));
+			else
+				$('.bandwidth').text('-');
+				
 			// Model
-			$('.modelDescription').text(data.model.description);
-			$('.model_status').text(data.status.model.status);
-			$('.modelSize').text(data.model.modelWidth + 'x' + data.model.modelHeight);
+			$('.modelDescription').text(data.model.description || "");
+			if(data.status.model.status)
+				$('.model_status').text(data.status.model.status);
+			else
+				$('.model_status').text("Loading");
+			if( data.model.modelWidth && data.model.modelHeight )
+				$('.modelSize').text(data.model.modelWidth + 'x' + data.model.modelHeight);
+			else
+				$('.modelSize').text("");
 			var inference = "";
 			if( App.status.model.averageTime )
 				inference = App.status.model.averageTime.toString();
 			$('.averageInference').text(inference);
-			$('.dlpu').text(data.model.chip);
+			if(data.model.chip);
+				$('.dlpu').text(data.model.chip);
+			else
+				$('.dlpu').text("-");
 
 			// MQTT
-			$('.mqttStatus').text(App.status.mqtt.status);
+			if( App.status.mqtt.status )
+				$('.mqttStatus').text(App.status.mqtt.status);
+			else
+				$('.mqttStatus').text("");
 			$('.mqttBroker').text(App.mqtt.address);
 			$('.mqttPort').text(App.mqtt.port);
 			$('.mqttClientId').text(App.mqtt.clientID);

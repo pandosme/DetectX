@@ -9,7 +9,7 @@ LDLIBS += $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(PKGS))
 LDLIBS  += -s -lm -ldl -lpthread
 
 CFLAGS += -Wall -DLAROD_API_VERSION_3
-
+CFLAGS += -Wno-format-overflow
 
 all:	$(PROGS)
 

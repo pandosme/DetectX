@@ -1,8 +1,11 @@
-/*
- * Copyright (c) 2024 Fred Juhlin
- * MIT License - See LICENSE file for details
+/**
+ * MQTT.c
+ * Fred Juhlin 2025
+ * This file implements an MQTT client using the Paho MQTT library.
+ * It handles connection, disconnection, reconnection, and message publishing.
+ * Version 2.0
  */
- 
+
 #ifndef _MQTT_Service_H_
 #define _MQTT_Service_H_
 

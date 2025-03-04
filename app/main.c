@@ -221,7 +221,7 @@ MAIN_MQTT_Conection_Status (int state) {
 			cJSON_AddStringToObject(payload,"address",ACAP_DEVICE_Prop("IPv4"));
 			char topic[128];
 			sprintf(topic,"connect/%s",ACAP_DEVICE_Prop("serial"));
-			MQTT_Publish_JSON(topic,payload,0,0);
+			MQTT_Publish_JSON(topic,payload,0,1);
 			cJSON_Delete(payload);
 			break;
 		case MQTT_RECONNECT:
@@ -297,6 +297,8 @@ int main(void) {
 	
     g_main_loop_run(main_loop);
 	LOG("Terminating and cleaning up %s\n",APP_PACKAGE);
+
+	MQTT_Cleanup();
     ACAP_Cleanup();
 	Model_Cleanup();
     closelog();
