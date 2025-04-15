@@ -12,8 +12,8 @@ Please read [Train-Build.md](https://github.com/pandosme/DetectX/blob/main/Train
   * GIT installed
   * Python installed
   * Conda installed
-- Preferebly a GPU
-  Training with a GPU that takes 15 minutes may take 10 hours on a CPU
+- Preferebly a GPU  
+  As refernece, training with a GPU that takes 15 minutes may take 10 hours on a CPU
 
 # User interface
 The user interface is designed to validate detection and apply various filters.
