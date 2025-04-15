@@ -8,6 +8,12 @@ Please read [Train-Build.md](https://github.com/pandosme/DetectX/blob/main/Train
 
 # Pre-requsite
 - Axis Camera based on ARTPEC-8 or ARTPEC-9
+- Linux PC
+  * GIT installed
+  * Python installed
+  * Conda installed
+- Preferebly a GPU
+  Training with a GPU that takes 15 minutes may take 10 hours on a CPU
 
 # User interface
 The user interface is designed to validate detection and apply various filters.
