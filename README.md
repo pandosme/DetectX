@@ -7,7 +7,7 @@ Please read [Train-Build.md](https://github.com/pandosme/DetectX/blob/main/Train
 **Breaking change:  You need to remove previous 2.x.x version before installing 3.x.x.**
 
 # Pre-requsite
-- Axis Camera based on ARTPEC-8. 
+- Axis Camera based on ARTPEC-8 or ARTPEC-9
 
 # User interface
 The user interface is designed to validate detection and apply various filters.
