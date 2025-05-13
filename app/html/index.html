@@ -159,11 +159,11 @@ $(document).ready(function() {
 		data: '{"apiVersion": "1.0","context": "DetectX","method": "getAllProperties"}',
 		cache: false,
 		success: function( response ) {
-			if( response.data.propertyList.Soc !== "Axis Artpec-8" ) {
-				$(".modal-body").html('<b>This camera is not supported.<br/>The camera needs to be based on ARTPEC-8</b>');
-				$('#errorModal').modal('show');
-				return;
-			}
+			// if( response.data.propertyList.Soc !== "Axis Artpec-8" ) {
+			//	$(".modal-body").html('<b>This camera is not supported.<br/>The camera needs to be based on ARTPEC-8</b>');
+			//	$('#errorModal').modal('show');
+			//	return;
+			// }
 			initializePage();
 		},
 		error: function(response) {
