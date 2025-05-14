@@ -1260,7 +1260,7 @@ cJSON* ACAP_DEVICE(void) {
 		free(response);
 
 	//Get IP address
-	response = ACAP_VAPIX_Get("param.cgi?action=list&group=root.network.IPAddress");
+	response = ACAP_VAPIX_Get("param.cgi?action=list&group=root.Network.eth0.IPAddress");
 	if( response ) {
 		items = SplitString( response, "=" );
 		if( items && cJSON_GetArraySize(items) == 2 )

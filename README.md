@@ -94,6 +94,11 @@ A stateful event (high/low) for each detected label.
 
 # History
 
+### 3.4.0	May 14, 2025
+- MQTT Cleanup
+- GUI fixes
+- Fixed IP address in MQTT connect message.
+
 ### 3.3.10	March 04, 2025
 - MQTT Refactoring
 

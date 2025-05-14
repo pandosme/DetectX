@@ -211,23 +211,57 @@ signal_handler(gpointer user_data) {
     return G_SOURCE_REMOVE;
 }
 
+void
+Main_MQTT_Subscription_Message(const char *topic, const char *payload) {
+	LOG("Message arrived: %s %s\n",topic,payload);
+}
+
 void 
-MAIN_MQTT_Conection_Status (int state) {
+Main_MQTT_Status (int state) {
+	char topic[64];
+	cJSON* connection = 0;
+
 	switch( state ) {
-		case MQTT_CONNECT:
-			LOG_TRACE("%s: Connect\n",__func__);
-			cJSON* payload = cJSON_CreateObject();
-			cJSON_AddTrueToObject(payload,"connected");
-			cJSON_AddStringToObject(payload,"address",ACAP_DEVICE_Prop("IPv4"));
-			char topic[128];
+		case MQTT_INITIALIZING:
+			LOG("%s: Initializing\n",__func__);
+			ACAP_STATUS_SetString("mqtt","status","Initializing");
+			ACAP_STATUS_SetBool("mqtt","connected",0);
+			break;
+		case MQTT_CONNECTING:
+			ACAP_STATUS_SetString("mqtt","status","Connecting");
+			ACAP_STATUS_SetBool("mqtt","connected",0);
+			LOG("%s: Connecting\n",__func__);
+			break;
+		case MQTT_CONNECTED:
+			ACAP_STATUS_SetString("mqtt","status","Connected");
+			ACAP_STATUS_SetBool("mqtt","connected",1);
+			LOG("%s: Connected\n",__func__);
 			sprintf(topic,"connect/%s",ACAP_DEVICE_Prop("serial"));
-			MQTT_Publish_JSON(topic,payload,0,1);
-			cJSON_Delete(payload);
+			connection = cJSON_CreateObject();
+			cJSON_AddTrueToObject(connection,"connected");
+			cJSON_AddStringToObject(connection,"address",ACAP_DEVICE_Prop("IPv4"));
+			if(!MQTT_Publish_JSON(topic,connection,0,1) )
+				LOG_WARN("%s: Announce messaged failed\n",__func__);
+			cJSON_Delete(connection);
 			break;
-		case MQTT_RECONNECT:
-			LOG("%s: Reconnect\n",__func__);
+		case MQTT_DISCONNECTING:
+			sprintf(topic,"connect/%s",ACAP_DEVICE_Prop("serial"));
+			connection = cJSON_CreateObject();
+			cJSON_AddFalseToObject(connection,"connected");
+			cJSON_AddStringToObject(connection,"address",ACAP_DEVICE_Prop("IPv4"));
+			if(!MQTT_Publish_JSON(topic,connection,0,1) )
+				LOG_WARN("%s: Disconnect messaged failed\n",__func__);
+			cJSON_Delete(connection);
 			break;
-		case MQTT_DISCONNECT:
+		
+		case MQTT_RECONNECTING:
+			ACAP_STATUS_SetString("mqtt","status","Reconnecting");
+			ACAP_STATUS_SetBool("mqtt","connected",0);
+			LOG("%s: Reconnecting\n",__func__);
+			break;
+		case MQTT_DISCONNECTED:
+			ACAP_STATUS_SetString("mqtt","status","Disconnected");
+			ACAP_STATUS_SetBool("mqtt","connected",0);
 			LOG("%s: Disconnect\n",__func__);
 			break;
 	}
@@ -278,7 +312,7 @@ int main(void) {
 	}
 	ACAP_Set_Config("model",model);
 	Output_reset();
-	MQTT_Init( APP_PACKAGE, MAIN_MQTT_Conection_Status );	
+	MQTT_Init( Main_MQTT_Status, Main_MQTT_Subscription_Message  );	
 	ACAP_Set_Config("mqtt", MQTT_Settings() );
 	
 	ACAP_DEVICE_CPU_Average();
@@ -298,6 +332,7 @@ int main(void) {
     g_main_loop_run(main_loop);
 	LOG("Terminating and cleaning up %s\n",APP_PACKAGE);
 
+	Main_MQTT_Status(MQTT_DISCONNECTING); //Send graceful disconnect message
 	MQTT_Cleanup();
     ACAP_Cleanup();
 	Model_Cleanup();
