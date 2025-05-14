@@ -165,7 +165,7 @@ $(document).ready(function() {
 			if( App.status.model.averageTime )
 				inference = App.status.model.averageTime.toString();
 			$('.averageInference').text(inference);
-			if(data.model.chip);
+			if(data.model.chip)
 				$('.dlpu').text(data.model.chip);
 			else
 				$('.dlpu').text("-");

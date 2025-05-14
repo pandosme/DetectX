@@ -15,7 +15,8 @@ def get_video_dimensions(image_size):
         480: 640,
         640: 800,  # New mapping for 640
         768: 1024,
-        960: 1280
+        960: 1280,
+        1440: 1920,
     }
     video_height_mapping = {
         640: 600  # Special case for height when image_size is 640
