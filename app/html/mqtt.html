@@ -15,10 +15,10 @@
 	<div class="bg-light border-right" id="sidebar-wrapper">
 		<div class="sidebar-heading">&nbsp;</div>
 		<div class="list-group list-group-flush">
-                <a href="index.html" class="list-group-item list-group-item-action">Detections</a>
-                <a href="mqtt.html" class="list-group-item list-group-item-action active">MQTT</a>
-                <a href="advanced.html" class="list-group-item list-group-item-action">Advanced</a>
-                <a href="about.html" class="list-group-item list-group-item-action">About</a>
+            <a href="index.html" class="list-group-item list-group-item-action">Detections</a>
+            <a href="mqtt.html" class="list-group-item list-group-item-action active">MQTT</a>
+            <a href="advanced.html" class="list-group-item list-group-item-action">Advanced</a>
+            <a href="about.html" class="list-group-item list-group-item-action">About</a>
 		</div>
 	</div>
 	
@@ -131,10 +131,14 @@ $(document).ready(function() {
 			document.title = app.manifest.acapPackageConf.setup.friendlyName;
 			$('.sidebar-heading').text(app.manifest.acapPackageConf.setup.friendlyName);
 			$("#mqtt_status").val(app.status.mqtt.status);
+			$("#ws_port").val(app.settings.WS_Port);
+			$("#wss_port").val(app.settings.WSS_Port);
+			$("#tls").prop("checked", app.settings.tls);
 			updateButtonState(app.status.mqtt);
 		},
 		error: function(response) {
 			showToast("The application is not running",'danger');
+			updateConnectionStatus("Disconnected");
 		}
 	});
 
@@ -176,6 +180,8 @@ $(document).ready(function() {
 				// Update status text
 				$("#mqtt_status").val(data.mqtt.status);
 				updateButtonState(data.mqtt);
+				if( data.mqtt.connected && !MQTT_Client )
+					ConnectWebSocketClient();
 			},
 			error: function(data) {
 				console.error("Failed to fetch status:", data);
@@ -184,21 +190,6 @@ $(document).ready(function() {
     }, 2000);
 
 });
-
-function onConnect() {
-	showToast("Web page connected to broker","success");
-}
-
-function onFailure(message) {
-	console.log("onFailure");
-	showToast("Web page not connect.<br/>" + message.errorMessage + "Check WebSocket connection in MQTT Settings","warning");
-}
-
-function onConnectionLost(message) {
-  if (message.errorCode !== 0) {
-	showToast("Web page lost connection. " + message.errorMessage,"warning");
-  }
-}
 
 // Function to update button state
 function updateButtonState(mqtt) {
@@ -239,7 +230,7 @@ $("#connect").click(function() {
 			url: 'mqtt?action=disconnect',
 			dataType: 'text',
 			success: function(response) {
-				// Button state will be updated by the status polling
+				showToast("Disconnected","success");
 			},
 			error: function(response) {
 				showToast("Failed to disconnect","warning");
@@ -274,15 +265,14 @@ $("#connect").click(function() {
 			dataType: 'text',
 			success: function(response) {
 				showToast("Updated and connected","success");
-				// Button state will be updated by the status polling
 			},
 			error: function(response) {
 				if( settings.tls === true && settings.verify === true ) {
-					showToast("<b>Unable to connect.</b><br\>Check:<br\>* Address<br\>* User/Password<br/>* Certificate verification","warning");
+					showToast("<b>Unable to connect.<b/><br\>Check:<br\>* Address<br\>* User/Password<br/>* Certificate verification","warning");
 					button.prop("disabled", false);
 					return;
 				}
-				showToast("<b>Unable to connect.<b/><br\>Check:<br\>* Address<br\>* User/Password","warning");
+				showToast("<b>Unable to connect.</b><br\>Check:<br\>* Address<br\>* User/Password","warning");
 				button.prop("disabled", false);
 			}
 		});

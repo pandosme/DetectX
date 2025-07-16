@@ -14,6 +14,11 @@
   },  
   "ignore": [],
   "stabelizeTransition": 600,
-  "minEventDuration": 3000
+  "minEventDuration": 3000,
+  "cropping": {
+	  "active": true,
+	  "sdcard": true,
+	  "mqtt": true
+  }
 }
 

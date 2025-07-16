@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <syslog.h>
+#include <stdlib.h>
 #include "Video.h"
+#include "imgutils.h"
+
 
 #define LOG(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args);}
 #define LOG_WARN(fmt, args...)    { syslog(LOG_WARNING, fmt, ## args); printf(fmt, ## args);}
@@ -35,6 +38,7 @@ Video_Stop_YUV() {
     }
 	yuvProvider = NULL;
 }
+
 
 VdoBuffer*
 Video_Capture_YUV() {
@@ -83,3 +87,5 @@ Video_Capture_RGB() {
     rgbBuffer = getLastFrameBlocking(rgbProvider);
     return rgbBuffer;
 }
+
+

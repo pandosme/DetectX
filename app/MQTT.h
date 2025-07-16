@@ -1,7 +1,7 @@
 /**
- * MQTT.c
+ * MQTT.h
  * Fred Juhlin 2025
- * Version 1.5
+ * Version 2.0
  */
  
 #ifndef _MQTT_Service_H_
@@ -19,6 +19,7 @@ extern "C" {
 #define MQTT_CONNECTED     4
 #define MQTT_DISCONNECTED  5
 #define MQTT_RECONNECTING  6
+#define MQTT_RECONNECTED   7
 
 
 typedef void (*MQTT_Callback_Connection) (int state);
