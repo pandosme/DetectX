@@ -120,13 +120,13 @@ ImageProcess(gpointer data) {
 		
 	cJSON* detection = detections->child;
 	while(detection) {
-		cJSON* property = detection->child;
 		unsigned cx = 0;
 		unsigned cy = 0;
 		unsigned width = 0;
 		unsigned height = 0;
 		unsigned c = 0;
 		label = "Undefined";
+		cJSON* property = detection->child;
 		while(property) {
 			if( strcmp("c",property->string) == 0 ) {
 				property->valueint = property->valuedouble * 100;
@@ -161,7 +161,6 @@ ImageProcess(gpointer data) {
 			property = property->next;
 		}
 		
-
 		//FILTER DETECTIONS
 		int insert = 0;
 		if( c >= confidenceThreshold && cx >= x1 && cx <= x2 && cy >= y1 && cy <= y2 )
@@ -189,6 +188,7 @@ ImageProcess(gpointer data) {
 	cJSON_Delete( detections );
 
 	Output( processedDetections );
+	Model_Reset();
 
 	cJSON_Delete(processedDetections);
 	LOG_TRACE("%s>\n",__func__);
@@ -338,7 +338,7 @@ int main(void) {
 		LOG_WARN("Model setup failed\n");
 	}
 	ACAP_Set_Config("model",model);
-	Output_reset();
+	Output_init();
 	MQTT_Init( Main_MQTT_Status, Main_MQTT_Subscription_Message  );	
 	ACAP_Set_Config("mqtt", MQTT_Settings() );
 	

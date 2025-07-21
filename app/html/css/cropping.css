@@ -1,0 +1,129 @@
+/**********************************************
+ * CROPPING CONFIGURATION PAGE STYLES
+ **********************************************/
+
+/*-------------------------------
+  Preset Buttons Row
+-------------------------------*/
+.preset-buttons .d-flex {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 10px;
+}
+.preset-buttons .btn {
+    min-width: 70px;
+    text-align: center;
+}
+
+/*-------------------------------
+  Crop Area Preview Box (Square)
+-------------------------------*/
+.border-preview {
+    width: 320px;
+    height: 320px;
+    position: relative;
+    background: #f8f9fa;
+    border: 2px solid #dee2e6;
+    margin: 18px auto 20px auto;
+    box-sizing: border-box;
+    user-select: none;
+    min-width: 320px;
+    min-height: 320px;
+}
+
+/* Crop overlay area */
+.crop-area {
+    position: absolute;
+    border: 2px dashed #28a745;
+    background: rgba(40, 167, 69, 0.09);
+    z-index: 1;
+    pointer-events: none;
+    box-sizing: border-box;
+}
+
+/* Detection box (centered, square) */
+.detection-area {
+    position: absolute;
+    background: rgba(255, 193, 7, 0.18);
+    border: 2px solid #ffc107;
+    z-index: 2;
+    pointer-events: none;
+    box-sizing: border-box;
+}
+
+.detection-label {
+    width: 100%;
+    text-align: center;
+    font-size: 0.99em;
+    color: #856404;
+    font-weight: 500;
+    padding-top: 32px;
+    pointer-events: none;
+    user-select: none;
+}
+
+/*-------------------------------
+  Border Handles & Value Labels
+-------------------------------*/
+.border-handle {
+    position: absolute;
+    background: #007bff;
+    border-radius: 3px;
+    z-index: 4;
+    transition: background 0.15s;
+}
+.border-handle:hover { background: #0056b3; }
+
+.border-handle.top,
+.border-handle.bottom {
+    width: 48px;
+    height: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    cursor: ns-resize;
+}
+.border-handle.left,
+.border-handle.right {
+    width: 8px;
+    height: 48px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: ew-resize;
+}
+.border-handle.top    { top: 0px; }
+.border-handle.right  { right: 0px; }
+.border-handle.bottom { bottom: 0px; }
+.border-handle.left   { left: 0px; }
+
+/* Value labels */
+.border-value-label {
+    position: absolute;
+    background: #fff;
+    color: #0062cc;
+    font-size: 1.1em;
+    font-weight: 600;
+    border-radius: 9px;
+    box-shadow: 0 1px 6px rgba(64,64,100,0.10);
+    padding: 1px 10px;
+    z-index: 10;
+    pointer-events: none;
+    min-width: 28px;
+    text-align: center;
+    line-height: 24px;
+    border: 1px solid #e0ecff;
+    box-sizing: border-box;
+}
+
+/*-------------------------------
+  Responsive
+-------------------------------*/
+@media (max-width: 480px) {
+    .border-preview {
+        width: 200px;
+        height: 200px;
+        min-width: 200px;
+        min-height: 200px;
+    }
+    .detection-label { padding-top: 18px; font-size: 0.83em; }
+    .preset-buttons .d-flex { flex-direction: column; gap: 7px; }
+}

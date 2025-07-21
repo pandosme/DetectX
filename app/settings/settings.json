@@ -16,9 +16,19 @@
   "stabelizeTransition": 600,
   "minEventDuration": 3000,
   "cropping": {
-	  "active": true,
-	  "sdcard": true,
-	  "mqtt": true
+	  "active": false,
+	  "sdcard": false,
+	  "mqtt": false,
+	  "http": false,
+	  "http_url": "",
+	  "http_auth": "none",
+	  "http_username": "",
+	  "http_password": "",
+	  "http_token": "",
+	  "leftborder": 0,
+	  "rightborder": 0,	  
+	  "topborder": 0,	  
+	  "bottomborder": 0
   }
 }
 

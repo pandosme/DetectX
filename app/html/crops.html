@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Cropped Images</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            margin: 0; background: #101010;
+        }
+        .crop-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-start;
+            gap: 20px;
+            padding: 22px 0 0 22px;
+        }
+        .crop-card {
+            position: relative;
+            background: #191c20;
+            border-radius: 4px;
+            margin-bottom: 18px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+            /* No width/height set: the size is the image's natural size */
+            display: inline-block;
+        }
+        .crop-img {
+            display: block;
+            max-width: none; /* Prevent browser downsizing */
+            max-height: none;
+            background: #222;
+            margin: 0;
+            padding: 0;
+        }
+        .crop-overlay-box {
+            position: absolute;
+            border: 2.5px solid #36B37E;
+            pointer-events: none;
+            z-index: 2;
+            box-sizing: border-box;
+        }
+        .overlay-label {
+            position: absolute;
+            background: rgba(17,23,24,0.83);
+            color: #fff;
+            font-size: 1em;
+            font-family: sans-serif;
+            font-weight: 500;
+            padding: 2px 7px 2px 5px;
+            border-radius: 6px;
+            pointer-events: none;
+            white-space: nowrap;
+            box-shadow: 0 2px 12px #0005;
+            z-index: 5;
+            left: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="crop-row" id="cropRow"></div>
+<script>
+// Utility to clear and show latest crop images
+function displayCrops(crops) {
+    const row = document.getElementById('cropRow');
+    row.innerHTML = "";
+    if (!crops || crops.length === 0) return;
+    for (const crop of crops) {
+        const card = document.createElement('div');
+        card.className = 'crop-card';
+
+        // Base image (shown at its ACTUAL pixel size)
+        const img = document.createElement('img');
+        img.src = "data:image/jpeg;base64," + crop.image;
+        img.className = "crop-img";
+        img.onload = function() {
+            // Ensures overlays match image size (if loading is slow)
+        };
+        card.appendChild(img);
+
+        // Overlay bounding box using x, y, w, h (all in image pixel coordinates)
+        const box = document.createElement('div');
+        box.className = "crop-overlay-box";
+        box.style.left = (crop.x||0)+'px';
+        box.style.top = (crop.y||0)+'px';
+        box.style.width = (crop.w||1)+'px';
+        box.style.height = (crop.h||1)+'px';
+        card.appendChild(box);
+
+        // Overlay label: label and confidence, ideally above the box, else inside
+        let conf = crop.confidence!=null ? ` (${(100*crop.confidence).toFixed(1)}%)` : "";
+        const labelText = (crop.label||"") + conf;
+
+        // Default place above, else inside if not enough space
+        let labelY = crop.y - 24 > 0 ? crop.y - 24 : crop.y + 4;
+        const label = document.createElement('div');
+        label.className = "overlay-label";
+        label.innerText = labelText;
+        label.style.left = (crop.x + 2)+'px';
+        label.style.top = labelY+'px';
+        if (labelY === crop.y + 4) {
+            label.style.background = 'rgba(18,31,31,0.90)';
+        }
+        card.appendChild(label);
+
+        row.appendChild(card);
+    }
+}
+
+function fetchAndDisplayCrops() {
+    fetch('crops')
+        .then(r => r.json())
+        .then(displayCrops)
+        .catch(()=>{});
+}
+
+fetchAndDisplayCrops();
+setInterval(fetchAndDisplayCrops, 2000);
+</script>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Cropped Images</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            margin: 0; background: #101010;
+        }
+        .crop-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-start;
+            gap: 20px;
+            padding: 22px 0 0 22px;
+        }
+        .crop-card {
+            position: relative;
+            background: #191c20;
+            border-radius: 4px;
+            margin-bottom: 18px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+            /* No width/height set: the size is the image's natural size */
+            display: inline-block;
+        }
+        .crop-img {
+            display: block;
+            max-width: none; /* Prevent browser downsizing */
+            max-height: none;
+            background: #222;
+            margin: 0;
+            padding: 0;
+        }
+        .crop-overlay-box {
+            position: absolute;
+            border: 2.5px solid #36B37E;
+            pointer-events: none;
+            z-index: 2;
+            box-sizing: border-box;
+        }
+        .overlay-label {
+            position: absolute;
+            background: rgba(17,23,24,0.83);
+            color: #fff;
+            font-size: 1em;
+            font-family: sans-serif;
+            font-weight: 500;
+            padding: 2px 7px 2px 5px;
+            border-radius: 6px;
+            pointer-events: none;
+            white-space: nowrap;
+            box-shadow: 0 2px 12px #0005;
+            z-index: 5;
+            left: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="crop-row" id="cropRow"></div>
+<script>
+// Utility to clear and show latest crop images
+function displayCrops(crops) {
+    const row = document.getElementById('cropRow');
+    row.innerHTML = "";
+    if (!crops || crops.length === 0) return;
+    for (const crop of crops) {
+        const card = document.createElement('div');
+        card.className = 'crop-card';
+
+        // Base image (shown at its ACTUAL pixel size)
+        const img = document.createElement('img');
+        img.src = "data:image/jpeg;base64," + crop.image;
+        img.className = "crop-img";
+        img.onload = function() {
+            // Ensures overlays match image size (if loading is slow)
+        };
+        card.appendChild(img);
+
+        // Overlay bounding box using x, y, w, h (all in image pixel coordinates)
+        const box = document.createElement('div');
+        box.className = "crop-overlay-box";
+        box.style.left = (crop.x||0)+'px';
+        box.style.top = (crop.y||0)+'px';
+        box.style.width = (crop.w||1)+'px';
+        box.style.height = (crop.h||1)+'px';
+        card.appendChild(box);
+
+        // Overlay label: label and confidence, ideally above the box, else inside
+        let conf = crop.confidence!=null ? ` (${(100*crop.confidence).toFixed(1)}%)` : "";
+        const labelText = (crop.label||"") + conf;
+
+        // Default place above, else inside if not enough space
+        let labelY = crop.y - 24 > 0 ? crop.y - 24 : crop.y + 4;
+        const label = document.createElement('div');
+        label.className = "overlay-label";
+        label.innerText = labelText;
+        label.style.left = (crop.x + 2)+'px';
+        label.style.top = labelY+'px';
+        if (labelY === crop.y + 4) {
+            label.style.background = 'rgba(18,31,31,0.90)';
+        }
+        card.appendChild(label);
+
+        row.appendChild(card);
+    }
+}
+
+
+function fetchAndDisplayCrops() {
+    fetch('crops')
+        .then(r => r.json())
+        .then(displayCrops)
+        .catch(()=>{});
+}
+
+fetchAndDisplayCrops();
+setInterval(fetchAndDisplayCrops, 2000);
+</script>
+</body>
+</html>
