@@ -4,6 +4,7 @@
 #include <syslog.h>
 #include <pthread.h>
 #include <sys/stat.h>
+#include <curl/curl.h>
 #include <errno.h>
 
 #include "ACAP.h"
@@ -56,11 +57,13 @@ static CropEntry crop_history[CROP_HISTORY_SIZE];
 static int crop_history_head = 0; // next insert
 static int crop_history_count = 0;
 static pthread_mutex_t crop_cache_mutex = PTHREAD_MUTEX_INITIALIZER;
+static double last_output_time_ms = 0; 
 
-static void add_crop_to_history(const unsigned char *jpeg_data, unsigned jpeg_size,
+static const char*
+	add_crop_to_history(const unsigned char *jpeg_data, unsigned jpeg_size,
                                 const char *label, int confidence, int x, int y, int w, int h) {
     char *b64img = base64_encode(jpeg_data, jpeg_size);
-    if (!b64img) return;
+    if (!b64img) return 0;
 	
     pthread_mutex_lock(&crop_cache_mutex);
 	
@@ -80,6 +83,7 @@ static void add_crop_to_history(const unsigned char *jpeg_data, unsigned jpeg_si
     if (crop_history_count < CROP_HISTORY_SIZE) crop_history_count++;
 	
     pthread_mutex_unlock(&crop_cache_mutex);
+	return b64img;
 }
 
 static void reset_crop_history() {
@@ -172,7 +176,8 @@ int lastDetectionsWhereEmpty = 0;
 
 // --- Core Output Function ---
 
-void Output(cJSON* detections) {
+void
+Output(cJSON* detections) {
     if (!detections || cJSON_GetArraySize(detections) == 0 ) return;
 	LOG_TRACE("<%s %d\n",__func__,cJSON_GetArraySize(detections));
 
@@ -188,7 +193,9 @@ void Output(cJSON* detections) {
     cJSON* cropping = cJSON_GetObjectItem(settings, "cropping");
     int cropping_active = cropping && cJSON_IsTrue(cJSON_GetObjectItem(cropping, "active"));
     int sdcard_enable = cropping && cJSON_IsTrue(cJSON_GetObjectItem(cropping, "sdcard"));
-    int mqtt_enable = cropping && cJSON_IsTrue(cJSON_GetObjectItem(cropping, "mqtt"));
+    int mqtt_export = cropping && cJSON_IsTrue(cJSON_GetObjectItem(cropping, "mqtt"));
+    int http_export = cropping && cJSON_IsTrue(cJSON_GetObjectItem(cropping, "http"));	
+    int throttle = cJSON_GetObjectItem(cropping, "throttle")?cJSON_GetObjectItem(cropping, "throttle")->valueint:500;
 
     if (sdcard_enable && !ensure_sd_directory()) {
         sdcard_enable = 0;
@@ -227,7 +234,7 @@ void Output(cJSON* detections) {
 
     while (detection) {
         cJSON* labelObj = cJSON_GetObjectItem(detection, "label");
-        cJSON* confObj = cJSON_GetObjectItem(detection, "confidence");
+        cJSON* confObj = cJSON_GetObjectItem(detection, "c");
         cJSON* timestampObj = cJSON_GetObjectItem(detection, "timestamp");
         const char* label = labelObj && cJSON_IsString(labelObj) ? labelObj->valuestring : "Undefined";
         int conf = confObj && cJSON_IsNumber(confObj) ? confObj->valueint : 0;
@@ -245,53 +252,117 @@ void Output(cJSON* detections) {
 				crop_y = topborder_offset;
 				crop_w = img_w - leftborder_offset - rightborder_offset;
 				crop_h = img_h - topborder_offset - bottomborder_offset;
-                add_crop_to_history(jpeg_data, jpeg_size, label, conf, crop_x, crop_y, crop_w, crop_h);
+                const char* imageDataBase64 = add_crop_to_history(jpeg_data, jpeg_size, label, conf, crop_x, crop_y, crop_w, crop_h);
 
-                // SD card output
-                if (sdcard_enable) {
-                    char safe_label[64];
-                    strncpy(safe_label, label, sizeof(safe_label) - 1);
-                    safe_label[sizeof(safe_label) - 1] = 0;
-                    replace_spaces(safe_label);
+				double now = ACAP_DEVICE_Timestamp();
+				if (imageDataBase64 && now - last_output_time_ms > throttle) {
+					last_output_time_ms = now;
 
-                    char fname_img[256], fname_label[256];
-                    snprintf(fname_img, sizeof(fname_img), "%s/crop_%s_%.0f_%d.jpg",
-                            SD_FOLDER, safe_label, timestamp, idx);
-                    snprintf(fname_label, sizeof(fname_label), "%s/crop_%s_%.0f_%d.txt",
-                            SD_FOLDER, safe_label, timestamp, idx);
+					// SD card output
+					if (sdcard_enable) {
+						char safe_label[64];
+						strncpy(safe_label, label, sizeof(safe_label) - 1);
+						safe_label[sizeof(safe_label) - 1] = 0;
+						replace_spaces(safe_label);
 
-                    if (save_jpeg_to_file(fname_img, jpeg_data, jpeg_size)) {
-                        if (save_label_to_file(fname_label, label, crop_x, crop_y, crop_w, crop_h)) {
-                            LOG_TRACE("Cropped detection and label written to SD: %s, %s\n", fname_img, fname_label);
-                        } else {
-                            LOG_WARN("%s: Failed to save crop label to SD: %s\n", __func__, fname_label);
-                        }
-                    } else {
-                        LOG_WARN("%s: Failed to save crop to SD: %s\n",__func__, fname_img);
-                    }
-                } // SD
+						char fname_img[256], fname_label[256];
+						snprintf(fname_img, sizeof(fname_img), "%s/crop_%s_%.0f_%d.jpg",
+								SD_FOLDER, safe_label, timestamp, idx);
+						snprintf(fname_label, sizeof(fname_label), "%s/crop_%s_%.0f_%d.txt",
+								SD_FOLDER, safe_label, timestamp, idx);
 
-                // MQTT output (optionally extend here for binary/JPEG)
-                if (mqtt_enable) {
-					//LOG_TRACE("%s Process item active mqtt_enambled\n",__func__);
-                    cJSON* mqttMsg = cJSON_CreateObject();
-                    cJSON_AddStringToObject(mqttMsg, "label", label);
-                    cJSON_AddNumberToObject(mqttMsg, "timestamp", timestamp);
-                    cJSON_AddNumberToObject(mqttMsg, "x", crop_x);
-                    cJSON_AddNumberToObject(mqttMsg, "y", crop_y);
-                    cJSON_AddNumberToObject(mqttMsg, "w", crop_w);
-                    cJSON_AddNumberToObject(mqttMsg, "h", crop_h);
-                    cJSON_AddNumberToObject(mqttMsg, "jpeg_size", jpeg_size);
-                    // Optionally: add cropped JPEG as Base64 string to MQTT
+						if (save_jpeg_to_file(fname_img, jpeg_data, jpeg_size)) {
+							if (save_label_to_file(fname_label, label, crop_x, crop_y, crop_w, crop_h)) {
+								LOG_TRACE("Cropped detection and label written to SD: %s, %s\n", fname_img, fname_label);
+							} else {
+								LOG_WARN("%s: Failed to save crop label to SD: %s\n", __func__, fname_label);
+							}
+						} else {
+							LOG_WARN("%s: Failed to save crop to SD: %s\n",__func__, fname_img);
+						}
+					} // SD
 
-                    char crop_topic[256];
-                    sprintf(crop_topic, "detection/%s/crop", ACAP_DEVICE_Prop("serial"));
-                    MQTT_Publish_JSON(crop_topic, mqttMsg, 0, 0);
-                    LOG("Detection with crop metadata sent to MQTT (label: %s, ts: %.0f, sz: %u)\n",
-                        label, timestamp, jpeg_size);
-                    cJSON_Delete(mqttMsg);
-                }
-				LOG_TRACE("%s Process item active done\n",__func__);	
+					// MQTT output (optionally extend here for binary/JPEG)
+					if (mqtt_export || http_export) {
+						cJSON* payload = cJSON_CreateObject();
+						cJSON_AddStringToObject(payload, "label", label);
+						cJSON_AddNumberToObject(payload, "timestamp", timestamp);
+						cJSON_AddNumberToObject(payload, "confidence", conf);
+						cJSON_AddNumberToObject(payload, "x", crop_x);
+						cJSON_AddNumberToObject(payload, "y", crop_y);
+						cJSON_AddNumberToObject(payload, "w", crop_w);
+						cJSON_AddNumberToObject(payload, "h", crop_h);
+						cJSON_AddStringToObject(payload, "image", imageDataBase64);
+						if( mqtt_export ) {
+							char crop_topic[64];
+							sprintf(crop_topic, "crop/%s", ACAP_DEVICE_Prop("serial"));
+							MQTT_Publish_JSON(crop_topic, payload, 0, 0);
+							LOG("Crop published on MQTT");
+						}
+						if( http_export ) {
+							cJSON_AddStringToObject(payload, "serial", ACAP_DEVICE_Prop("serial"));
+							const char* url = cJSON_GetObjectItem(cropping, "http_url") ? cJSON_GetObjectItem(cropping, "http_url")->valuestring : NULL;
+							const char* authentication = cJSON_GetObjectItem(cropping, "http_auth") ? cJSON_GetObjectItem(cropping, "http_auth")->valuestring : "none";
+							const char* username = cJSON_GetObjectItem(cropping, "http_username") ? cJSON_GetObjectItem(cropping, "http_username")->valuestring : NULL;
+							const char* password = cJSON_GetObjectItem(cropping, "http_password") ? cJSON_GetObjectItem(cropping, "http_password")->valuestring : NULL;
+							const char* token = cJSON_GetObjectItem(cropping, "http_token") ? cJSON_GetObjectItem(cropping, "http_token")->valuestring : NULL;
+
+							if (url && url[0] != 0) {
+								CURL *curl = curl_easy_init();
+								if (curl) {
+									struct curl_slist *headers = NULL;
+									CURLcode res;
+
+									char *payload_str = cJSON_PrintUnformatted(payload);
+
+									headers = curl_slist_append(headers, "Content-Type: application/json");
+
+									// Authentication
+									if (strcmp(authentication, "basic") == 0 && username && password) {
+										curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+										char userpwd[256];
+										snprintf(userpwd, sizeof(userpwd), "%s:%s", username, password);
+										curl_easy_setopt(curl, CURLOPT_USERPWD, userpwd);
+									} else if (strcmp(authentication, "digest") == 0 && username && password) {
+										curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_DIGEST);
+										char userpwd[256];
+										snprintf(userpwd, sizeof(userpwd), "%s:%s", username, password);
+										curl_easy_setopt(curl, CURLOPT_USERPWD, userpwd);
+									} else if (strcmp(authentication, "bearer") == 0 && token) {
+										char bearer_header[384];
+										snprintf(bearer_header, sizeof(bearer_header), "Authorization: Bearer %s", token);
+										headers = curl_slist_append(headers, bearer_header);
+									}
+									// none: do nothing extra
+
+									curl_easy_setopt(curl, CURLOPT_URL, url);
+									curl_easy_setopt(curl, CURLOPT_POST, 1L);
+									curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+									curl_easy_setopt(curl, CURLOPT_POSTFIELDS, payload_str);
+
+									res = curl_easy_perform(curl);
+									if (res != CURLE_OK) {
+										LOG_WARN("HTTP POST failed: %s\n", curl_easy_strerror(res));
+									} else {
+										long http_code = 0;
+										curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+										if (http_code < 200 || http_code > 299) {
+											LOG_WARN("HTTP POST returned status %ld\n", http_code);
+										}
+									}
+									free(payload_str);
+									curl_slist_free_all(headers);
+									curl_easy_cleanup(curl);
+								} else {
+									LOG_WARN("Failed to initialize CURL for HTTP export!\n");
+								}
+							} else {
+								LOG_WARN("HTTP export enabled, but URL is not set.\n");
+							}
+						}
+						cJSON_Delete(payload);
+					}
+				}
             }
 			LOG_TRACE("%s Process item done\n",__func__);
         }

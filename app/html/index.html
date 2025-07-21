@@ -54,9 +54,9 @@
             <div class="sidebar-heading">Custom Model</div>
             <div class="list-group list-group-flush">
                 <a href="index.html" class="list-group-item list-group-item-action active">Detections</a>
-                <a href="cropping.html" class="list-group-item list-group-item-action">Cropping</a>
                 <a href="mqtt.html" class="list-group-item list-group-item-action">MQTT</a>
-                <a href="advanced.html" class="list-group-item list-group-item-action">Advanced</a>
+                <a href="advanced.html" class="list-group-item list-group-item-action">Events/Labels</a>
+                <a href="cropping.html" class="list-group-item list-group-item-action">Detection Export</a>
                 <a href="about.html" class="list-group-item list-group-item-action">About</a>
             </div>
         </div>
@@ -245,18 +245,18 @@ function initializePage() {
 
 	// Set AOI button click handler
 	$("#aoi_button").click(function() {
-		var x1 = parseInt( App.settings.aoi.x1 / 1000 * imageWidth);
-		var y1 = parseInt( App.settings.aoi.y1 / 1000 * imageHeight);
-		var x2 = parseInt( App.settings.aoi.x2 / 1000 * imageWidth);
-		var y2 = parseInt( App.settings.aoi.y2 / 1000 * imageHeight);
-
-		imgAreaSelectInstance.setSelection(x1, y1, x2, y2, 0);		
 		if (selectionMode === "aoi" ) {
 			selectionMode = "none";
 			imgAreaSelectInstance.setOptions({hide:true});
 			$(this).removeClass('btn-primary').addClass('btn-secondary');
 		} else {
 			selectionMode = "aoi";
+			var x1 = parseInt( App.settings.aoi.x1 / 1000 * imageWidth);
+			var y1 = parseInt( App.settings.aoi.y1 / 1000 * imageHeight);
+			var x2 = parseInt( App.settings.aoi.x2 / 1000 * imageWidth);
+			var y2 = parseInt( App.settings.aoi.y2 / 1000 * imageHeight);
+
+			imgAreaSelectInstance.setSelection(x1, y1, x2, y2, 0);		
 			imgAreaSelectInstance.setOptions({show:true});
 			$("#size_button").removeClass('btn-primary').addClass('btn-secondary');
 			$(this).removeClass('btn-secondary').addClass('btn-primary');

@@ -17,9 +17,9 @@
             <div class="sidebar-heading">Custom Model</div>
             <div class="list-group list-group-flush">
                 <a href="index.html" class="list-group-item list-group-item-action">Detections</a>
-                <a href="cropping.html" class="list-group-item list-group-item-action active">Cropping</a>
                 <a href="mqtt.html" class="list-group-item list-group-item-action">MQTT</a>
-                <a href="advanced.html" class="list-group-item list-group-item-action">Advanced</a>
+                <a href="advanced.html" class="list-group-item list-group-item-action">Events/Labels</a>
+                <a href="cropping.html" class="list-group-item list-group-item-action active">Detection Export</a>
                 <a href="about.html" class="list-group-item list-group-item-action">About</a>
             </div>
         </div>
@@ -27,17 +27,20 @@
 
         <!-- Page Content -->
         <div id="page-content-wrapper" class="p-0">
-            <div id='modal' style='display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000;'>
-                <div style='position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:20px;'>
-                    <h2>Model Offline</h2>
-                    <p>The model is currently loading. Please wait.</p>
-                </div>
-            </div>
-
-            <div class="container-fluid p-4">
-                <h2>Detection Cropping Configuration</h2>
-                <p class="text-muted">Configure automatic cropping of detected objects for storage and analysis.</p>
-
+		
+			<div class="container-fluid pt-0 pb-4 px-4">
+				<div class="d-flex align-items-center justify-content-between flex-wrap mb-2">
+					<div>
+						<h2 class="mb-0 mt-0">Detection Cropping Configuration</h2>
+						<p class="text-muted mb-0" style="font-size: 0.99em;">
+							Configure automatic cropping of detected objects for storage and analysis.
+						</p>
+					</div>
+					<button class="btn btn-lg btn-success mt-2 mt-md-0" onclick="window.open('crops.html', '_blank')">
+						View the latest image crops
+					</button>
+				</div>
+				
                 <div class="row">
                     <!-- Left Column: Cropping Control with Border Adjustment -->
                     <div class="col-lg-6 col-12 mb-4">
@@ -89,9 +92,11 @@
                                     <span class="border-value-label left"   id="left_value_label">0</span>
                                 </div>
 
-                                <div class="d-grid mt-4">
-                                    <button id="save_settings_cropping" class="btn btn-primary" >Save Settings</button>
-                                </div>
+								<div class="d-flex justify-content-center mt-4">
+								  <button id="save_settings_cropping" class="btn btn-primary">
+									Save Settings
+								  </button>
+								</div>
                             </div>
                         </div>
                     </div>
@@ -103,8 +108,9 @@
                                 <h5 class="card-title mb-0">Output Destinations</h5>
                             </div>
                             <div class="card-body">
+
                                 <p class="text-muted small">Choose where to save or send the cropped detection images.</p>
-                                <!-- SD Card Output -->
+                                <!-- SD Card Output 
                                 <div class="form-check mb-3">
                                     <input class="form-check-input" type="checkbox" id="sdcard_output" disabled>
                                     <label class="form-check-label" for="sdcard_output">
@@ -113,14 +119,15 @@
                                     </label>
                                     <div class="form-text">SD Card status: <span id="sdcard_status_text">Checking...</span></div>
                                 </div>
+								-->
                                 <!-- MQTT Output -->
                                 <div class="form-check mb-3">
-                                    <input class="form-check-input" type="checkbox" id="mqtt_output" disabled>
+                                    <input class="form-check-input" type="checkbox" id="mqtt_output">
                                     <label class="form-check-label" for="mqtt_output">
                                         <span class="status-indicator" id="mqtt_status"></span>
                                         <strong>Send via MQTT</strong>
                                     </label>
-                                    <div class="form-text">MQTT status: <span id="mqtt_status_text">Checking...</span></div>
+                                    <div class="form-text">MQTT topic: <span id="mqtt_status_text">Checking...</span></div>
                                 </div>
                                 <!-- HTTP POST Output -->
                                 <div class="form-check mb-3">
@@ -169,16 +176,27 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="d-grid gap-2 mt-4">
-                                    <button id="save_settings" class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
-                                </div>
+								<div class="mb-3">
+									<label for="throttle_interval" class="form-label">
+										<strong>Throttle Output</strong>
+									</label>
+									<div class="input-group input-group-sm" style="max-width: 400px;">
+										<input type="number" class="form-control" id="throttle_interval" min="100" max="10000" step="100" value="100">
+										<span class="input-group-text">ms minimum between outputs</span>
+									</div>
+									<div class="form-text">
+										Prevents sending too many images; outputs will be limited to at most one every chosen interval (100–10,000 ms).
+									</div>
+								</div>
+								<div class="d-flex justify-content-center mt-4">
+								  <button id="save_settings_cropping" class="btn btn-primary">
+									Save Settings
+								  </button>
+								</div>
                             </div>
                         </div>
                     </div>
                 </div>
-				<button class="btn btn-primary" onclick="window.open('crops.html', '_blank')">
-					View the latest image crops
-				</button>
             </div>
         </div>
 
@@ -241,6 +259,12 @@ function initializePage() {
                 data.manifest.acapPackageConf.setup.friendlyName) {
                 document.title = data.manifest.acapPackageConf.setup.friendlyName + " - Cropping";
                 $("#sidebar-wrapper .sidebar-heading").text(data.manifest.acapPackageConf.setup.friendlyName);
+				var topic = "";
+				if( data.mqtt.preTopic && data.mqtt.preTopic.length )
+				   topic += data.mqtt.preTopic + "/";
+				topic += "crop/" + data.device.serial;
+				$('#mqtt_status_text').text(topic);	
+
             }
             loadCroppingSettings();
         },
@@ -397,6 +421,8 @@ function updateUI() {
     $('#http_username').val(croppingSettings.http_username || '');
     $('#http_password').val(croppingSettings.http_password || '');
     $('#http_token').val(croppingSettings.http_token || '');
+	$("#throttle_interval").val(croppingSettings.throttle);
+
     updateBorderDisplay();
     updateCropArea();
     toggleHttpConfig();
@@ -441,18 +467,6 @@ function updateStatus() {
                     $('#sdcard_output').prop('disabled', true).prop('checked', false);
                 }
             }
-            // MQTT status
-            if (status.mqtt && status.mqtt.connected !== undefined) {
-                if (status.mqtt.connected) {
-                    $('#mqtt_status').removeClass('status-unavailable').addClass('status-connected');
-                    $('#mqtt_status_text').text('Connected');
-                    $('#mqtt_output').prop('disabled', false);
-                } else {
-                    $('#mqtt_status').removeClass('status-connected').addClass('status-unavailable');
-                    $('#mqtt_status_text').text('Not Connected');
-                    $('#mqtt_output').prop('disabled', true).prop('checked', false);
-                }
-            }
         }
     });
 }
@@ -467,6 +481,7 @@ function saveSettings() {
     croppingSettings.http_username = $('#http_username').val();
     croppingSettings.http_password = $('#http_password').val();
     croppingSettings.http_token = $('#http_token').val();
+    croppingSettings.throttle = parseInt($('#throttle_interval').val());
     $.ajax({
         type: "POST",
         url: 'settings',

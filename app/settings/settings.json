@@ -17,6 +17,7 @@
   "minEventDuration": 3000,
   "cropping": {
 	  "active": false,
+	  "throttle": 500,
 	  "sdcard": false,
 	  "mqtt": false,
 	  "http": false,
