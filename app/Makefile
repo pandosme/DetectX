@@ -1,5 +1,5 @@
 PROG1   = detectx
-OBJS1   = main.c ACAP.c cJSON.c Model.c Video.c Output.c imgprovider.c imgutils.c MQTT.c CERTS.c
+OBJS1   = main.c ACAP.c cJSON.c Model.c Video.c Output.c Output_crop_cache.c Output_helpers.c Output_http.c imgprovider.c imgutils.c MQTT.c CERTS.c
 PROGS   = $(PROG1)
 LIBDIR  = lib
 INCDIR  = include
@@ -13,7 +13,7 @@ LDLIBS  += -ljpeg -lturbojpeg -s -lm -ldl -lpthread
 CFLAGS += $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --cflags $(PKGS))
 LDLIBS += $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(PKGS))
 
-CFLAGS += -Wall -Wno-format-overflow
+CFLAGS += -Wall -Wno-format-overflow -Wno-format-truncation
 
 all: $(PROGS)
 

@@ -45,21 +45,15 @@
 							</div>
 						</div>
 						<div class="row align-items-center mt-2">
-							<div class="col-auto">
-								<label for="stabelizeTransition" class="col-form-label">Stabilize transition time</label>
-							</div>
-							<div class="col-3">
-								<select class="form-control" id="stabelizeTransition">
-									<option value="0">Immidiate</option>
-									<option value="300">300 ms</option>
-									<option value="600">600 ms</option>
-									<option value="900">900 ms</option>
-									<option value="1200">1.2 s</option>
-									<option value="1500">1.5 s</option>
-									<option value="2000">2 s</option>
-									<option value="2000">4 s</option>
-								</select>
-							</div>
+						  <div class="col-auto">
+							<label for="prioritize" class="col-form-label">Prioritize</label>
+						  </div>
+						  <div class="col-3">
+							<select class="form-control" id="prioritize">
+							  <option value="accuracy">Accuracy (suppress false triggers)</option>
+							  <option value="speed">Speed (trigger instantly)</option>
+							</select>
+						  </div>
 						</div>
 						<div class="row align-items-center mt-2">
 							<div class="col-auto">
@@ -123,7 +117,7 @@ $(document).ready(function() {
 			// Create checkboxes for labels
 			$('#storeImagesCheckbox').prop('checked', App.settings.capture);
 			createLabelCheckboxes(App.model.labels, App.settings.ignore);
-			$("#stabelizeTransition").val(App.settings.stabelizeTransition);
+			$("#prioritize").val(App.settings.prioritize || "accuracy");			
 			$("#minEventDuration").val(App.settings.minEventDuration);
 		},
 		error: function(response) {
@@ -215,21 +209,20 @@ $('#minEventDuration').change(function() {
 	});
 });
 
-$('#stabelizeTransition').change(function() {
-	$.ajax({
-		type: "POST",
-		url: "settings",
-		contentType: 'application/json',
-		data: JSON.stringify({ "stabelizeTransition": parseInt($(this).val()) }),
-		success: function(response) {
-			console.log("Settings updated successfully");
-		},
-		error: function(response) {
-			alert("Failed to update setting: " + response.statusText);
-		}
-	});
+$('#prioritize').change(function() {
+    $.ajax({
+        type: "POST",
+        url: "settings",
+        contentType: 'application/json',
+        data: JSON.stringify({ "prioritize": $(this).val() }),
+        success: function(response) {
+            console.log("Prioritize setting updated successfully");
+        },
+        error: function(response) {
+            alert("Failed to update setting: " + response.statusText);
+        }
+    });
 });
-
 
 $("#menu-toggle").click(function(e) {
 	e.preventDefault();
