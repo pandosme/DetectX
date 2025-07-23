@@ -3,7 +3,7 @@
 Run custom trained data models.  This package includes MobileNet SSD COCO model.  The idea is to replace this model with your own.  
 Please read [Train-Build.md](https://github.com/pandosme/DetectX/blob/main/Train-Build.md) to understand how to train and build the package.
 
-## [Download and test a pre-compiled version for ARTPE8/9 running the COCO SSD Dataset](https://www.dropbox.com/scl/fi/543nxhnorpu0f9nbv3emh/DetectX_COCO.zip?rlkey=0zux5f3z9aimt6lqghi75kxix&dl=1)
+## [Download and test a pre-compiled version for ARTPEC8/9 running the COCO SSD Dataset](https://www.dropbox.com/scl/fi/543nxhnorpu0f9nbv3emh/DetectX_COCO.zip?rlkey=0zux5f3z9aimt6lqghi75kxix&dl=1)
 
 # Pre-requsite
 - Axis Camera based on ARTPEC-8 or ARTPEC-9
