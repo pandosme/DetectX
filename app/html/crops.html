@@ -57,9 +57,18 @@
     </style>
 </head>
 <body>
+    <div style="padding-top:22px;">
+      <div style="color:#fff; font-size:1.5em; font-weight:bold; margin-left:22px;">
+        These are the cropped images of the latest detections
+      </div>
+      <div style="color:#ffd600; font-size:1em; font-style:italic; margin:8px 0 0 22px;">
+        Note: Images sent on HTTP or MQTT may only include one or a few, depending on your Area-Of-Interest and throttle settings.
+      </div>
+    </div>
     <div class="crop-row" id="cropRow"></div>
 <script>
-// Utility to clear and show latest crop images
+  // ... your fetch/display code unchanged ...
+</script>// Utility to clear and show latest crop images
 function displayCrops(crops) {
     const row = document.getElementById('cropRow');
     row.innerHTML = "";
@@ -87,7 +96,7 @@ function displayCrops(crops) {
         card.appendChild(box);
 
         // Overlay label: label and confidence, ideally above the box, else inside
-        let conf = crop.confidence!=null ? ` (${(100*crop.confidence).toFixed(1)}%)` : "";
+        let conf = "  (" + crop.confidence + "%)";
         const labelText = (crop.label||"") + conf;
 
         // Default place above, else inside if not enough space
@@ -207,7 +216,7 @@ function displayCrops(crops) {
         card.appendChild(box);
 
         // Overlay label: label and confidence, ideally above the box, else inside
-        let conf = crop.confidence!=null ? ` (${(100*crop.confidence).toFixed(1)}%)` : "";
+        let conf = " (" + crop.confidence + "%)";
         const labelText = (crop.label||"") + conf;
 
         // Default place above, else inside if not enough space

@@ -94,6 +94,18 @@
 							</div>
 						</div>
 					</div>
+					<div class="col-md-6">
+						<div class="card h-100">
+							<div class="card-header bg-warning text-black">
+								<h5 class="mb-0">MQTT Topics</h5>
+							</div>
+							<div class="card-body" style="font-size: 1.2rem;">
+								<p><strong>detectx/detections/[serial] </strong></p><p>List of all detection bounding boxes, labels and confidence</p>
+								<p><strong>detectx/events/[serial]/[label]/[true/false] </strong></p><p>Mimics events.  Only sent on state change if label is present or not</p>
+								<p><strong>detectx/crops/[serial] </strong></p><p>An object with the a cropped detection image data(base64), bounding box,label and confidence</p>
+							</div>
+						</div>
+					</div>
 				</div>
 			</div>
 

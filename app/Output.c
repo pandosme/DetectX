@@ -81,7 +81,6 @@ static gboolean Output_DeactivateExpired(gpointer user_data) {
             if ((now - eventsCache[i].last_detect_time) > minEventDuration) {
                 eventsCache[i].state = 0;
                 ACAP_EVENTS_Fire_State(eventsCache[i].name, 0);
-                LOG("%s: false", eventsCache[i].name);
                 snprintf(topic, sizeof(topic), "event/%s/%s/false", ACAP_DEVICE_Prop("serial"), eventsCache[i].name);
                 cJSON* statePayload = cJSON_CreateObject();
                 cJSON_AddStringToObject(statePayload, "label", eventsCache[i].name);
@@ -96,6 +95,7 @@ static gboolean Output_DeactivateExpired(gpointer user_data) {
 	return TRUE;
 }
 
+int lastDetectionsWhereEmpty = 0;
 
 // --------- Main output function (with rolling logic) ---------
 void Output(cJSON* detections) {
@@ -297,7 +297,6 @@ void Output(cJSON* detections) {
                     cJSON_AddNumberToObject(payload, "w", crop_w);
                     cJSON_AddNumberToObject(payload, "h", crop_h);
                     cJSON_AddStringToObject(payload, "image", imageDataBase64);
-
                     if (mqtt_export) {
                         char crop_topic[64];
                         snprintf(crop_topic, sizeof(crop_topic), "crop/%s", ACAP_DEVICE_Prop("serial"));

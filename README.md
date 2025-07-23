@@ -94,6 +94,28 @@ A stateful event (high/low) for each detected label.
 
 # History
 
+### Release Notes — Version 3.5.0 (Jul 23, 2025)
+
+#### New Features
+
+- **Export of Cropped Detection Images**
+  - Enables building two-stage detection and analytics workflows, where the camera generates rough detections and exports cropped images for advanced processing by LLMs or other AI/image analytics services.
+  - Simplifies dataset expansion and refinement by automatically generating pre-labeled cropped images to be stored for training or analysis.
+
+  **Highlights:**
+  - Supports both **MQTT** and **HTTP** output for flexible integration.
+  - Optional border padding on cropped images (top, left, bottom, right) for context preservation.
+  - Built-in visual inspection page to review the latest detected images directly.
+  - Configurable export throttling to prevent bursts and control image delivery rate.
+
+#### Improvements
+
+- **MQTT Stability**
+  - Enhanced MQTT handling for more reliable connection and seamless reconnection in dynamic network environments.
+
+This release further streamlines integration with external analytics tools and enhances the stability and flexibility of detection event exports.
+
+	
 ### 3.4.0	May 14, 2025
 - MQTT Cleanup
 - GUI fixes

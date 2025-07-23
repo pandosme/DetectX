@@ -589,7 +589,7 @@ messageArrived(void* context, char* topicName, int topicLen, MQTTAsync_message* 
 
 static void
 deliveryComplete(void* context, MQTTAsync_token token) {
-    LOG("Message delivery confirmed for token %d\n", token);
+    LOG_TRACE("Message delivery confirmed for token %d\n", token);
 }
 
 static void
@@ -721,7 +721,7 @@ MQTT_HTTP_callback(const ACAP_HTTP_Response response, const ACAP_HTTP_Request re
     // 1. Handle initial state checks
     if (!MQTTSettings) {
         ACAP_HTTP_Respond_Error(response, 500, "MQTT not initialized");
-        syslog(LOG_ERR, "MQTT settings not initialized");
+        LOG_WARN("MQTT settings not initialized");
         pthread_mutex_unlock(&config_mutex);
         return;
     }

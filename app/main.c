@@ -41,7 +41,6 @@ ConfigUpdate( const char *setting, cJSON* data) {
 		return;
 	char *json = cJSON_PrintUnformatted(data);
 	if( json ) {
-		LOG("Config: %s = %s\n",setting, json);
 		free(json);
 	}
 	LOG_TRACE("%s>\n",__func__);	
