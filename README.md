@@ -94,7 +94,7 @@ A stateful event (high/low) for each detected label.
 
 # History
 
-### Release Notes — Version 3.5.0 (Jul 23, 2025)
+### 3.5.0 Jul 23, 2025
 
 #### New Features
 
@@ -115,7 +115,6 @@ A stateful event (high/low) for each detected label.
 
 This release further streamlines integration with external analytics tools and enhances the stability and flexibility of detection event exports.
 
-	
 ### 3.4.0	May 14, 2025
 - MQTT Cleanup
 - GUI fixes

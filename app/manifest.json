@@ -1,5 +1,5 @@
 {
-    "schemaVersion": "1.7.1",
+    "schemaVersion": "1.7.3",
     "acapPackageConf": {
         "setup": {
             "friendlyName": "DetectX COCO",
@@ -8,7 +8,7 @@
             "embeddedSdkVersion": "3.0",
             "vendorUrl": "https://pandosme.github.io",
             "runMode": "once",
-            "version": "3.5.0"
+            "version": "4.0.0"
         },
         "configuration": {
 			"settingPage": "index.html",
@@ -19,23 +19,15 @@
 				{"name": "device","access": "admin","type": "fastCgi"},
 				{"name": "model","access": "admin","type": "fastCgi"},
 				{"name": "mqtt","access": "admin","type": "fastCgi"},
-				{"name": "certs","access": "admin","type": "fastCgi"},
-				{"name": "crops","access": "admin","type": "fastCgi"}
+				{"name": "certs","access": "admin","type": "fastCgi"}
 			]
 		}
     },
-    "resources": {
-        "linux": {
-            "user": {
-                "groups": [
-                    "storage"
-                ]
-            }
-        },
+	"resources": {
 		"dbus": {
 			"requiredMethods": [
 				"com.axis.HTTPConf1.VAPIXServiceAccounts1.GetCredentials"
 			]
 		}
-    }
+	}
 }
