@@ -3,8 +3,7 @@
 Run custom trained data models.  This package includes MobileNet SSD COCO model.  The idea is to replace this model with your own.  
 Please read [Train-Build.md](https://github.com/pandosme/DetectX/blob/main/Train-Build.md) to understand how to train and build the package.
 
-
-**Breaking change:  You need to remove previous 2.x.x version before installing 3.x.x.**
+## [Download and test a pre-compiled version for ARTPEC8/9 running the COCO SSD Dataset](https://www.dropbox.com/scl/fi/543nxhnorpu0f9nbv3emh/DetectX_COCO.zip?rlkey=0zux5f3z9aimt6lqghi75kxix&dl=1)
 
 # Pre-requsite
 - Axis Camera based on ARTPEC-8 or ARTPEC-9
@@ -95,21 +94,16 @@ A stateful event (high/low) for each detected label.
 # History
 
 ### 3.5.0 Jul 23, 2025
-
 #### New Features
-
 - **Export of Cropped Detection Images**
   - Enables building two-stage detection and analytics workflows, where the camera generates rough detections and exports cropped images for advanced processing by LLMs or other AI/image analytics services.
   - Simplifies dataset expansion and refinement by automatically generating pre-labeled cropped images to be stored for training or analysis.
-
   **Highlights:**
   - Supports both **MQTT** and **HTTP** output for flexible integration.
   - Optional border padding on cropped images (top, left, bottom, right) for context preservation.
   - Built-in visual inspection page to review the latest detected images directly.
   - Configurable export throttling to prevent bursts and control image delivery rate.
-
 #### Improvements
-
 - **MQTT Stability**
   - Enhanced MQTT handling for more reliable connection and seamless reconnection in dynamic network environments.
 
