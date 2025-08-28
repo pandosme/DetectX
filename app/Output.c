@@ -99,8 +99,10 @@ int lastDetectionsWhereEmpty = 0;
 
 // --------- Main output function (with rolling logic) ---------
 void Output(cJSON* detections) {
-    if (!detections || cJSON_GetArraySize(detections) == 0)
+    if (!detections || cJSON_GetArraySize(detections) == 0) {
+		ACAP_STATUS_SetObject("labels", "detections", cJSON_CreateArray());
         return;
+	}
 
     LOG_TRACE("<%s %d\n", __func__, cJSON_GetArraySize(detections));
 

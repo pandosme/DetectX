@@ -93,6 +93,10 @@ A stateful event (high/low) for each detected label.
 
 # History
 
+### 3.5.1 Aug 28, 2025
+- Updated user interface
+- Fixed view of cropped images
+
 ### 3.5.0 Jul 23, 2025
 #### New Features
 - **Export of Cropped Detection Images**

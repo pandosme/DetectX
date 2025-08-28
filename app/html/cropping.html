@@ -24,23 +24,20 @@
             </div>
         </div>
         <!-- /#sidebar-wrapper -->
-
         <!-- Page Content -->
         <div id="page-content-wrapper" class="p-0">
-		
-			<div class="container-fluid pt-0 pb-4 px-4">
-				<div class="d-flex align-items-center justify-content-between flex-wrap mb-2">
-					<div>
-						<h2 class="mb-0 mt-0">Detection Cropping Configuration</h2>
-						<p class="text-muted mb-0" style="font-size: 0.99em;">
-							Configure automatic cropping of detected objects for storage and analysis.
-						</p>
-					</div>
-					<button class="btn btn-lg btn-success mt-2 mt-md-0" onclick="window.open('crops.html', '_blank')">
-						View the latest image crops
-					</button>
-				</div>
-				
+            <div class="container-fluid pt-0 pb-4 px-4">
+                <div class="d-flex align-items-center justify-content-between flex-wrap mb-2">
+                    <div>
+                        <h2 class="mb-0 mt-0">Detection Cropping Configuration</h2>
+                        <p class="text-muted mb-0" style="font-size: 0.99em;">
+                            Configure automatic cropping of detected objects for storage and analysis.
+                        </p>
+                    </div>
+                    <button class="btn btn-lg btn-success mt-2 mt-md-0" onclick="window.open('crops.html', '_blank')">
+                        View the latest image crops
+                    </button>
+                </div>
                 <div class="row">
                     <!-- Left Column: Cropping Control with Border Adjustment -->
                     <div class="col-lg-6 col-12 mb-4">
@@ -56,51 +53,42 @@
                                     </label>
                                     <div class="form-text">Automatically crop detected objects from the main image</div>
                                 </div>
-
                                 <hr>
-
                                 <!-- Border Adjustment Section -->
                                 <h6 class="mb-3">Border Adjustment</h6>
-
                                 <div class="preset-buttons mb-3">
                                     <div class="d-flex gap-2">
-                                        <button class="btn btn-sm btn-outline-secondary flex-fill" onclick="setPreset(0, 0, 0, 0)">None</button>
-                                        <button class="btn btn-sm btn-outline-secondary flex-fill" onclick="setPreset(25, 25, 25, 25)">25px</button>
-                                        <button class="btn btn-sm btn-outline-secondary flex-fill" onclick="setPreset(50, 50, 50, 50)">50px</button>
-                                        <button class="btn btn-sm btn-outline-secondary flex-fill" onclick="setPreset(100, 100, 100, 100)">100px</button>
+                                        <button class="btn btn-sm btn-outline-secondary flex-fill" type="button" onclick="setPreset(0, 0, 0, 0)">None</button>
+                                        <button class="btn btn-sm btn-outline-secondary flex-fill" type="button" onclick="setPreset(25, 25, 25, 25)">25px</button>
+                                        <button class="btn btn-sm btn-outline-secondary flex-fill" type="button" onclick="setPreset(50, 50, 50, 50)">50px</button>
+                                        <button class="btn btn-sm btn-outline-secondary flex-fill" type="button" onclick="setPreset(100, 100, 100, 100)">100px</button>
                                     </div>
                                 </div>
-
                                 <p class="text-muted small">Drag the blue handles to expand the crop area around detections. Values are in pixels.</p>
-                                
                                 <div class="border-preview">
                                     <div class="detection-area" id="detection_area">
                                         <div class="detection-label">Detection Box</div>
                                     </div>
                                     <div class="crop-area" id="crop_area"></div>
-
                                     <!-- Handles -->
                                     <div class="border-handle top" data-border="top"></div>
                                     <div class="border-handle right" data-border="right"></div>
                                     <div class="border-handle bottom" data-border="bottom"></div>
                                     <div class="border-handle left" data-border="left"></div>
-
                                     <!-- Value Bubbles -->
                                     <span class="border-value-label top"    id="top_value_label">0</span>
                                     <span class="border-value-label right"  id="right_value_label">0</span>
                                     <span class="border-value-label bottom" id="bottom_value_label">0</span>
                                     <span class="border-value-label left"   id="left_value_label">0</span>
                                 </div>
-
-								<div class="d-flex justify-content-center mt-4">
-								  <button id="save_settings_cropping" class="btn btn-primary">
-									Save Settings
-								  </button>
-								</div>
+                                <div class="d-flex justify-content-center mt-4">
+                                    <button id="save_settings_cropping" type="button" class="btn btn-primary">
+                                        Save Settings
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
-
                     <!-- Right Column: Output Destinations -->
                     <div class="col-lg-6 col-12 mb-4" id="output_destinations_card">
                         <div class="card h-100">
@@ -108,18 +96,7 @@
                                 <h5 class="card-title mb-0">Output Destinations</h5>
                             </div>
                             <div class="card-body">
-
                                 <p class="text-muted small">Choose where to save or send the cropped detection images.</p>
-                                <!-- SD Card Output 
-                                <div class="form-check mb-3">
-                                    <input class="form-check-input" type="checkbox" id="sdcard_output" disabled>
-                                    <label class="form-check-label" for="sdcard_output">
-                                        <span class="status-indicator" id="sdcard_status"></span>
-                                        <strong>Save to SD Card</strong>
-                                    </label>
-                                    <div class="form-text">SD Card status: <span id="sdcard_status_text">Checking...</span></div>
-                                </div>
-								-->
                                 <!-- MQTT Output -->
                                 <div class="form-check mb-3">
                                     <input class="form-check-input" type="checkbox" id="mqtt_output">
@@ -143,20 +120,20 @@
                                         <label for="http_url" class="form-label">URL</label>
                                         <input type="text" class="form-control form-control-sm" id="http_url" placeholder="https://example.com/upload">
                                     </div>
-									<div class="mb-3">
-										<label for="http_auth" class="form-label">Authentication Method</label>
-										<div class="row g-0">
-											<div class="col-3">
-												<select class="form-select form-select-sm w-100" id="http_auth">
-													<option value="none">None</option>
-													<option value="basic">Basic</option>
-													<option value="digest">Digest</option>
-													<option value="bearer">Bearer</option>
-												</select>
-											</div>
-											<div class="col-4"></div>
-										</div>
-									</div>
+                                    <div class="mb-3">
+                                        <label for="http_auth" class="form-label">Authentication Method</label>
+                                        <div class="row g-0">
+                                            <div class="col-3">
+                                                <select class="form-select form-select-sm w-100" id="http_auth">
+                                                    <option value="none">None</option>
+                                                    <option value="basic">Basic</option>
+                                                    <option value="digest">Digest</option>
+                                                    <option value="bearer">Bearer</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-4"></div>
+                                        </div>
+                                    </div>
                                     <!-- Basic/Digest Auth Fields -->
                                     <div id="basic_auth_fields" class="auth-fields" style="display: none;">
                                         <div class="mb-2">
@@ -176,30 +153,29 @@
                                         </div>
                                     </div>
                                 </div>
-								<div class="mb-3">
-									<label for="throttle_interval" class="form-label">
-										<strong>Throttle Output</strong>
-									</label>
-									<div class="input-group input-group-sm" style="max-width: 400px;">
-										<input type="number" class="form-control" id="throttle_interval" min="100" max="10000" step="100" value="100">
-										<span class="input-group-text">ms minimum between outputs</span>
-									</div>
-									<div class="form-text">
-										Prevents sending too many images; outputs will be limited to at most one every chosen interval (100–10,000 ms).
-									</div>
-								</div>
-								<div class="d-flex justify-content-center mt-4">
-								  <button id="save_settings_cropping" class="btn btn-primary">
-									Save Settings
-								  </button>
-								</div>
+                                <div class="mb-3">
+                                    <label for="throttle_interval" class="form-label">
+                                        <strong>Throttle Output</strong>
+                                    </label>
+                                    <div class="input-group input-group-sm" style="max-width: 400px;">
+                                        <input type="number" class="form-control" id="throttle_interval" min="100" max="10000" step="100" value="100">
+                                        <span class="input-group-text">ms minimum between outputs</span>
+                                    </div>
+                                    <div class="form-text">
+                                        Prevents sending too many images; outputs will be limited to at most one every chosen interval (100–10,000 ms).
+                                    </div>
+                                </div>
+                                <div class="d-flex justify-content-center mt-4">
+                                    <button id="save_settings_cropping" type="button" class="btn btn-primary">
+                                        Save Settings
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-
         <!-- Error Modal -->
         <div class="modal fade" id="errorModal" tabindex="-1" aria-labelledby="errorModalLabel" aria-hidden="true">
             <div class="modal-dialog">
@@ -233,7 +209,8 @@ var croppingSettings = {
     http_auth: 'none',
     http_username: '',
     http_password: '',
-    http_token: ''
+    http_token: '',
+    throttle: 100
 };
 var isDragging = false;
 var dragBorder = null;
@@ -245,8 +222,23 @@ $(document).ready(function() {
     $('#http_output').on('change', toggleHttpConfig);
     $('#http_auth').on('change', toggleAuthFields);
     $('#save_settings_cropping, #save_settings').on('click', saveSettings);
+    // IMMEDIATE save on enable/disable cropping
+    $('#cropping_active').on('change', function() {
+        croppingSettings.active = $(this).is(':checked');
+        $.ajax({
+            type: "POST",
+            url: 'settings',
+            contentType: 'application/json',
+            data: JSON.stringify({ cropping: croppingSettings }),
+            success: function() {
+                showToast('Cropping ' + (croppingSettings.active ? 'enabled' : 'disabled') + ' successfully','info');
+            },
+            error: function(response) {
+                showToast('Failed to update cropping: ' + response.statusText,"warning");
+            }
+        });
+    });
 });
-
 function initializePage() {
     $.ajax({
         type: "GET",
@@ -259,12 +251,11 @@ function initializePage() {
                 data.manifest.acapPackageConf.setup.friendlyName) {
                 document.title = data.manifest.acapPackageConf.setup.friendlyName + " - Cropping";
                 $("#sidebar-wrapper .sidebar-heading").text(data.manifest.acapPackageConf.setup.friendlyName);
-				var topic = "";
-				if( data.mqtt.preTopic && data.mqtt.preTopic.length )
-				   topic += data.mqtt.preTopic + "/";
-				topic += "crop/" + data.device.serial;
-				$('#mqtt_status_text').text(topic);	
-
+                var topic = "";
+                if( data.mqtt.preTopic && data.mqtt.preTopic.length )
+                    topic += data.mqtt.preTopic + "/";
+                topic += "crop/" + data.device.serial;
+                $('#mqtt_status_text').text(topic);
             }
             loadCroppingSettings();
         },
@@ -273,7 +264,6 @@ function initializePage() {
         }
     });
 }
-
 function initializeBorderPreview() {
     updateDetectionArea();
     updateCropArea();
@@ -319,7 +309,6 @@ function initializeBorderPreview() {
         setTimeout(updateBorderDisplay, 120);
     });
 }
-
 function updateDetectionArea() {
     const preview = $('.border-preview');
     const detection = $('#detection_area');
@@ -333,7 +322,6 @@ function updateDetectionArea() {
         top: (previewHeight / 2 - size / 2) + 'px'
     });
 }
-
 function updateCropArea() {
     const detection = $('#detection_area');
     const crop = $('#crop_area');
@@ -351,7 +339,6 @@ function updateCropArea() {
         height: height + 'px'
     });
 }
-
 function updateBorderDisplay() {
     $('#top_value_label').text(croppingSettings.topborder);
     $('#bottom_value_label').text(croppingSettings.bottomborder);
@@ -386,7 +373,6 @@ function updateBorderDisplay() {
         transform: 'none'
     });
 }
-
 function setPreset(top, right, bottom, left) {
     croppingSettings.topborder = top;
     croppingSettings.rightborder = right;
@@ -395,7 +381,6 @@ function setPreset(top, right, bottom, left) {
     updateBorderDisplay();
     updateCropArea();
 }
-
 function loadCroppingSettings() {
     $.ajax({
         type: "GET",
@@ -404,13 +389,12 @@ function loadCroppingSettings() {
         cache: false,
         success: function(settings) {
             if (settings.cropping) {
-                croppingSettings = settings.cropping;
+                Object.assign(croppingSettings, settings.cropping);
                 updateUI();
             }
         }
     });
 }
-
 function updateUI() {
     $('#cropping_active').prop('checked', croppingSettings.active);
     $('#sdcard_output').prop('checked', croppingSettings.sdcard || false);
@@ -421,14 +405,12 @@ function updateUI() {
     $('#http_username').val(croppingSettings.http_username || '');
     $('#http_password').val(croppingSettings.http_password || '');
     $('#http_token').val(croppingSettings.http_token || '');
-	$("#throttle_interval").val(croppingSettings.throttle);
-
+    $("#throttle_interval").val(croppingSettings.throttle);
     updateBorderDisplay();
     updateCropArea();
     toggleHttpConfig();
     toggleAuthFields();
 }
-
 function toggleHttpConfig() {
     if ($('#http_output').is(':checked')) {
         $('#http_config').show();
@@ -436,7 +418,6 @@ function toggleHttpConfig() {
         $('#http_config').hide();
     }
 }
-
 function toggleAuthFields() {
     const authType = $('#http_auth').val();
     $('#basic_auth_fields').hide();
@@ -447,7 +428,6 @@ function toggleAuthFields() {
         $('#bearer_auth_fields').show();
     }
 }
-
 function updateStatus() {
     $.ajax({
         type: "GET",
@@ -455,7 +435,7 @@ function updateStatus() {
         dataType: 'json',
         cache: false,
         success: function(status) {
-            // SD Card status
+            // SD Card status (optional)
             if (status.SDCARD && status.SDCARD.available !== undefined) {
                 if (status.SDCARD.available) {
                     $('#sdcard_status').removeClass('status-unavailable').addClass('status-available');
@@ -470,7 +450,6 @@ function updateStatus() {
         }
     });
 }
-
 function saveSettings() {
     croppingSettings.active = $('#cropping_active').is(':checked');
     croppingSettings.sdcard = $('#sdcard_output').is(':checked');
@@ -495,12 +474,10 @@ function saveSettings() {
         }
     });
 }
-
 function showError(message) {
     $('.modal-body').html('<b>' + message + '</b>');
     $('#errorModal').modal('show');
 }
-
 function showToast(message, type = 'danger') {
     const toastContainer = document.querySelector('.toast-container');
     const textColorClass = type === 'warning' ? 'text-dark' : 'text-white';

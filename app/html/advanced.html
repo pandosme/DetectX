@@ -8,173 +8,172 @@
     <link rel="stylesheet" href="css/app.css">
     <script src="js/jquery-3.7.1.min.js"></script>
     <script src="js/bootstrap.bundle.min.js"></script>
+    <style>
+        .setting-label {
+            font-weight: 500;
+            min-width: 180px;
+        }
+        #labelsGrid .form-check-label {
+            word-break: break-word;
+            white-space: normal;
+        }
+        #labelsGrid {
+            margin-top: 0;
+        }
+        /* Optional: Make checkbox area easier to scan visually */
+        .form-check {
+            padding-left: 1.5em;
+            margin-bottom: 0.2em;
+        }
+        .card {
+            margin-bottom: 1.8rem;
+        }
+        @media (max-width: 575.98px) {
+            .setting-label {
+                min-width: unset;
+                font-size: 1rem;
+            }
+        }
+    </style>
 </head>
-
 <body>
 <div class="d-flex" id="wrapper">
-	<!-- Sidebar -->
-	<div class="bg-light border-right" id="sidebar-wrapper">
-		<div class="sidebar-heading">Custom Model</div>
-		<div class="list-group list-group-flush">
-			<a href="index.html" class="list-group-item list-group-item-action">Detections</a>
-			<a href="mqtt.html" class="list-group-item list-group-item-action">MQTT</a>
+    <!-- Sidebar -->
+    <div class="bg-light border-right" id="sidebar-wrapper">
+        <div class="sidebar-heading">Custom Model</div>
+        <div class="list-group list-group-flush">
+            <a href="index.html" class="list-group-item list-group-item-action">Detections</a>
+            <a href="mqtt.html" class="list-group-item list-group-item-action">MQTT</a>
             <a href="advanced.html" class="list-group-item list-group-item-action active">Events/Labels</a>
-			<a href="cropping.html" class="list-group-item list-group-item-action">Detection Export</a>
-			<a href="about.html" class="list-group-item list-group-item-action">About</a>
-		</div>
-	</div>
-	<!-- /#sidebar-wrapper -->
+            <a href="cropping.html" class="list-group-item list-group-item-action">Detection Export</a>
+            <a href="about.html" class="list-group-item list-group-item-action">About</a>
+        </div>
+    </div>
+    <!-- /#sidebar-wrapper -->
+    <!-- Page Content -->
+    <div id="page-content-wrapper">
+        <div class="container-fluid py-4">
 
-	<!-- Page Content -->
-	<div id="page-content-wrapper">
-		<nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
-			<button class="btn btn-link" id="menu-toggle">
-				<i class="fas fa-bars"></i>
-			</button>
-			<span class="navbar-text" id="model_status">Loading...</span>
-		</nav>
+            <!-- Card: Event State Settings -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    Event State Settings
+                </div>
+                <div class="card-body">
+                    <form>
+                        <div class="row mb-3 align-items-center">
+                            <label for="prioritize" class="col-sm-4 col-form-label setting-label">Prioritize</label>
+                            <div class="col-sm-6">
+                                <select class="form-select w-100" id="prioritize">
+                                    <option value="accuracy">Accuracy (suppress false triggers)</option>
+                                    <option value="speed">Speed (Trigger instantly)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row mb-1 align-items-center">
+                            <label for="minEventDuration" class="col-sm-4 col-form-label setting-label">Min Event State Duration</label>
+                            <div class="col-sm-6">
+                                <select class="form-select w-100" id="minEventDuration">
+                                    <option value="2000">2 seconds</option>
+                                    <option value="3000">3 seconds</option>
+                                    <option value="5000">5 seconds</option>
+                                    <option value="10000">10 seconds</option>
+                                    <option value="15000">15 seconds</option>
+                                    <option value="30000">30 seconds</option>
+                                </select>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
 
-		<div class="container-fluid">
-			<div class="row">
-				<div class="col-md-12">
-					<br>
-					<div class="container">
-						<div class="row align-items-center">
-							<div class="col-auto">
-								<h3 id="debug-heading">Event state settings</h3>
-							</div>
-						</div>
-						<div class="row align-items-center mt-2">
-						  <div class="col-auto">
-							<label for="prioritize" class="col-form-label">Prioritize</label>
-						  </div>
-						  <div class="col-3">
-							<select class="form-control" id="prioritize">
-							  <option value="accuracy">Accuracy (suppress false triggers)</option>
-							  <option value="speed">Speed (trigger instantly)</option>
-							</select>
-						  </div>
-						</div>
-						<div class="row align-items-center mt-2">
-							<div class="col-auto">
-								<label for="minEventDuration" class="col-form-label">Min event state duration</label>
-							</div>
-							<div class="col-3">
-								<select class="form-control" id="minEventDuration">
-									<option value="2000">2 seconds</option>
-									<option value="3000">3 seconds</option>
-									<option value="5000">5 seconds</option>
-									<option value="10000">10 seconds</option>
-									<option value="15000">15 seconds</option>
-									<option value="30000">30 seconds</option>
-								</select>
-							</div>
-						</div>
-					</div>
-					<br><br>						
-					<h3 id="labels-heading">Labels Processed</h3>
-					<table class="table" id="labelsTable">
-						<!-- Checkboxes will be dynamically inserted here -->
-					</table>
-				</div>
-			</div>
-		</div>
-	</div>
-	<div class="modal fade" id="errorModal" tabindex="-1" aria-labelledby="errorModalLabel" aria-hidden="true">
-		<div class="modal-dialog">
-			<div class="modal-content">
-				<div class="modal-header">
-					<h5 class="modal-title" id="errorModalLabel">Error</h5>
-					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-				</div>
-				<div class="modal-body">
-					The application is not running.
-				</div>
-				<div class="modal-footer">
-					<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-				</div>
-			</div>
-		</div>
-	</div>				
+            <!-- Card: Labels -->
+            <div class="card">
+                <div class="card-header">
+                    Labels Processed
+                </div>
+                <div class="card-body">
+                    <div class="row g-2" id="labelsGrid"></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Error Modal -->
+    <div class="modal fade" id="errorModal" tabindex="-1" aria-labelledby="errorModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="errorModalLabel">Error</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    The application is not running.
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
-
 <script>
 var App = 0;
-
 $(document).ready(function() {
-	$.ajax({
-		type: "GET",
-		url: 'app',
-		dataType: 'json',
-		cache: false,
-		success: function(data) {
-			App = data;
-			// Update UI elements
-			document.title = App.manifest.acapPackageConf.setup.friendlyName;
-			$(".acapName").html(App.manifest.acapPackageConf.setup.friendlyName);
-			$("#sidebar-wrapper .sidebar-heading").html(App.manifest.acapPackageConf.setup.friendlyName);
-			$("#model_status").text("Status: " + App.status.model.status);
-			// Create checkboxes for labels
-			$('#storeImagesCheckbox').prop('checked', App.settings.capture);
-			createLabelCheckboxes(App.model.labels, App.settings.ignore);
-			$("#prioritize").val(App.settings.prioritize || "accuracy");			
-			$("#minEventDuration").val(App.settings.minEventDuration);
-		},
-		error: function(response) {
-			$('#errorModal').modal('show');
-		}
-	});
-
-	setInterval( function(){
-		$.ajax({type: "GET",url: 'status',dataType: 'json',cache: false,
-			success: function( data ) {
-				$("#model_status").text("Status: " + data.model.status);
-			},
-			error(){
-				$("#model_status").text("Status: No response");
-			}
-		});
-	},300);
-});
-
-
-function createLabelCheckboxes(labels, ignoreList) {
-    const table = $('#labelsTable');
-    const columns = 10; // Number of columns
-
-    for (let i = 0; i < labels.length; i += columns) {
-        const row = $('<tr></tr>');
-
-        for (let j = 0; j < columns; j++) {
-            const index = i + j;
-            const label = labels[index];
-            if (index >= labels.length) break;
-
-            // Check if the label is in the ignore list
-            const isChecked = !ignoreList.includes(label);
-            var td = '<td>';
-            td += '<div class="form-check">';
-            td += '<input type="checkbox" class="form-check-input label-checkbox" id="label-' + index + '" data-label="' + label + '"';
-            if (isChecked) td += ' checked'; // Set checked if not in ignore list
-            td += '>';
-            td += '<label class="form-check-label" for="label-' + index + '">' + label + '</label>';
-            td += '</div>';
-            td += '</td>';
-            row.append(td);
+    $.ajax({
+        type: "GET",
+        url: 'app',
+        dataType: 'json',
+        cache: false,
+        success: function(data) {
+            App = data;
+            document.title = App.manifest.acapPackageConf.setup.friendlyName;
+            $(".acapName").html(App.manifest.acapPackageConf.setup.friendlyName);
+            $("#sidebar-wrapper .sidebar-heading").html(App.manifest.acapPackageConf.setup.friendlyName);
+            $("#model_status").text("Status: " + App.status.model.status);
+            createLabelCheckboxes(App.model.labels, App.settings.ignore);
+            $("#prioritize").val(App.settings.prioritize || "accuracy");         
+            $("#minEventDuration").val(App.settings.minEventDuration);
+        },
+        error: function(response) {
+            $('#errorModal').modal('show');
         }
-
-        table.append(row);
+    });
+    setInterval( function(){
+        $.ajax({type: "GET",url: 'status',dataType: 'json',cache: false,
+            success: function( data ) {
+                $("#model_status").text("Status: " + data.model.status);
+            },
+            error(){
+                $("#model_status").text("Status: No response");
+            }
+        });
+    },300);
+});
+function createLabelCheckboxes(labels, ignoreList) {
+    const grid = $('#labelsGrid');
+    grid.empty();
+    // Responsive: 1/1/2/3/4 columns at xs/sm/md/lg/xl
+    for (let i = 0; i < labels.length; i++) {
+        const label = labels[i];
+        const isChecked = !ignoreList.includes(label);
+        // Use Bootstrap columns that wrap: 1 per row xs, 2 sm, 3 md, 4 lg+
+        const col = $(`
+            <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input label-checkbox" id="label-${i}" data-label="${label}"${isChecked ? ' checked' : ''}>
+                    <label class="form-check-label" for="label-${i}">${label}</label>
+                </div>
+            </div>
+        `);
+        grid.append(col);
     }
-
-    // Rebind change event to new checkboxes
     $('.label-checkbox').change(function() {
         const label = $(this).data('label');
-
         if (this.checked) {
-            // Remove label from ignore list
             App.settings.ignore = App.settings.ignore.filter(item => item !== label);
         } else {
-            // Add label to ignore list
             if (!App.settings.ignore.includes(label)) {
                 App.settings.ignore.push(label);
             }
@@ -184,52 +183,29 @@ function createLabelCheckboxes(labels, ignoreList) {
             url: "settings",
             contentType: 'application/json',
             data: JSON.stringify({ "ignore": App.settings.ignore }),
-            success: function(response) {
-                console.log("AOI updated successfully.");
-            },
-            error: function(response) {
-                alert("Failed to update AOI: " + response.statusText);
-            }
         });
     });
 }
-
 $('#minEventDuration').change(function() {
-	$.ajax({
-		type: "POST",
-		url: "settings",
-		contentType: 'application/json',
-		data: JSON.stringify({ "minEventDuration": parseInt($(this).val()) }),
-		success: function(response) {
-			console.log("Settings updated successfully");
-		},
-		error: function(response) {
-			alert("Failed to update setting: " + response.statusText);
-		}
-	});
+    $.ajax({
+        type: "POST",
+        url: "settings",
+        contentType: 'application/json',
+        data: JSON.stringify({ "minEventDuration": parseInt($(this).val()) }),
+    });
 });
-
 $('#prioritize').change(function() {
     $.ajax({
         type: "POST",
         url: "settings",
         contentType: 'application/json',
         data: JSON.stringify({ "prioritize": $(this).val() }),
-        success: function(response) {
-            console.log("Prioritize setting updated successfully");
-        },
-        error: function(response) {
-            alert("Failed to update setting: " + response.statusText);
-        }
     });
 });
-
 $("#menu-toggle").click(function(e) {
-	e.preventDefault();
-	$("#wrapper").toggleClass("toggled");
+    e.preventDefault();
+    $("#wrapper").toggleClass("toggled");
 });
-
 </script>
 </body>
-
 </html>

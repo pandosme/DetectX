@@ -153,7 +153,7 @@ var viewWidth = 800;
 var viewHeight = 450;
 var inferenceTimer = 0;
 var imgAreaSelectInstance = null;
-var selectionMode = "aoi";
+var selectionMode = "";
 var setupComplete = false;
 		
 $(document).ready(function() {
@@ -352,7 +352,7 @@ function initializePage() {
 
 function SetupView(aspect) {
 	switch (aspect) {
-		case '4:3': viewWidth = 800; viewHeight = 600; videoWidth = 800; videoHeight = 600; imageWidth = 800; imageHeight = 600; break;
+		case '4:3': viewWidth = 800; viewHeight = 600; videoWidth = 1920; videoHeight = 1440; imageWidth = 800; imageHeight = 600; break;
 		case '16:9':viewWidth = 800; viewHeight = 450; videoWidth = 1280; videoHeight = 720; imageWidth = 800; imageHeight = 450; break;
 		case '1:1': viewWidth = 450; viewHeight = 450; videoWidth = 640; videoHeight = 640; imageWidth = 640; imageHeight = 640; break;
 		case '16:10': videoWidth = 800; videoHeight = 500; imageWidth = 800; imageHeight = 500; break;
@@ -367,7 +367,7 @@ function SetupView(aspect) {
 	var secureConnection = "";
 	if (location.protocol === 'https:')
 		secureConnection = "secure=true"
-	var player = '<media-stream-player hostname="' + window.location.hostname + '" ' + secureConnection + '  format="RTP_H264" compression="40" audio="0" resolution="' + imageWidth + 'x' + imageHeight + '" variant="basic" autoplay></media-stream-player>';
+	var player = '<media-stream-player hostname="' + window.location.hostname + '" ' + secureConnection + '  format="RTP_H264" compression="40" audio="0" resolution="' + videoWidth + 'x' + videoHeight + '" variant="basic" autoplay></media-stream-player>';
 	$("#video").append(player);
 	setupComplete = true;
 }

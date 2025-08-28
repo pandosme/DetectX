@@ -316,7 +316,7 @@ int main(void) {
 		return 1;
 	}
 
-	Setup_SD_Card();
+//	Setup_SD_Card();
 
 	eventLabelCounter = cJSON_CreateObject();
 
