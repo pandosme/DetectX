@@ -1,117 +1,234 @@
-# DetectX  - Default COCO
+# DetectX
 
 Run custom trained data models.  This package includes MobileNet SSD COCO model.  The idea is to replace this model with your own.  
 Please read [Train-Build.md](https://github.com/pandosme/DetectX/blob/main/Train-Build.md) to understand how to train and build the package.
 
-## [Download and test a pre-compiled version for ARTPEC8/9 running the COCO SSD Dataset](https://www.dropbox.com/scl/fi/543nxhnorpu0f9nbv3emh/DetectX_COCO.zip?rlkey=0zux5f3z9aimt6lqghi75kxix&dl=1)
 
-# Pre-requsite
-- Axis Camera based on ARTPEC-8 or ARTPEC-9
-- Linux PC
-  * GIT installed
-  * Python installed
-  * Conda installed
-- Preferebly a GPU  
-  As refernece, training with a GPU that takes 15 minutes may take 10 hours on a CPU
+***
 
-# User interface
-The user interface is designed to validate detection and apply various filters.
+# DetectX User & Integration Guide
 
-## Detections
-The 10 latest detections is shown in video as bounding box and table.  The events are shown in a separate table.
+***
 
-### Confidence
-Initial filter to reduce the number of false detection. 
+## DetectX Model Overview
 
-### Set Area of Intrest
-Additional filter to reduce the number of false detection. Click button and use mouse to define an area that the center of the detection must be within.
+DetectX is a versatile ACAP (Axis Camera Application Platform) for on-camera, real-time object detection, supporting various detection tasks depending on the bundled model.  
 
-### Set Minimum Size
-Additional filter to reduce the number of false detection. Click button and use mouse to define a minimum width and height that the detection must have.
+Below are model-specific details relevant to the generic "COCO" demo:
 
-## MQTT
-Configure the MQTT Broker to connect to.  
-Properties names name & location are properties targeting systems with many devices in order to identify who sent the message.
-### Topics & Payload
-The coordinate system is relative [0..1000][0..1000] regardless of resolution and aspect ratio.  The origo is in the top-left corner.  
+| **Variant**    | **Dataset** | **Labels**                   | **ARTPEC-8**<br>(Small) | **ARTPEC-9**<br>(Medium) |
+|----------------|-------------|------------------------------|------------------------|--------------------------|
+| DetectX COCO   | COCO        | person, bicycle, car, motorcycle, airplane, bus, train, truck, boat, traffic light, fire hydrant, stop sign, parking meter, bench, bird, cat, dog, horse, sheep, cow, elephant, bear, zebra, giraffe, backpack, umbrella, handbag, tie, suitcase, frisbee, skis, snowboard, sports ball, kite, baseball bat, baseball glove, skateboard, surfboard, tennis racket, bottle, wine glass, cup, fork, knife, spoon, bowl, banana, apple, sandwich, orange, broccoli, carrot, hot dog, pizza, donut, cake, chair, couch, potted plant, bed, dining table, toilet, TV, laptop, mouse, remote, keyboard, cell phone, microwave, oven, toaster, sink, refrigerator, book, clock, vase, scissors, teddy bear, hair drier, toothbrush | Model input: **960** |  |
 
-**Detections**  
-[pretopic]/detection  
-```
+*Note: ARTPEC-8 and ARTPEC-9 are Axis camera chipset platforms, with ARTPEC-9 offering enhanced performance and the ability to process larger images for improved detection quality.*
+
+***
+
+## Application Overview
+
+DetectX provides real-time detection and state data from network cameras directly to your systems. **Intended for system integrators**, all outputs are designed for machine-to-machine (M2M) workflows, with flexible configuration from a built-in web UI and standards-based output via MQTT, ONVIF, or HTTP.
+
+Typical use cases include:
+- Vehicle and person detection in perimeter security
+- Counting and presence analytics
+- Intelligence enrichment for video management systems (VMS) or IoT platforms
+
+***
+
+## Menu & Feature Walkthrough
+
+Each menu item below describes both *user options* and *integration outputs*, matched to the associated interface screenshot for easy visual orientation.
+
+***
+
+### 1. Detections
+
+Allows you to see object detections overlayed on the video, and to adjust detection parameters.
+
+<img src="pictures/Detections.jpg" alt="Detections Page" width="500"/>
+
+- **Adjust Confidence Threshold:**  
+  Set the minimum confidence (0–100) for labeling a detection as valid.
+- **Set Area of Interest (AOI):**  
+  Drag and resize a region to receive detections from only a selected area of the scene.
+- **Configure Minimum Object Size:**  
+  Exclude detections smaller than the specified pixel area.
+
+**Visualization Notes:**
+- The overlay updates approximately two times per second (“best effort”). The bounding boxes may lag or not exactly match all detections due to UI and network constraints.
+- Use this page for *quick confirmation* that detection is working and properly tuned.
+
+***
+
+### 2. MQTT
+
+Here you configure the gateway between the camera and your backend system.
+
+<img src="pictures/MQTT.jpg" alt="MQTT Page" width="500"/>
+
+- **Broker Address and Port:**  
+  Specify the IP or hostname for your MQTT broker and port (default: 1883).
+- **Authentication:**  
+  Optional username and password if security is enforced.
+- **Pre-topic:**  
+  The prefix added to all MQTT topics (e.g., `detectx/detection/...`). Change if routing multiple cameras.
+- **Additional Metadata:**  
+  *Name* and *Location* properties help you distinguish events in multi-camera setups.
+
+**Connection Status** is displayed, along with currently active parameters for fast troubleshooting.
+
+***
+
+### 3. Events/Labels
+
+This section allows you to tailor detection and event signaling to your application:
+
+<img src="pictures/Detection-Export.jpg" alt="Detection Export Page" width="500"/>
+
+- **Selectable Labels:**  
+  Check or uncheck which object types (labels) are actively processed, reducing false positives or narrowing the scope (e.g., only cars and persons).
+- **Event State Settings:**  
+  - *Prioritize*: Opt for accuracy (suppresses false triggers) or responsiveness.
+  - *Minimum Event State Duration*: Avoid chattering by forcing a minimum active/inactive state period for each label.
+
+**Note:**  
+Each label produces an independent event state. Tuning event parameters is crucial for noisy or high-traffic scenes.
+
+***
+
+### 4. Detection Export
+
+When downstream systems require not only detection data but *cropped images* for each detection:
+
+<img src="pictures/Detection-Export.jpg" alt="Detection Export Page" width="500"/>
+
+- **Enable/Disable Detection Cropping**
+- **Set Border Adjustment:**  
+  Expand or shrink the crop region around detected objects (e.g., add 25px margin).
+- **Output Methods:**  
+  - **MQTT:** Sends cropped images as base64 payloads.
+  - **HTTP POST:** Posts the payload to a configurable endpoint.
+- **Throttle Output:**  
+  Limit image frequency to reduce load or network traffic.
+
+#### View the Latest Crops
+<img src="pictures/crops.jpg" alt="Crops Gallery" width="600"/>
+- Opens a gallery of up to 10 most recent image crops, labeled by type and confidence.
+- Essential for quality assurance—check that crops are readable, in correct locations, and correspond to real detections.
+
+***
+
+### 5. About
+
+<img src="pictures/About.jpg" alt="About Page" width="480"/>
+
+A dashboard combining:
+- **Model Status:** Input size, inference time, DLPU backend, and status.
+- **Device Details:** Camera type, firmware, serial, CPU & network usage.
+- **MQTT Status:** Broker and topic configuration, connection health.
+- **Application Info:** Name, version, vendor, support/documentation link.
+
+Use this page as your *first check* when troubleshooting or confirming installation.
+
+***
+
+## Integration & Payload Examples
+
+DetectX delivers three primary payload types, all enrichable with the configured device name, location, and serial for easy association in your backend systems.
+
+### 1. Detection (Bounding Box) on MQTT
+
+**Topic:**  
+`detectx/detection/<serial>`
+
+**Example Payload:**
+```json
 {
-	"detections":[
-		{"label":"car","c":50,"x":530,"y":146,"w":46,"h":50,"timestamp":1734820170032},
-		{"label":"car","c":69,"x":222,"y":203,"w":150,"h":96,"timestamp":1734820170032}
-	],
-	"name":"Parking 3",
-	"location":"Site 4"
+  "detections": [
+    {
+      "label": "car",
+      "c": 77,
+      "x": 274,
+      "y": 224,
+      "w": 180,
+      "h": 104,
+      "timestamp": 1756453942980,
+      "refId": 260
+    }
+  ],
+  "name": "Front",
+  "location": "",
+  "serial": "B8A44F3024BB"
 }
 ```
-**Events**  
-[pretopic]/event/B8A44F000000/car/true  
-```
+
+***
+
+### 2. Event State on MQTT or ONVIF
+
+**Topic:**  
+`detectx/event/<serial>/<label>/<state>`
+
+**Example Payload:**
+```json
 {
-	"state": true,
-	"label": "car",
-	"c": 50,
-	"x": 530,
-	"y": 146,
-	"w": 46,
-	"h": 50,
-	"timestamp": 1734820051124,
-	"name":"Parking 3",
-	"location":"Site 4"
-}
-```
-[pretopic]/event/B8A44F000000/car/false  
-```
-{
-	"label": "car",
-	"state": false,
-	"timestamp": 1734820051124,
-	"name":"Parking 3",
-	"location":"Site 4"
+  "label": "car",
+  "state": false,
+  "timestamp": 1756453946184,
+  "name": "Front",
+  "location": "",
+  "serial": "B8A44F3024BB"
 }
 ```
 
-## Advanced
-Additional filters to apply on the detection and output.
+***
 
-### Detection transition
-A minumum time that the detection must be stable before an event is fired.  It define how trigger-happy the evant shall be.
+### 3. Detection Crop Image
 
-### Min event state duration
-The minumum event duration a detection may have.  
+**MQTT/HTTP Topic or POST:**  
+`detectx/crop/<serial>`
 
-### Labels Processed
-Enable or disable selected gestures.
+**Example Payload:**
+```json
+{
+  "label": "truck",
+  "timestamp": 1756454378759,
+  "confidence": 47,
+  "x": 25,
+  "y": 25,
+  "w": 218,
+  "h": 106,
+  "image": "/9j/4AAQSk...",  // JPEG in Base64
+  "name": "Front",
+  "location": "",
+  "serial": "B8A44F3024BB"
+}
+```
 
-## Integration
-The service fires two different events targeting different use cases.  Service may monitor these event using camera event syste, ONVIF event stream and MQTT.
-## Label state
-A stateful event (high/low) for each detected label.
+***
 
-# History
+## System Integrator Tips
 
-### 3.5.1 Aug 28, 2025
-- Updated user interface
-- Fixed view of cropped images
+- **Start with the About page** to confirm firmware, model, and MQTT status before field adjustments.
+- Use Detection and Crops pages for rapid troubleshooting—verify detections visually before integrating triggers or actions.
+- Use unique device names/locations in MQTT setup for scalable multi-camera deployments.
+- Adjust event suppression and AOI settings based on site/scene context for best accuracy.
 
-### 3.5.0 Jul 23, 2025
-#### New Features
-- **Export of Cropped Detection Images**
-  - Enables building two-stage detection and analytics workflows, where the camera generates rough detections and exports cropped images for advanced processing by LLMs or other AI/image analytics services.
-  - Simplifies dataset expansion and refinement by automatically generating pre-labeled cropped images to be stored for training or analysis.
-  **Highlights:**
-  - Supports both **MQTT** and **HTTP** output for flexible integration.
-  - Optional border padding on cropped images (top, left, bottom, right) for context preservation.
-  - Built-in visual inspection page to review the latest detected images directly.
-  - Configurable export throttling to prevent bursts and control image delivery rate.
-#### Improvements
-- **MQTT Stability**
-  - Enhanced MQTT handling for more reliable connection and seamless reconnection in dynamic network environments.
+***
 
-This release further streamlines integration with external analytics tools and enhances the stability and flexibility of detection event exports.
+## Troubleshooting & Support
+
+- If bounding boxes do not appear but the model status is OK, check confidence, AOI, and MQTT broker configuration.
+- If crop images are misaligned or cut-off, adjust crop borders and AOI, validating via the “View the latest crops” gallery.
+- Monitor CPU and network on the About page to avoid overload (especially on ARTPEC-8 devices).
+
+***
+
+### 3.5.1	Aug 29, 2025
+- Added Detection Export
+- Updated GUI
+- MQTT improvements
+
 
 ### 3.4.0	May 14, 2025
 - MQTT Cleanup

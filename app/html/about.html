@@ -212,8 +212,14 @@ $(document).ready(function() {
 					inference = App.status.model.averageTime.toString();
 				$('.averageInference').text(inference);
 				$('.mqttStatus').text(data.mqtt.status);
-				$('.cpuLoad').text(parseInt(data.device.cpu * 100));
-				$('.bandwidth').text(formatBandwidth(data.device.network));
+				if( data.device.cpu )
+					$('.cpuLoad').text(parseInt(data.device.cpu * 100));
+				else
+					$('.cpuLoad').text('-');
+				if( data.device.network )
+					$('.bandwidth').text(formatBandwidth(data.device.network));
+				else
+					$('.bandwidth').text('-');
 			},
 			error() {
 				$('#model_status').text('Status: No response');
