@@ -45,7 +45,7 @@ Each menu item below describes both *user options* and *integration outputs*, ma
 
 Allows you to see object detections overlayed on the video, and to adjust detection parameters.
 
-<img src="pictures/Detections.jpg" alt="Detections Page" width="500"/>
+<img src="pictures/Detections.jpeg" alt="Detections Page" width="500"/>
 
 - **Adjust Confidence Threshold:**  
   Set the minimum confidence (0–100) for labeling a detection as valid.
@@ -305,6 +305,7 @@ DetectX delivers three primary payload types, all enrichable with the configured
 
 ### 1.0.0	September 5, 2024
 - Initial commit
+
 
 
 
