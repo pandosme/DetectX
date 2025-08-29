@@ -16,9 +16,9 @@ DetectX is a versatile ACAP (Axis Camera Application Platform) for on-camera, re
 
 Below are model-specific details relevant to the generic "COCO" demo:
 
-| **Variant**    | **Dataset** | **Labels**                   | **ARTPEC-8**<br>(Small) | **ARTPEC-9**<br>(Medium) |
+| **Variant**    | **Dataset** | **Labels**                   | **ARTPEC-8** | **ARTPEC-9** |
 |----------------|-------------|------------------------------|------------------------|--------------------------|
-| DetectX COCO   | COCO        | person, bicycle, car, motorcycle, airplane, bus, train, truck, boat, traffic light, fire hydrant, stop sign, parking meter, bench, bird, cat, dog, horse, sheep, cow, elephant, bear, zebra, giraffe, backpack, umbrella, handbag, tie, suitcase, frisbee, skis, snowboard, sports ball, kite, baseball bat, baseball glove, skateboard, surfboard, tennis racket, bottle, wine glass, cup, fork, knife, spoon, bowl, banana, apple, sandwich, orange, broccoli, carrot, hot dog, pizza, donut, cake, chair, couch, potted plant, bed, dining table, toilet, TV, laptop, mouse, remote, keyboard, cell phone, microwave, oven, toaster, sink, refrigerator, book, clock, vase, scissors, teddy bear, hair drier, toothbrush | Model input: **960** |  |
+| DetectX COCO   | COCO        | person, bicycle, car, motorcycle, airplane, bus, train, truck, boat, traffic light, fire hydrant, stop sign, parking meter, bench, bird, cat, dog, horse, sheep, cow, elephant, bear, zebra, giraffe, backpack, umbrella, handbag, tie, suitcase, frisbee, skis, snowboard, sports ball, kite, baseball bat, baseball glove, skateboard, surfboard, tennis racket, bottle, wine glass, cup, fork, knife, spoon, bowl, banana, apple, sandwich, orange, broccoli, carrot, hot dog, pizza, donut, cake, chair, couch, potted plant, bed, dining table, toilet, TV, laptop, mouse, remote, keyboard, cell phone, microwave, oven, toaster, sink, refrigerator, book, clock, vase, scissors, teddy bear, hair drier, toothbrush | Model input: **640**<br>Model size: Small | Model input: **640**<br>Model size: Small |
 
 *Note: ARTPEC-8 and ARTPEC-9 are Axis camera chipset platforms, with ARTPEC-9 offering enhanced performance and the ability to process larger images for improved detection quality.*
 
@@ -83,7 +83,7 @@ Here you configure the gateway between the camera and your backend system.
 
 This section allows you to tailor detection and event signaling to your application:
 
-<img src="pictures/Detection-Export.jpg" alt="Detection Export Page" width="500"/>
+<img src="pictures/Evenst_Labels.jpg" alt="Detection Export Page" width="500"/>
 
 - **Selectable Labels:**  
   Check or uncheck which object types (labels) are actively processed, reducing false positives or narrowing the scope (e.g., only cars and persons).
@@ -305,6 +305,7 @@ DetectX delivers three primary payload types, all enrichable with the configured
 
 ### 1.0.0	September 5, 2024
 - Initial commit
+
 
 
 
