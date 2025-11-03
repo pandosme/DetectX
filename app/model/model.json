@@ -12,7 +12,7 @@
   "videoWidth": 800,
   "videoHeight": 600,
   "videoAspect": "4:3",
-  "chip": "a9-dlpu-tflite",
+  "chip": "axis-a8-dlpu-tflite",
   "labels": [
     "person",
     "bicycle",

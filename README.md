@@ -224,6 +224,9 @@ DetectX delivers three primary payload types, all enrichable with the configured
 
 ***
 
+## 3.5.2       Aug 29, 2025
+- Fixed "black-box-video" shown on selected cameras
+
 ### 3.5.1	Aug 29, 2025
 - Added Detection Export
 - Updated GUI
