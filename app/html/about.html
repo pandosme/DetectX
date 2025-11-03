@@ -156,7 +156,7 @@ $(document).ready(function() {
 			$('.model').text(data.device.model);
 			$('.firmware').text(data.device.firmware);
 			if( data.status.device.cpu )
-				$('.cpuLoad').text(parseInt(data.status.device.cpu * 100));
+				$('.cpuLoad').text(parseInt(data.status.device.cpu * 50));
 			else
 				$('.cpuLoad').text('-');
 			if( data.status.device.network )
@@ -213,7 +213,7 @@ $(document).ready(function() {
 				$('.averageInference').text(inference);
 				$('.mqttStatus').text(data.mqtt.status);
 				if( data.device.cpu )
-					$('.cpuLoad').text(parseInt(data.device.cpu * 100));
+					$('.cpuLoad').text(parseInt(data.device.cpu * 50));
 				else
 					$('.cpuLoad').text('-');
 				if( data.device.network )
