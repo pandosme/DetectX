@@ -133,7 +133,7 @@ void Output(cJSON* detections) {
     char topic[256];
     snprintf(topic, sizeof(topic), "detection/%s", ACAP_DEVICE_Prop("serial"));
     cJSON* mqttPayload = cJSON_CreateObject();
-    cJSON_AddItemReferenceToObject(mqttPayload, "detections", detections);
+    cJSON_AddItemToObject(mqttPayload, "detections", cJSON_Duplicate(detections, 1));
 
     if (cJSON_GetArraySize(detections)) {
         MQTT_Publish_JSON(topic, mqttPayload, 0, 0);
@@ -143,6 +143,7 @@ void Output(cJSON* detections) {
             MQTT_Publish_JSON(topic, mqttPayload, 0, 0);
         lastDetectionsWereEmpty = 1;
     }
+
     cJSON_Delete(mqttPayload);
 
     // --- Adaptive event gating

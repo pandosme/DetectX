@@ -223,6 +223,8 @@ DetectX delivers three primary payload types, all enrichable with the configured
 - Monitor CPU and network on the About page to avoid overload (especially on ARTPEC-8 devices).
 
 ***
+## 3.5.3	Nov 29, 2025
+- Fixed a memory leak
 
 ## 3.5.2       Aug 29, 2025
 - Fixed "black-box-video" shown on selected cameras

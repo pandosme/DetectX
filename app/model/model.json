@@ -1,6 +1,6 @@
 {
-  "modelWidth": 640,
-  "modelHeight": 640,
+  "modelWidth": 1440,
+  "modelHeight": 1440,
   "quant": 0.004190513398498297,
   "zeroPoint": 0,
   "boxes": 25200,
@@ -9,10 +9,10 @@
   "nms": 0.05,
   "path": "model/model.tflite",
   "scaleMode": 0,
-  "videoWidth": 800,
-  "videoHeight": 600,
+  "videoWidth": 1920,
+  "videoHeight": 1440,
   "videoAspect": "4:3",
-  "chip": "axis-a8-dlpu-tflite",
+  "chip": "a9-dlpu-tflite",
   "labels": [
     "person",
     "bicycle",
