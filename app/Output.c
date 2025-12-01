@@ -1,11 +1,3 @@
-/**
- * @file output.c
- * @brief Central orchestrator for detection output, event logic, API endpoints.
- *
- * Implements detection reporting, HTTP/MQTT/SD export, and per-label event gating
- * with rolling-window or immediate logic depending on "prioritize" setting.
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,10 +16,8 @@
 #include "Output_helpers.h"
 #include "Output_http.h"
 
-
 #define LOG(fmt, args...)      { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args);}
 #define LOG_WARN(fmt, args...) { syslog(LOG_WARNING, fmt, ## args); printf(fmt, ## args);}
-//#define LOG_TRACE(fmt, args...) { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args);}
 #define LOG_TRACE(fmt, args...) {}
 
 #define MAX_LABELS 32
@@ -38,10 +28,10 @@
 typedef struct {
     char name[64];
     int state; // 0=LOW, 1=HIGH
-    int rolling[MAX_ROLLING];   // For accuracy mode: 1=detected, 0=not in most recent frame, ringbuffer
+    int rolling[MAX_ROLLING];
     int rolling_head;
-    int rolling_count;          // How much of rolling[] is in use ( <= window_size)
-    double last_detect_time;    // ms
+    int rolling_count;
+    double last_detect_time;
 } LabelEventState;
 
 static LabelEventState eventsCache[MAX_LABELS];
@@ -49,7 +39,7 @@ static int eventsCache_len = 0;
 static int lastDetectionsWereEmpty = 0;
 static double last_output_time_ms = 0;
 
-// --------- Helper: manage per-label state ---------
+// Helper: manage per-label state
 static LabelEventState* find_or_create_label_state(const char* label) {
     for (int i = 0; i < eventsCache_len; ++i)
         if (strcmp(eventsCache[i].name, label) == 0)
@@ -69,11 +59,11 @@ static LabelEventState* find_or_create_label_state(const char* label) {
 
 static gboolean Output_DeactivateExpired(gpointer user_data) {
     double now = ACAP_DEVICE_Timestamp();
-	cJSON* settings = ACAP_Get_Config("settings");
-	if(!settings)
-		return TRUE;
+    cJSON* settings = ACAP_Get_Config("settings");
+    if(!settings)
+        return TRUE;
     double minEventDuration = cJSON_GetObjectItem(settings,"minEventDuration")?cJSON_GetObjectItem(settings,"minEventDuration")->valuedouble:3000;
-	
+
     char topic[256];
     for (int i = 0; i < eventsCache_len; ++i) {
         if (eventsCache[i].state == 1) {
@@ -92,22 +82,24 @@ static gboolean Output_DeactivateExpired(gpointer user_data) {
             }
         }
     }
-	return TRUE;
+    return TRUE;
 }
 
-int lastDetectionsWhereEmpty = 0;
-
-// --------- Main output function (with rolling logic) ---------
 void Output(cJSON* detections) {
     if (!detections || cJSON_GetArraySize(detections) == 0) {
-		ACAP_STATUS_SetObject("labels", "detections", cJSON_CreateArray());
+        cJSON* emptyArr = cJSON_CreateArray();
+        ACAP_STATUS_SetObject("labels", "detections", emptyArr);
+        cJSON_Delete(emptyArr);
         return;
-	}
+    }
 
     LOG_TRACE("<%s %d\n", __func__, cJSON_GetArraySize(detections));
 
-    // Export current detections to status
-    ACAP_STATUS_SetObject("labels", "detections", detections);
+    // Export current detections to status (DUPLICATE for safety)
+    cJSON* statusDup = cJSON_Duplicate(detections, 1);
+    ACAP_STATUS_SetObject("labels", "detections", statusDup);
+    cJSON_Delete(statusDup);
+
     double now = ACAP_DEVICE_Timestamp();
 
     cJSON* settings = ACAP_Get_Config("settings");
@@ -135,35 +127,27 @@ void Output(cJSON* detections) {
     cJSON* mqttPayload = cJSON_CreateObject();
     cJSON_AddItemToObject(mqttPayload, "detections", cJSON_Duplicate(detections, 1));
 
-    if (cJSON_GetArraySize(detections)) {
-        MQTT_Publish_JSON(topic, mqttPayload, 0, 0);
-        lastDetectionsWereEmpty = 0;
-    } else {
-        if (!lastDetectionsWereEmpty)
-            MQTT_Publish_JSON(topic, mqttPayload, 0, 0);
-        lastDetectionsWereEmpty = 1;
-    }
-
+    MQTT_Publish_JSON(topic, mqttPayload, 0, 0);
     cJSON_Delete(mqttPayload);
+    lastDetectionsWereEmpty = (cJSON_GetArraySize(detections) == 0);
 
     // --- Adaptive event gating
     const char *prioritize = cJSON_GetObjectItem(settings, "prioritize")?cJSON_GetObjectItem(settings, "prioritize")->valuestring:"accuracy";
 
-    double averageInferenceTime = ACAP_STATUS_Double("mode", "averageTime"); // ms
-    int   desired_window_ms = 1000;              // 1 second rolling window for accuracy mode
-    int   min_frames_in_window = 3;              // Default: 3 detections needed
+    double averageInferenceTime = ACAP_STATUS_Double("mode", "averageTime");
+    int   desired_window_ms = 1000;
+    int   min_frames_in_window = 3;
     int   window_size = (int)((desired_window_ms + averageInferenceTime - 1) / averageInferenceTime);
     if (window_size < 2) window_size = 2;
     if (window_size > MAX_ROLLING) window_size = MAX_ROLLING;
 
-    // allow overrides (future: from JSON)
     cJSON* logic = cJSON_GetObjectItem(settings, "eventLogic");
     if (logic) {
         if (cJSON_GetObjectItem(logic, "frames")) min_frames_in_window = cJSON_GetObjectItem(logic, "frames")->valueint;
         if (cJSON_GetObjectItem(logic, "window")) desired_window_ms = cJSON_GetObjectItem(logic, "window")->valueint;
     }
 
-    // --- Cropping settings ---
+    // Cropping settings
     int leftborder_offset   = cropping && cJSON_GetObjectItem(cropping, "leftborder") ?
                                 cJSON_GetObjectItem(cropping, "leftborder")->valueint : 0;
     int rightborder_offset  = cropping && cJSON_GetObjectItem(cropping, "rightborder") ?
@@ -173,11 +157,8 @@ void Output(cJSON* detections) {
     int bottomborder_offset = cropping && cJSON_GetObjectItem(cropping, "bottomborder") ?
                                 cJSON_GetObjectItem(cropping, "bottomborder")->valueint : 0;
 
-    // --- Per-detection logic ---
     int idx = 0;
     cJSON* detection = detections->child;
-
-    // -- Track which labels were present in this frame
     char frame_labels[MAX_LABELS][64];
     int n_frame_labels = 0;
 
@@ -185,45 +166,45 @@ void Output(cJSON* detections) {
         const char* label = "Undefined";
         int conf = 0;
         double timestamp = now;
-		cJSON* labelObj;
+        cJSON* labelObj;
         if ((labelObj = cJSON_GetObjectItem(detection, "label")))
             if (cJSON_IsString(labelObj)) label = labelObj->valuestring;
-		cJSON* confObj;
+        cJSON* confObj;
         if ((confObj = cJSON_GetObjectItem(detection, "c")))
             if (cJSON_IsNumber(confObj)) conf = confObj->valueint;
-		cJSON* timestampObj;
+        cJSON* timestampObj;
         if ((timestampObj = cJSON_GetObjectItem(detection, "timestamp")))
             if (cJSON_IsNumber(timestampObj)) timestamp = timestampObj->valuedouble;
 
-        // Store this label for present frame (for non-detected tracking)
         if (n_frame_labels < MAX_LABELS) {
             strncpy(frame_labels[n_frame_labels++], label, 63);
             frame_labels[n_frame_labels - 1][63] = 0;
         }
 
-        // --------- Event Gating: Speed/Accuracy mode ----------
         LabelEventState* evt = find_or_create_label_state(label);
         if (!evt) { idx++; detection = detection->next; continue; }
+
         if (strcmp(prioritize, "speed") == 0) {
-            // Immediate HIGH on any detection, LOW handled below (minEventDuration)
             if (evt->state == 0) {
                 evt->state = 1;
                 evt->last_detect_time = now;
                 ACAP_EVENTS_Fire_State(label, 1);
                 snprintf(topic, sizeof(topic), "event/%s/%s/true", ACAP_DEVICE_Prop("serial"), label);
-                cJSON_AddTrueToObject(detection, "state");
-                MQTT_Publish_JSON(topic, detection, 0, 0);
+
+                // Create temp object for event
+                cJSON* eventPayload = cJSON_Duplicate(detection, 1);
+                cJSON_AddTrueToObject(eventPayload, "state");
+                MQTT_Publish_JSON(topic, eventPayload, 0, 0);
+                cJSON_Delete(eventPayload);
             } else {
                 evt->last_detect_time = now;
             }
         } else {
-            // Accuracy mode: Rolling window
             evt->rolling_head = (evt->rolling_head + 1) % window_size;
             evt->rolling[evt->rolling_head] = 1;
             if (evt->rolling_count < window_size) evt->rolling_count++;
             evt->last_detect_time = now;
 
-            // Will mark 0 for non-detected labels below
             int sum = 0;
             for (int i = 0; i < evt->rolling_count; ++i)
                 sum += evt->rolling[i];
@@ -232,14 +213,17 @@ void Output(cJSON* detections) {
                 evt->last_detect_time = now;
                 ACAP_EVENTS_Fire_State(label, 1);
                 snprintf(topic, sizeof(topic), "event/%s/%s/true", ACAP_DEVICE_Prop("serial"), label);
-                cJSON_AddTrueToObject(detection, "state");
-                MQTT_Publish_JSON(topic, detection, 0, 0);
+
+                // Create temp object for event
+                cJSON* eventPayload = cJSON_Duplicate(detection, 1);
+                cJSON_AddTrueToObject(eventPayload, "state");
+                MQTT_Publish_JSON(topic, eventPayload, 0, 0);
+                cJSON_Delete(eventPayload);
             }
             if (evt->state == 1) evt->last_detect_time = now;
         }
 
-
-        // --- Cropping output path ---
+        // Cropping output path
         if (cropping_active) {
             int crop_x = 0, crop_y = 0, crop_w = 0, crop_h = 0, img_w = 0, img_h = 0;
             unsigned jpeg_size = 0;
@@ -248,24 +232,19 @@ void Output(cJSON* detections) {
                                    &crop_x, &crop_y, &crop_w, &crop_h,
                                    &img_w, &img_h);
 
-            // Apply border offsets if available
             crop_x = leftborder_offset;
             crop_y = topborder_offset;
             crop_w = img_w - leftborder_offset - rightborder_offset;
             crop_h = img_h - topborder_offset - bottomborder_offset;
 
-            // Cache for HTTP crop API
-            const char* imageDataBase64 = NULL;
-            if (jpeg_data && jpeg_size > 0) {
-                imageDataBase64 = output_crop_cache_add(
-                    jpeg_data, jpeg_size, label, conf, crop_x, crop_y, crop_w, crop_h);
-            }
+            // NOTE: Implement cache eviction in output_crop_cache_add for safety
+            const char* imageDataBase64 = output_crop_cache_add(
+                jpeg_data, jpeg_size, label, conf, crop_x, crop_y, crop_w, crop_h);
 
             double now_ts = ACAP_DEVICE_Timestamp();
             if (imageDataBase64 && now_ts - last_output_time_ms > throttle) {
                 last_output_time_ms = now_ts;
 
-                // --- SD Card Export ----
                 if (sdcard_enable) {
                     char safe_label[64];
                     strncpy(safe_label, label, sizeof(safe_label) - 1);
@@ -274,9 +253,9 @@ void Output(cJSON* detections) {
 
                     char fname_img[256], fname_label[256];
                     snprintf(fname_img, sizeof(fname_img), "%s/crop_%s_%.0f_%d.jpg",
-                             SD_FOLDER, safe_label, timestamp, idx);
+                            SD_FOLDER, safe_label, timestamp, idx);
                     snprintf(fname_label, sizeof(fname_label), "%s/crop_%s_%.0f_%d.txt",
-                             SD_FOLDER, safe_label, timestamp, idx);
+                            SD_FOLDER, safe_label, timestamp, idx);
 
                     if (save_jpeg_to_file(fname_img, jpeg_data, jpeg_size)) {
                         if (save_label_to_file(fname_label, label, crop_x, crop_y, crop_w, crop_h)) {
@@ -289,7 +268,7 @@ void Output(cJSON* detections) {
                     }
                 }
 
-                // --- MQTT and HTTP Export ----
+                // MQTT and HTTP Export
                 if (mqtt_export || http_export) {
                     cJSON* payload = cJSON_CreateObject();
                     cJSON_AddStringToObject(payload, "label", label);
@@ -309,19 +288,18 @@ void Output(cJSON* detections) {
                     if (http_export) {
                         cJSON_AddStringToObject(payload, "serial", ACAP_DEVICE_Prop("serial"));
                         const char* url = cJSON_GetObjectItem(cropping, "http_url") ?
-                                          cJSON_GetObjectItem(cropping, "http_url")->valuestring : NULL;
+                                        cJSON_GetObjectItem(cropping, "http_url")->valuestring : NULL;
                         const char* authentication = cJSON_GetObjectItem(cropping, "http_auth") ?
-                                                     cJSON_GetObjectItem(cropping, "http_auth")->valuestring : "none";
+                                                    cJSON_GetObjectItem(cropping, "http_auth")->valuestring : "none";
                         const char* username = cJSON_GetObjectItem(cropping, "http_username") ?
-                                               cJSON_GetObjectItem(cropping, "http_username")->valuestring : NULL;
+                                            cJSON_GetObjectItem(cropping, "http_username")->valuestring : NULL;
                         const char* password = cJSON_GetObjectItem(cropping, "http_password") ?
-                                               cJSON_GetObjectItem(cropping, "http_password")->valuestring : NULL;
+                                            cJSON_GetObjectItem(cropping, "http_password")->valuestring : NULL;
                         const char* token = cJSON_GetObjectItem(cropping, "http_token") ?
                                             cJSON_GetObjectItem(cropping, "http_token")->valuestring : NULL;
 
                         if (url && url[0] != 0) {
-                            int http_ok = output_http_post_json(url, payload,
-                                authentication, username, password, token);
+                            int http_ok = output_http_post_json(url, payload, authentication, username, password, token);
                             if (!http_ok) {
                                 LOG_WARN("HTTP POST failed: %s\n", url);
                             }
@@ -332,13 +310,12 @@ void Output(cJSON* detections) {
                     cJSON_Delete(payload);
                 }
             }
-        } // end cropping_active
-
+        }
         idx++;
         detection = detection->next;
-    } // end detection loop
+    }
 
-    // -- For all labels that did NOT occur this frame, roll in 0 (for accuracy, not speed)
+    // Mark 0 for non-detected labels for rolling buffer
     if (strcmp(prioritize, "accuracy") == 0) {
         for (int i = 0; i < eventsCache_len; ++i) {
             int seen = 0;
@@ -348,7 +325,6 @@ void Output(cJSON* detections) {
                 eventsCache[i].rolling_head = (eventsCache[i].rolling_head + 1) % window_size;
                 eventsCache[i].rolling[eventsCache[i].rolling_head] = 0;
                 if (eventsCache[i].rolling_count < window_size) eventsCache[i].rolling_count++;
-                // do NOT update last_detect_time here, only on real detection
             }
         }
     }
@@ -356,7 +332,7 @@ void Output(cJSON* detections) {
     LOG_TRACE("%s>\n", __func__);
 }
 
-// --- Reset: Clear all timers/state/crop API/eventsCache ---
+// Reset all state/crop API/eventsCache
 void Output_reset(void) {
     LOG_TRACE("<%s\n", __func__);
     eventsCache_len = 0;
@@ -366,7 +342,7 @@ void Output_reset(void) {
     LOG_TRACE("%s>\n", __func__);
 }
 
-// --- Initialization: Register HTTP endpoint for crop API, register events in ACAP ---
+// Initialization
 void Output_init(void) {
     LOG_TRACE("<%s\n", __func__);
     ACAP_HTTP_Node("crops", output_crop_cache_http_callback);
@@ -396,6 +372,9 @@ void Output_init(void) {
         label = label->next;
     }
     output_crop_cache_reset();
-	g_timeout_add(200, Output_DeactivateExpired, NULL);	
+    g_timeout_add(200, Output_DeactivateExpired, NULL);
+
+    // Optionally: Cleanup crop cache every 5 minutes
+//    g_timeout_add_seconds(300, output_crop_cache_cleanup, NULL);
     LOG_TRACE("%s>\n", __func__);
 }
