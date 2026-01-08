@@ -25,17 +25,20 @@ The package is designed to minimize customization needs, encapsulating complexit
 
 ## Training Your Model
 
-To ensure the model is compatible with the camera, follow steps:
+To ensure the model is compatible with the camera, follow these steps for ARTPEC-9:
 
 ```bash
 git clone https://github.com/ultralytics/yolov5
 cd yolov5
 git checkout 95ebf68f92196975e53ebc7e971d0130432ad107
-curl -L https://acap-ml-model-storage.s3.amazonaws.com/yolov5/A9/yolov5-axis-A9.patch | git apply
+curl -L https://acap-ml-models.s3.amazonaws.com/yolov5/yolov5_artpec9.patch | git apply
 pip install -r requirements.txt
 ```
 
-More info found in [YOLOv5 on ARTPEC-8](https://github.com/AxisCommunications/axis-model-zoo/blob/main/docs/yolov5-on-artpec8.md)
+> [!NOTE]
+> For ARTPEC-8, use `https://acap-ml-models.s3.amazonaws.com/yolov5/yolov5_artpec8.patch`.
+
+*More info found in [YOLOv5 on Axis cameras](https://github.com/AxisCommunications/axis-model-zoo/blob/main/docs/yolov5.md).*
 
 Create a directory for images and label files.
 [Read more here on labels and training](https://docs.ultralytics.com/yolov5/tutorials/train_custom_data/).
