@@ -1,5 +1,5 @@
 PROG1   = detectx
-OBJS1   = main.c ACAP.c cJSON.c Model.c Video.c Output.c Output_crop_cache.c Output_helpers.c Output_http.c imgprovider.c imgutils.c MQTT.c CERTS.c
+OBJS1   = main.c ACAP.c cJSON.c Model.c Video.c Output.c Output_crop_cache.c Output_helpers.c Output_http.c imgprovider.c imgutils.c MQTT.c CERTS.c labelparse.c
 PROGS   = $(PROG1)
 LIBDIR  = lib
 INCDIR  = include
