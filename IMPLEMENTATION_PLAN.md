@@ -183,6 +183,8 @@ cJSON_AddNumberToObject(modelConfig, "modelWidth", modelWidth);
 cJSON_AddNumberToObject(modelConfig, "modelHeight", modelHeight);
 cJSON_AddNumberToObject(modelConfig, "videoWidth", videoWidth);
 cJSON_AddNumberToObject(modelConfig, "videoHeight", videoHeight);
+cJSON_AddStringToObject(modelConfig, "videoAspect", "4:3");  // For frontend/client
+cJSON_AddNumberToObject(modelConfig, "scaleMode", 0);  // 0 = Balanced mode
 cJSON_AddNumberToObject(modelConfig, "boxes", boxes);
 cJSON_AddNumberToObject(modelConfig, "classes", classes);
 cJSON_AddNumberToObject(modelConfig, "quant", quant);
