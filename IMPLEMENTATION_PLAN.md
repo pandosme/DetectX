@@ -51,9 +51,10 @@ if (larodModelFd < 0) {
     return 0;
 }
 
-// Determine chip from platform
-const char* chipString = "a9-dlpu-tflite";  // Default for ARTPEC-9
-// TODO: Could auto-detect from platform if needed
+// Determine chip - default to ARTPEC-8 (most common)
+const char* chipString = "axis-a8-dlpu-tflite";  // ARTPEC-8
+// For ARTPEC-9, this would be "a9-dlpu-tflite"
+// Could add runtime detection if supporting both platforms
 
 const larodDevice* device = larodGetDevice(conn, chipString, 0, &error);
 if (!device) {
@@ -256,6 +257,36 @@ To:
 ```bash
 git rm prepare.py
 ```
+
+## Platform Detection (Optional)
+
+If you need to support both ARTPEC-8 and ARTPEC-9 cameras, you can detect the platform:
+
+**Option 1: Try ARTPEC-8 first, fallback to ARTPEC-9**
+```c
+const char* chipString = "axis-a8-dlpu-tflite";
+const larodDevice* device = larodGetDevice(conn, chipString, 0, &error);
+if (!device) {
+    LOG("ARTPEC-8 not available, trying ARTPEC-9...\n");
+    larodClearError(&error);
+    chipString = "a9-dlpu-tflite";
+    device = larodGetDevice(conn, chipString, 0, &error);
+}
+if (!device) {
+    LOG_WARN("%s: Could not get device: %s\n", __func__, error->msg);
+    larodClearError(&error);
+    Model_Cleanup();
+    return 0;
+}
+```
+
+**Option 2: Read from system property**
+```c
+// Check /etc/soc or similar system file to determine platform
+// This would require additional system calls
+```
+
+For most deployments, defaulting to ARTPEC-8 is sufficient since it's the more common platform.
 
 ## Testing Checklist
 
