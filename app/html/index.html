@@ -1,125 +1,403 @@
 <!DOCTYPE html>
+<!-- DetectX v3.6.0 - Modern UI with Top Navigation -->
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Custom Model</title>
     <link rel="stylesheet" href="css/bootstrap.min.css">
-    <link rel="stylesheet" href="css/app.css">
+    <link rel="stylesheet" href="css/app.css?v=3.6.0">
     <link rel="stylesheet" href="css/imgareaselect-default.css">
     <script src="js/jquery-3.7.1.min.js"></script>
     <script src="js/bootstrap.bundle.min.js"></script>
     <script src="js/media-stream-player.min.js"></script>
     <script src="js/jquery.imgareaselect.js"></script>
-	
+
 <style>
+    :root {
+        --primary-color: #2563eb;
+        --primary-dark: #1e40af;
+        --primary-light: #3b82f6;
+        --success-color: #10b981;
+        --danger-color: #ef4444;
+        --warning-color: #f59e0b;
+        --info-color: #06b6d4;
+        --bg-light: #f8fafc;
+        --bg-white: #ffffff;
+        --text-dark: #1e293b;
+        --text-muted: #64748b;
+        --border-color: #e2e8f0;
+        --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    }
+
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        background-color: var(--bg-light);
+        color: var(--text-dark);
+    }
+
+    /* Top Navigation Bar */
+    .top-navbar {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+        box-shadow: var(--shadow-lg);
+        padding: 0;
+        min-height: 64px;
+    }
+
+    .navbar-brand {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: white !important;
+        padding: 0.75rem 1.5rem;
+    }
+
+    .nav-pills .nav-link {
+        color: rgba(255, 255, 255, 0.85);
+        border-radius: 8px;
+        padding: 0.65rem 1.25rem;
+        margin: 0 0.25rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+    .nav-pills .nav-link:hover {
+        background-color: rgba(255, 255, 255, 0.15);
+        color: white;
+    }
+
+    .nav-pills .nav-link.active {
+        background-color: rgba(255, 255, 255, 0.25);
+        color: white;
+        font-weight: 600;
+    }
+
+    /* Main Content Area */
+    .main-content {
+        padding: 2rem;
+        max-width: 1600px;
+        margin: 0 auto;
+    }
+
+    /* Cards */
+    .card {
+        border: none;
+        border-radius: 12px;
+        box-shadow: var(--shadow-md);
+        background: var(--bg-white);
+        margin-bottom: 1.5rem;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .card-title {
+        color: var(--text-dark);
+        font-weight: 600;
+        font-size: 1.25rem;
+        margin-bottom: 1.25rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 2px solid var(--bg-light);
+    }
+
+    /* Video Display */
+    #view {
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: var(--shadow-lg);
+        background: black;
+    }
+
     #viewgroup {
         display: flex;
         justify-content: center;
         align-items: center;
-        overflow: hidden; /* Prevents overflowing content */
+        overflow: hidden;
     }
 
     #snapshot {
-        max-width: 100%; /* Prevents the image from exceeding its container */
-        max-height: 500px; /* Limits the maximum height of the image */
-        object-fit: contain; /* Ensures the image fits within its container */
+        max-width: 100%;
+        max-height: 600px;
+        object-fit: contain;
     }
 
-    .table-container {
-        overflow-x: auto; /* Allows horizontal scrolling if the table is too wide */
+    #video media-stream-player {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: contain !important;
     }
 
-    .row {
-        flex-wrap: nowrap; /* Prevents wrapping of columns */
+    /* Ensure imgAreaSelect appears above canvases */
+    .imgareaselect-border1,
+    .imgareaselect-border2,
+    .imgareaselect-border3,
+    .imgareaselect-border4,
+    .imgareaselect-outer,
+    .imgareaselect-selection {
+        z-index: 1000 !important;
     }
 
+    .imgareaselect-handle {
+        z-index: 1001 !important;
+    }
+
+    /* Buttons */
+    .btn {
+        border-radius: 8px;
+        padding: 0.65rem 1.25rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        border: none;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-color) 100%);
+        transform: translateY(-1px);
+        box-shadow: var(--shadow-md);
+    }
+
+    .btn-secondary {
+        background-color: var(--text-muted);
+        color: white;
+    }
+
+    .btn-secondary:hover {
+        background-color: var(--text-dark);
+        transform: translateY(-1px);
+        box-shadow: var(--shadow-md);
+    }
+
+    /* Form Controls */
+    .form-control, .form-select {
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+        padding: 0.65rem 1rem;
+        transition: all 0.2s ease;
+    }
+
+    .form-control:focus, .form-select:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+
+    .form-label {
+        color: var(--text-dark);
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+    }
+
+    /* Table */
+    .table {
+        margin-bottom: 0;
+    }
+
+    .table thead th {
+        background-color: var(--bg-light);
+        color: var(--text-dark);
+        font-weight: 600;
+        border-bottom: 2px solid var(--border-color);
+        padding: 1rem;
+    }
+
+    .table tbody td {
+        padding: 1rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .table-striped tbody tr:nth-of-type(odd) {
+        background-color: rgba(248, 250, 252, 0.5);
+    }
+
+    /* Info Display */
+    .info-item {
+        padding: 0.5rem 0;
+        color: var(--text-muted);
+        font-size: 0.95rem;
+    }
+
+    .info-item strong {
+        color: var(--text-dark);
+    }
+
+    /* Loading Modal */
+    #modal {
+        backdrop-filter: blur(4px);
+    }
+
+    #modal > div {
+        background: white;
+        border-radius: 12px;
+        box-shadow: var(--shadow-lg);
+        padding: 2rem;
+        text-align: center;
+    }
+
+    #modal h2 {
+        color: var(--text-dark);
+        font-weight: 600;
+        margin-bottom: 1rem;
+    }
+
+    #modal p {
+        color: var(--text-muted);
+        margin-bottom: 0;
+    }
+
+    /* Responsive */
     @media (max-width: 768px) {
-        .row {
-            flex-wrap: wrap; /* Allows wrapping on smaller screens */
+        .main-content {
+            padding: 1rem;
         }
 
         #snapshot {
-            max-height: 300px; /* Reduce image height for smaller screens */
+            max-height: 400px;
+        }
+
+        .navbar-brand {
+            font-size: 1.25rem;
+        }
+
+        .nav-pills {
+            flex-wrap: wrap;
         }
     }
 </style>
-	
+
 </head>
 
 <body>
-    <div class="d-flex" id="wrapper">
-        <!-- Sidebar -->
-        <div class="bg-light border-right" id="sidebar-wrapper">
-            <div class="sidebar-heading">Custom Model</div>
-            <div class="list-group list-group-flush">
-                <a href="index.html" class="list-group-item list-group-item-action active">Detections</a>
-                <a href="mqtt.html" class="list-group-item list-group-item-action">MQTT</a>
-                <a href="advanced.html" class="list-group-item list-group-item-action">Events/Labels</a>
-                <a href="cropping.html" class="list-group-item list-group-item-action">Detection Export</a>
-                <a href="about.html" class="list-group-item list-group-item-action">About</a>
+    <!-- Top Navigation -->
+    <nav class="navbar navbar-expand-lg top-navbar">
+        <div class="container-fluid">
+            <span class="navbar-brand acapName">Custom Model</span>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                    aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation"
+                    style="background-color: rgba(255,255,255,0.2); border: none;">
+                <span class="navbar-toggler-icon" style="filter: invert(1);"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto nav-pills">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="index.html">Detections</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="mqtt.html">MQTT</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="advanced.html">Events/Labels</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="cropping.html">Detection Export</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="about.html">About</a>
+                    </li>
+                </ul>
             </div>
         </div>
-        <!-- /#sidebar-wrapper -->
+    </nav>
 
-        <!-- Page Content -->
-        <div id="page-content-wrapper" class="p-0">
-            <div id='modal' style='display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000;'>
-                <div style='position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:20px;'>
-                    <h2>Model Offline</h2>
-                    <p>The model is currently loading. Please wait.</p>
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Loading Modal -->
+        <div id='modal' style='display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.2); z-index:1000;'>
+            <div style='position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:2rem; border-radius:12px; box-shadow:var(--shadow-lg); text-align:center;'>
+                <h2>Model Offline</h2>
+                <p>The model is currently loading. Please wait.</p>
+            </div>
+        </div>
+
+        <!-- Main Content Grid -->
+        <div class="row g-4">
+            <!-- Left Column: Video and Settings -->
+            <div class="col-lg-8">
+                <!-- Video Display Card -->
+                <div class="card">
+                    <div class="card-body">
+                        <div id="view" style="width:1000px; height:562px; max-width:100%; margin:0 auto;">
+                            <div style="width:100%; height:100%; position:relative; background-color: black;">
+                                <img id="snapshot" src="" style="width:100%; height:100%; position:absolute; top:0px; left:0px; object-fit:contain;">
+                                <div id="video" style="width:100%; height:100%; position:absolute; top:0px; left:0px;"></div>
+                                <canvas id="overlayCanvas" width="1000" height="1000" style="width:100%; height:100%; position:absolute; top:0px; left:0px; pointer-events:none;"></canvas>
+                                <canvas id="canvas" width="1000" height="1000" style="width:100%; height:100%; position:absolute; top:0px; left:0px;"></canvas>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>		
 
-            <div class="container-fluid">
-                <!-- Image/Video -->
-				<div class="row">
-					<!-- Image Section -->
-					<div class="col-md-8 col-lg-7">
-						<div class="p-1">
-							<div id="view" style="width:800px; height:450px;">
-								<div style="width:100%; height:100%; position:relative">
-									<img id="snapshot" src="" style="width:100%; height:100%; position:absolute; top:0px; left:0px;">
-									<div id="video" style="width:100%; height:100%; position:absolute; top:0px; left:0px;"></div>
-									<canvas id="canvas" width="1000" height="1000" style="width:100%; height:100%; position:absolute; top:0px; left:0px;"></canvas>
-								</div>
-							</div>
-							<div class="control-row mt-4">
-								<label for="settings_confidence" class="form-label">Confidence</label>
-								<select id="settings_confidence" class="setting form-control">
-									<option value="20">20</option>
-									<option value="30">30</option>
-									<option value="40">40</option>
-									<option value="50">50</option>
-									<option value="60">60</option>
-									<option value="70">70</option>
-									<option value="75">75</option>
-									<option value="80">80</option>
-									<option value="85">85</option>
-									<option value="90">90</option>
-									<option value="95">95</option>
-								</select>
-								<button id="aoi_button" class="btn btn-secondary">Set Area Of Interest</button>
-								<button id="size_button" class="btn btn-secondary">Set Minimum Size</button>
-							</div>
-						</div>
-					</div>
+                <!-- Detection Settings Card -->
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Detection Settings</h5>
 
-					<!-- Table Section -->
-					<div class="table-container col-md-4 col-lg-5">
-						<h4>Active Event States</h4>
-						<table class="table table-striped">
-							<thead>
-								<tr>
-									<th>Event</th>
-								</tr>
-							</thead>
-							<tbody id="events-table">
-								<!-- Data will be appended here -->
-							</tbody>
-						</table>
-					</div>
-				</div>
+                        <div class="mb-3 d-flex align-items-center">
+                            <label for="settings_confidence" class="form-label fw-bold mb-0" style="min-width: 180px;">Confidence Threshold</label>
+                            <select id="settings_confidence" class="setting form-select" style="width: 120px;">
+                                <option value="20">20%</option>
+                                <option value="30">30%</option>
+                                <option value="40">40%</option>
+                                <option value="50">50%</option>
+                                <option value="60">60%</option>
+                                <option value="70">70%</option>
+                                <option value="75">75%</option>
+                                <option value="80">80%</option>
+                                <option value="85">85%</option>
+                                <option value="90">90%</option>
+                                <option value="95">95%</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3 d-flex align-items-center">
+                            <label for="settings_scaleMode" class="form-label fw-bold mb-0" style="min-width: 180px;">Scale Mode</label>
+                            <select id="settings_scaleMode" class="setting form-select" style="flex: 1;">
+                                <option value="balanced">Balanced - Reduced area, good quality</option>
+                                <option value="crop">Center-Crop - Smallest area, best quality</option>
+                                <option value="letterbox">Letterbox - Full area, less quality</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Video Information</label>
+                            <div class="info-item">Capture Resolution: <strong><span id="captureResolution">-</span></strong></div>
+                            <div class="info-item">Model Input: <strong><span id="modelResolution">-</span></strong></div>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button id="aoi_button" class="btn btn-secondary flex-fill">Set Area Of Interest</button>
+                            <button id="size_button" class="btn btn-secondary flex-fill">Set Minimum Size</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Active Events -->
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Active Event States</h5>
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Event</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="events-table">
+                                    <!-- Data will be appended here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -150,8 +428,8 @@ var imageWidth = 800;
 var imageHeight = 450;
 var videoWidth = 640;
 var videoHeight = 360;
-var viewWidth = 800;
-var viewHeight = 450;
+var viewWidth = 1000;
+var viewHeight = 562;
 var inferenceTimer = 0;
 var imgAreaSelectInstance = null;
 var selectionMode = "";
@@ -185,42 +463,99 @@ function initializePage() {
 			// Update UI elements
 			document.title = App.manifest.acapPackageConf.setup.friendlyName;
 			$(".acapName").html(App.manifest.acapPackageConf.setup.friendlyName);
-			$("#sidebar-wrapper .sidebar-heading").html(App.manifest.acapPackageConf.setup.friendlyName);
 			$("#model_status").text("Status: " + App.status.model.status);
 			$("#settings_confidence").val(App.settings.confidence);
+			$("#settings_scaleMode").val(App.settings.scaleMode || "balanced");
+
+			// Store initial scale mode for revert functionality
+			window.previousScaleMode = App.settings.scaleMode || "balanced";
+
+			// Update resolution displays
+			if (App.model) {
+				$("#captureResolution").text(App.model.videoWidth + " x " + App.model.videoHeight);
+				$("#modelResolution").text(App.model.modelWidth + " x " + App.model.modelHeight);
+			}
+
 			SetupView(App.model.videoAspect);
+
+			// Calculate initial AOI position (direct mapping from 16:9 display space)
+			var aoi_x1 = parseInt(App.settings.aoi.x1 * viewWidth / 1000);
+			var aoi_x2 = parseInt(App.settings.aoi.x2 * viewWidth / 1000);
+			var aoi_y1 = parseInt(App.settings.aoi.y1 * viewHeight / 1000);
+			var aoi_y2 = parseInt(App.settings.aoi.y2 * viewHeight / 1000);
+
 			imgAreaSelectInstance = $("#video").imgAreaSelect({
-				x1: parseInt( App.settings.aoi.x1 / 1000 * imageWidth),
-				y1: parseInt( App.settings.aoi.y1 / 1000 * imageHeight),
-				x2: parseInt( App.settings.aoi.x2 / 1000 * imageWidth),
-				y2: parseInt( App.settings.aoi.y2 / 1000 * imageHeight),
+				x1: aoi_x1,
+				y1: aoi_y1,
+				x2: aoi_x2,
+				y2: aoi_y2,
 				handles: true, enable:true, movable:true, resizable:true, show:false,
 				instance: true,
 				onSelectEnd: function(img, selection) {
-					var x1 = Math.round(selection.x1 * 1000 / imageWidth);
-					var x2 = Math.round(selection.x2 * 1000 / imageWidth);
-					var y1 = Math.round(selection.y1 * 1000 / imageHeight);
-					var y2 = Math.round(selection.y2 * 1000 / imageHeight);
+					// Selection is in display space (viewWidth x viewHeight)
+					// Convert to 0-1000 range for 16:9 display (no capture space transformation)
+					// Backend will handle transforming detections to display space
+
+					var x1 = Math.round(selection.x1 * 1000 / viewWidth);
+					var x2 = Math.round(selection.x2 * 1000 / viewWidth);
+					var y1 = Math.round(selection.y1 * 1000 / viewHeight);
+					var y2 = Math.round(selection.y2 * 1000 / viewHeight);
+
+					// Ensure proper ordering (handle reverse dragging)
+					if (x1 > x2) { var temp = x1; x1 = x2; x2 = temp; }
+					if (y1 > y2) { var temp = y1; y1 = y2; y2 = temp; }
+
+					// Clamp to valid range [0, 1000]
+					x1 = Math.max(0, Math.min(1000, x1));
+					x2 = Math.max(0, Math.min(1000, x2));
+					y1 = Math.max(0, Math.min(1000, y1));
+					y2 = Math.max(0, Math.min(1000, y2));
+
+					// Ensure non-zero area
+					if (x2 - x1 < 10) x2 = Math.min(1000, x1 + 10);
+					if (y2 - y1 < 10) y2 = Math.min(1000, y1 + 10);
 					if( selectionMode === "aoi" ) {
+						// Validate: AOI must be at least as large as size filter
+						var sizeW = App.settings.size.x2 - App.settings.size.x1;
+						var sizeH = App.settings.size.y2 - App.settings.size.y1;
+						var aoiW = x2 - x1;
+						var aoiH = y2 - y1;
+
+						if (aoiW < sizeW || aoiH < sizeH) {
+							showToast("Area of Interest cannot be smaller than Minimum Size filter (" + sizeW + "x" + sizeH + ")", "danger");
+							return;
+						}
+
 						App.settings.aoi = { x1, y1, x2, y2 };
 						$.ajax({type: "POST",url: "settings",contentType: 'application/json',
 							data: JSON.stringify({ aoi: App.settings.aoi }),
 							success: function(response) {
-								console.log("AOI updated successfully.");
+								showToast("Area of Interest updated successfully", "success");
 							},
 							error: function(response) {
-								alert("Failed to update AOI: " + response.statusText);
+								showToast("Failed to update Area of Interest: " + response.statusText, "danger");
 							}
 						});
 					} else {
+						// Validate: Size cannot be larger than AOI
+						var aoiW = App.settings.aoi.x2 - App.settings.aoi.x1;
+						var aoiH = App.settings.aoi.y2 - App.settings.aoi.y1;
+						var sizeW = x2 - x1;
+						var sizeH = y2 - y1;
+
+						if (sizeW > aoiW || sizeH > aoiH) {
+							showToast("Minimum Size cannot be larger than Area of Interest (" + aoiW + "x" + aoiH + ")", "danger");
+							return;
+						}
+
 						App.settings.size = { x1, y1, x2, y2 };
 						$.ajax({type: "POST",url: "settings",contentType: 'application/json',
 							data: JSON.stringify({ size: App.settings.size }),
 							success: function(response) {
-								console.log("AOI updated successfully.");
+								showToast("Minimum Size updated successfully", "success");
 							},
 							error: function(response) {
-								alert("Failed to update AOI: " + response.statusText);
+								showToast("Failed to update Minimum Size: " + response.statusText, "danger");
 							}
 						});
 					}
@@ -252,12 +587,14 @@ function initializePage() {
 			$(this).removeClass('btn-primary').addClass('btn-secondary');
 		} else {
 			selectionMode = "aoi";
-			var x1 = parseInt( App.settings.aoi.x1 / 1000 * imageWidth);
-			var y1 = parseInt( App.settings.aoi.y1 / 1000 * imageHeight);
-			var x2 = parseInt( App.settings.aoi.x2 / 1000 * imageWidth);
-			var y2 = parseInt( App.settings.aoi.y2 / 1000 * imageHeight);
 
-			imgAreaSelectInstance.setSelection(x1, y1, x2, y2, 0);		
+			// Convert AOI from 0-1000 display space to pixel space (direct mapping)
+			var x1 = parseInt(App.settings.aoi.x1 * viewWidth / 1000);
+			var x2 = parseInt(App.settings.aoi.x2 * viewWidth / 1000);
+			var y1 = parseInt(App.settings.aoi.y1 * viewHeight / 1000);
+			var y2 = parseInt(App.settings.aoi.y2 * viewHeight / 1000);
+
+			imgAreaSelectInstance.setSelection(x1, y1, x2, y2, 0);
 			imgAreaSelectInstance.setOptions({show:true});
 			$("#size_button").removeClass('btn-primary').addClass('btn-secondary');
 			$(this).removeClass('btn-secondary').addClass('btn-primary');
@@ -271,10 +608,13 @@ function initializePage() {
 			$(this).removeClass('btn-primary').addClass('btn-secondary');
 		} else {
 			selectionMode = "size";
-			var x1 = parseInt( App.settings.size.x1 / 1000 * imageWidth);
-			var y1 = parseInt( App.settings.size.y1 / 1000 * imageHeight);
-			var x2 = parseInt( App.settings.size.x2 / 1000 * imageWidth);
-			var y2 = parseInt( App.settings.size.y2 / 1000 * imageHeight);
+
+			// Convert size from 0-1000 display space to pixel space (direct mapping)
+			var x1 = parseInt(App.settings.size.x1 * viewWidth / 1000);
+			var x2 = parseInt(App.settings.size.x2 * viewWidth / 1000);
+			var y1 = parseInt(App.settings.size.y1 * viewHeight / 1000);
+			var y2 = parseInt(App.settings.size.y2 * viewHeight / 1000);
+
 			imgAreaSelectInstance.setSelection(x1, y1, x2, y2, 0);
 			imgAreaSelectInstance.setOptions({show:true});
 			$(this).removeClass('btn-secondary').addClass('btn-primary');
@@ -295,12 +635,53 @@ function initializePage() {
 			}
 		});
 	});
-			
+
+	$("#settings_scaleMode").change(function() {
+		var scaleModeValue = $(this).val();
+
+		// Show confirmation dialog
+		if (confirm("This will restart the ACAP. Proceed?")) {
+			// User clicked OK - save and restart
+			App.settings.scaleMode = scaleModeValue;
+			$.ajax({type: "POST",url: "settings",contentType: 'application/json',
+				data: JSON.stringify({ scaleMode: scaleModeValue }),
+				success: function(response) {
+					// Send VAPIX request to restart the ACAP
+					$.ajax({
+						type: "GET",
+						url: "/axis-cgi/applications/control.cgi?action=restart&package=detectx",
+						success: function() {
+							showToast('ACAP is restarting. Please wait...', 'info');
+							window.previousScaleMode = scaleModeValue;
+						},
+						error: function(xhr, status, error) {
+							showToast('Failed to restart ACAP: ' + error, 'danger');
+						}
+					});
+				},
+				error: function(xhr, status, error) {
+					showToast('Failed to save scale mode: ' + error, 'danger');
+					// Revert selection
+					$("#settings_scaleMode").val(window.previousScaleMode);
+				}
+			});
+		} else {
+			// User clicked Cancel - revert to previous value
+			$("#settings_scaleMode").val(window.previousScaleMode);
+		}
+	});
+
 	setInterval( function(){
 		$.ajax({type: "GET",url: 'status',dataType: 'json',cache: false,
 			success: function( status ) {
-				if( !status.model || !status.model.state )
+				if( !status.model || !status.model.state ) {
+					// Model is not ready - show loading modal
+					$('#modal').show();
 					return;
+				}
+
+				// Model is ready - hide loading modal
+				$('#modal').hide();
 
 				if ($('.modal:visible').length && $('body').hasClass('modal-open')) {
 					$('#errorModal').modal('hide');
@@ -324,13 +705,17 @@ function initializePage() {
 				ctx.lineWidth = 3;
 				ctx.strokeStyle = '#FFFF00';
 				ctx.font = '24px Arial';  // Set font style and size
-				ctx.fillStyle = '#FFFF00'; // Same color as the box				
+				ctx.fillStyle = '#FFFF00'; // Same color as the box
 				ctx.beginPath();
 				for( var i = 0; i < status.labels.detections.length; i++ ) {
 				    var detection = status.labels.detections[i];
-					ctx.rect(detection.x, detection.y, detection.w, detection.h );
+
+					// Transform coordinates from capture space to display space (16:9)
+					var transformed = transformCoordinates(detection.x, detection.y, detection.w, detection.h, App.model.videoAspect);
+
+					ctx.rect(transformed.x, transformed.y, transformed.w, transformed.h);
 					var text = detection.label + ': ' + detection.c;
-					ctx.fillText(text, detection.x, detection.y - 10); // -10 to position 					
+					ctx.fillText(text, transformed.x, transformed.y - 10); // -10 to position
 				}
 				ctx.stroke();	
 
@@ -342,27 +727,69 @@ function initializePage() {
 					}
 				};
 			},
-			error(){
-				$(".modal-body").html('<b>The application is not responding<b/>');
-				$('#errorModal').modal('show');
+			error: function() {
+				// ACAP is not responding - show loading modal
+				$('#modal').show();
 			}
 		});
 	},300);
 };			
 	  
 
+function transformCoordinates(x, y, w, h, aspect) {
+	// Coordinates come from backend in 0-1000 range representing capture image
+	// Display is always 16:9 (800x450), canvas is 1000x1000
+	// Need to transform based on how capture image is letterboxed in display
+
+	if (aspect === '4:3') {
+		// Capture is 4:3 (800x600), displayed in 16:9 (800x450)
+		// Image displayed as 600x450 (maintaining 4:3), centered horizontally
+		// In canvas coords: content is 750 units wide (600/800 * 1000), offset by 125
+		var scale = 0.75;  // 600/800
+		var offsetX = 125;  // (1000 - 750) / 2
+		return {
+			x: x * scale + offsetX,
+			y: y,
+			w: w * scale,
+			h: h
+		};
+	} else if (aspect === '1:1') {
+		// Capture is 1:1 (640x640), displayed in 16:9 (800x450)
+		// Image displayed as 450x450 (maintaining 1:1), centered horizontally
+		// In canvas coords: content is 562.5 units wide (450/800 * 1000), offset by 218.75
+		var scale = 0.5625;  // 450/800
+		var offsetX = 218.75;  // (1000 - 562.5) / 2
+		return {
+			x: x * scale + offsetX,
+			y: y,
+			w: w * scale,
+			h: h
+		};
+	} else if (aspect === '16:9') {
+		// Capture is 16:9, displayed in 16:9 - no transformation needed
+		return { x: x, y: y, w: w, h: h };
+	} else {
+		// Default: no transformation
+		return { x: x, y: y, w: w, h: h };
+	}
+}
+
 function SetupView(aspect) {
+	// Always display in 16:9 format regardless of capture aspect ratio
+	viewWidth = 1000;
+	viewHeight = 562;
+
 	switch (aspect) {
-		case '4:3': viewWidth = 800; viewHeight = 600; videoWidth = 1280; videoHeight = 960; imageWidth = 800; imageHeight = 600; break;
-		case '16:9':viewWidth = 800; viewHeight = 450; videoWidth = 1280; videoHeight = 720; imageWidth = 800; imageHeight = 450; break;
-		case '1:1': viewWidth = 450; viewHeight = 450; videoWidth = 640; videoHeight = 640; imageWidth = 640; imageHeight = 640; break;
+		case '4:3': videoWidth = 1280; videoHeight = 960; imageWidth = 800; imageHeight = 600; break;
+		case '16:9': videoWidth = 1280; videoHeight = 720; imageWidth = 800; imageHeight = 450; break;
+		case '1:1': videoWidth = 640; videoHeight = 640; imageWidth = 640; imageHeight = 640; break;
 		case '16:10': videoWidth = 800; videoHeight = 500; imageWidth = 800; imageHeight = 500; break;
 	}
 
 	$("#view").css("width", viewWidth + "px");
 	$("#view").css("height", viewHeight + "px");
 
-	var src = '/axis-cgi/jpg/image.cgi?resolution=' + imageWidth + 'x' + imageHeight + '&compression=25&camera=1'; // '/axis-cgi/mjpg/video.cgi'; //?resolution='+imageWidth+'x'+imageHeight;//+'&compression=40&fps=5';
+	var src = '/axis-cgi/jpg/image.cgi?resolution=' + imageWidth + 'x' + imageHeight + '&compression=25&camera=1';
 	$("#snapshot").attr("src", src);
 
 	var secureConnection = "";
@@ -370,13 +797,54 @@ function SetupView(aspect) {
 		secureConnection = "secure=true"
 	var player = '<media-stream-player hostname="' + window.location.hostname + '" ' + secureConnection + '  format="RTP_H264" compression="40" audio="0" resolution="' + videoWidth + 'x' + videoHeight + '" variant="basic" autoplay></media-stream-player>';
 	$("#video").append(player);
+
+	// Draw overlay bars based on scale mode
+	drawScaleModeOverlay(aspect);
+
 	setupComplete = true;
 }
 
-$("#menu-toggle").click(function(e) {
-	e.preventDefault();
-	$("#wrapper").toggleClass("toggled");
-});
+function drawScaleModeOverlay(aspect) {
+	var overlayCanvas = document.getElementById('overlayCanvas');
+	if (!overlayCanvas) return;
+
+	var ctx = overlayCanvas.getContext("2d");
+	ctx.clearRect(0, 0, 1000, 1000);
+
+	// Semi-transparent black for non-detection areas
+	ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+
+	// Calculate bars based on aspect ratio
+	// Canvas coordinates are 0-1000, view is always 16:9 (800x450 in px)
+	// View aspect ratio: 16:9 = 1.778
+
+	if (aspect === '4:3') {
+		// Balanced mode: 4:3 capture (ratio 1.333) shown in 16:9 view
+		// Content width when fit by height: 450 * (4/3) = 600px out of 800px
+		// Black bars on left and right sides
+		// Canvas coordinates: (800-600)/2 = 100px margins = 125 in 1000-scale
+		var contentWidth = 1000 * (600 / 800); // 750
+		var barWidth = (1000 - contentWidth) / 2; // 125
+		ctx.fillRect(0, 0, barWidth, 1000); // Left bar
+		ctx.fillRect(1000 - barWidth, 0, barWidth, 1000); // Right bar
+	} else if (aspect === '1:1') {
+		// Center-crop mode: 1:1 capture (ratio 1.0) shown in 16:9 view
+		// Content width when fit by height: 450px out of 800px
+		// Black bars on left and right sides
+		// Canvas coordinates: (800-450)/2 = 175px margins = 218.75 in 1000-scale
+		var contentWidth = 1000 * (450 / 800); // 562.5
+		var barWidth = (1000 - contentWidth) / 2; // 218.75
+		ctx.fillRect(0, 0, barWidth, 1000); // Left bar
+		ctx.fillRect(1000 - barWidth, 0, barWidth, 1000); // Right bar
+	} else if (aspect === '16:9') {
+		// Letterbox mode: 16:9 video, 1:1 model
+		// Video is 16:9 (e.g., 1280x720), model is 1:1 (640x640)
+		// Padding is added internally during preprocessing to make 16:9 → 1:1
+		// But from user's perspective, the ENTIRE 16:9 video is visible and can have detections
+		// Display is also 16:9, so NO dark bars needed - perfect match
+		// No overlay bars to draw
+	}
+}
 
 function appendDataToTable(dataArray) {
 	var $tableBody = $("#detection-table");

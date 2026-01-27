@@ -1,102 +1,245 @@
 <!DOCTYPE html>
+<!-- DetectX - Modern UI with Top Navigation -->
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Custom Model</title>
+    <title>Events/Labels</title>
     <link rel="stylesheet" href="css/bootstrap.min.css">
     <link rel="stylesheet" href="css/app.css">
     <script src="js/jquery-3.7.1.min.js"></script>
     <script src="js/bootstrap.bundle.min.js"></script>
-    <style>
+
+<style>
+    :root {
+        --primary-color: #2563eb;
+        --primary-dark: #1e40af;
+        --primary-light: #3b82f6;
+        --success-color: #10b981;
+        --danger-color: #ef4444;
+        --warning-color: #f59e0b;
+        --info-color: #06b6d4;
+        --bg-light: #f8fafc;
+        --bg-white: #ffffff;
+        --text-dark: #1e293b;
+        --text-muted: #64748b;
+        --border-color: #e2e8f0;
+        --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    }
+
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        background-color: var(--bg-light);
+        color: var(--text-dark);
+    }
+
+    .top-navbar {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+        box-shadow: var(--shadow-lg);
+        padding: 0;
+        min-height: 64px;
+    }
+
+    .navbar-brand {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: white !important;
+        padding: 0.75rem 1.5rem;
+    }
+
+    .nav-pills .nav-link {
+        color: rgba(255, 255, 255, 0.85);
+        border-radius: 8px;
+        padding: 0.65rem 1.25rem;
+        margin: 0 0.25rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+    .nav-pills .nav-link:hover {
+        background-color: rgba(255, 255, 255, 0.15);
+        color: white;
+    }
+
+    .nav-pills .nav-link.active {
+        background-color: rgba(255, 255, 255, 0.25);
+        color: white;
+        font-weight: 600;
+    }
+
+    .main-content {
+        padding: 2rem;
+        max-width: 1600px;
+        margin: 0 auto;
+    }
+
+    .card {
+        border: none;
+        border-radius: 12px;
+        box-shadow: var(--shadow-md);
+        background: var(--bg-white);
+        margin-bottom: 1.5rem;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .card-header {
+        background: linear-gradient(135deg, var(--bg-light) 0%, var(--bg-white) 100%);
+        border-bottom: 2px solid var(--border-color);
+        padding: 1.25rem 1.5rem;
+        font-weight: 600;
+        font-size: 1.15rem;
+        color: var(--text-dark);
+        border-radius: 12px 12px 0 0 !important;
+    }
+
+    .form-label, .col-form-label {
+        color: var(--text-dark);
+        font-weight: 500;
+    }
+
+    .setting-label {
+        font-weight: 500;
+        min-width: 180px;
+    }
+
+    .form-select {
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+        padding: 0.65rem 1rem;
+        transition: all 0.2s ease;
+    }
+
+    .form-select:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+
+    .form-check {
+        padding-left: 1.5em;
+        margin-bottom: 0.5rem;
+    }
+
+    .form-check-input {
+        border-radius: 4px;
+        border: 2px solid var(--border-color);
+        width: 1.25em;
+        height: 1.25em;
+    }
+
+    .form-check-input:checked {
+        background-color: var(--primary-color);
+        border-color: var(--primary-color);
+    }
+
+    .form-check-label {
+        word-break: break-word;
+        white-space: normal;
+        color: var(--text-dark);
+        margin-left: 0.5rem;
+    }
+
+    #labelsGrid {
+        margin-top: 1rem;
+    }
+
+    @media (max-width: 768px) {
+        .main-content {
+            padding: 1rem;
+        }
+
+        .navbar-brand {
+            font-size: 1.25rem;
+        }
+
         .setting-label {
-            font-weight: 500;
-            min-width: 180px;
+            min-width: unset;
         }
-        #labelsGrid .form-check-label {
-            word-break: break-word;
-            white-space: normal;
-        }
-        #labelsGrid {
-            margin-top: 0;
-        }
-        /* Optional: Make checkbox area easier to scan visually */
-        .form-check {
-            padding-left: 1.5em;
-            margin-bottom: 0.2em;
-        }
-        .card {
-            margin-bottom: 1.8rem;
-        }
-        @media (max-width: 575.98px) {
-            .setting-label {
-                min-width: unset;
-                font-size: 1rem;
-            }
-        }
-    </style>
+    }
+</style>
+
 </head>
 <body>
-<div class="d-flex" id="wrapper">
-    <!-- Sidebar -->
-    <div class="bg-light border-right" id="sidebar-wrapper">
-        <div class="sidebar-heading">Custom Model</div>
-        <div class="list-group list-group-flush">
-            <a href="index.html" class="list-group-item list-group-item-action">Detections</a>
-            <a href="mqtt.html" class="list-group-item list-group-item-action">MQTT</a>
-            <a href="advanced.html" class="list-group-item list-group-item-action active">Events/Labels</a>
-            <a href="cropping.html" class="list-group-item list-group-item-action">Detection Export</a>
-            <a href="about.html" class="list-group-item list-group-item-action">About</a>
+    <!-- Top Navigation -->
+    <nav class="navbar navbar-expand-lg top-navbar">
+        <div class="container-fluid">
+            <span class="navbar-brand acapName">Custom Model</span>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                    aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation"
+                    style="background-color: rgba(255,255,255,0.2); border: none;">
+                <span class="navbar-toggler-icon" style="filter: invert(1);"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto nav-pills">
+                    <li class="nav-item">
+                        <a class="nav-link" href="index.html">Detections</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="mqtt.html">MQTT</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="advanced.html">Events/Labels</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="cropping.html">Detection Export</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="about.html">About</a>
+                    </li>
+                </ul>
+            </div>
         </div>
-    </div>
-    <!-- /#sidebar-wrapper -->
-    <!-- Page Content -->
-    <div id="page-content-wrapper">
-        <div class="container-fluid py-4">
+    </nav>
 
-            <!-- Card: Event State Settings -->
-            <div class="card mb-4">
-                <div class="card-header">
-                    Event State Settings
-                </div>
-                <div class="card-body">
-                    <form>
-                        <div class="row mb-3 align-items-center">
-                            <label for="prioritize" class="col-sm-4 col-form-label setting-label">Prioritize</label>
-                            <div class="col-sm-6">
-                                <select class="form-select w-100" id="prioritize">
-                                    <option value="accuracy">Accuracy (suppress false triggers)</option>
-                                    <option value="speed">Speed (Trigger instantly)</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="row mb-1 align-items-center">
-                            <label for="minEventDuration" class="col-sm-4 col-form-label setting-label">Min Event State Duration</label>
-                            <div class="col-sm-6">
-                                <select class="form-select w-100" id="minEventDuration">
-                                    <option value="2000">2 seconds</option>
-                                    <option value="3000">3 seconds</option>
-                                    <option value="5000">5 seconds</option>
-                                    <option value="10000">10 seconds</option>
-                                    <option value="15000">15 seconds</option>
-                                    <option value="30000">30 seconds</option>
-                                </select>
-                            </div>
-                        </div>
-                    </form>
-                </div>
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Event State Settings Card -->
+        <div class="card">
+            <div class="card-header">
+                Event State Settings
             </div>
-
-            <!-- Card: Labels -->
-            <div class="card">
-                <div class="card-header">
-                    Labels Processed
-                </div>
-                <div class="card-body">
-                    <div class="row g-2" id="labelsGrid"></div>
-                </div>
+            <div class="card-body">
+                <form>
+                    <div class="row mb-3 align-items-center">
+                        <label for="prioritize" class="col-sm-4 col-form-label setting-label">Prioritize</label>
+                        <div class="col-sm-6">
+                            <select class="form-select w-100" id="prioritize">
+                                <option value="accuracy">Accuracy (suppress false triggers)</option>
+                                <option value="speed">Speed (Trigger instantly)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mb-1 align-items-center">
+                        <label for="minEventDuration" class="col-sm-4 col-form-label setting-label">Min Event State Duration</label>
+                        <div class="col-sm-6">
+                            <select class="form-select w-100" id="minEventDuration">
+                                <option value="2000">2 seconds</option>
+                                <option value="3000">3 seconds</option>
+                                <option value="5000">5 seconds</option>
+                                <option value="10000">10 seconds</option>
+                                <option value="15000">15 seconds</option>
+                                <option value="30000">30 seconds</option>
+                            </select>
+                        </div>
+                    </div>
+                </form>
             </div>
+        </div>
 
+        <!-- Labels Processed Card -->
+        <div class="card">
+            <div class="card-header">
+                Labels Processed
+            </div>
+            <div class="card-body">
+                <div class="row g-2" id="labelsGrid"></div>
+            </div>
         </div>
     </div>
 
@@ -117,7 +260,7 @@
             </div>
         </div>
     </div>
-</div>
+
 <script>
 var App = 0;
 $(document).ready(function() {
@@ -130,10 +273,9 @@ $(document).ready(function() {
             App = data;
             document.title = App.manifest.acapPackageConf.setup.friendlyName;
             $(".acapName").html(App.manifest.acapPackageConf.setup.friendlyName);
-            $("#sidebar-wrapper .sidebar-heading").html(App.manifest.acapPackageConf.setup.friendlyName);
             $("#model_status").text("Status: " + App.status.model.status);
             createLabelCheckboxes(App.model.labels, App.settings.ignore);
-            $("#prioritize").val(App.settings.prioritize || "accuracy");         
+            $("#prioritize").val(App.settings.prioritize || "accuracy");
             $("#minEventDuration").val(App.settings.minEventDuration);
         },
         error: function(response) {
@@ -201,10 +343,6 @@ $('#prioritize').change(function() {
         contentType: 'application/json',
         data: JSON.stringify({ "prioritize": $(this).val() }),
     });
-});
-$("#menu-toggle").click(function(e) {
-    e.preventDefault();
-    $("#wrapper").toggleClass("toggled");
 });
 </script>
 </body>

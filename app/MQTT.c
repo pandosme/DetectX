@@ -358,8 +358,8 @@ MQTT_Publish(const char *topic, const char *payload, int qos, int retained) {
     
     int rc = mqtt.sendMessage(mqtt_client, fullTopic, &pubmsg, &opts);
     if( rc != MQTTASYNC_SUCCESS )
-        LOG_TRACE("%s: Published failed\n",__func__);
-    
+        LOG_WARN("%s: MQTT publish failed on topic '%s' (rc=%d, payload size=%d bytes)\n", __func__, fullTopic, rc, pubmsg.payloadlen);
+
     return (rc == MQTTASYNC_SUCCESS);
 }
 

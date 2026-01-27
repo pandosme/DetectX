@@ -14,6 +14,9 @@
 #include "ACAP.h"
 #include "Model.h"
 #include "imgutils.h"
+#include "labelparse.h"
+#include "preprocess.h"
+#include "model_params.h"  // Generated at build time by extract_model_params.py
 
 #define LOG(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args);}
 #define LOG_WARN(fmt, args...)    { syslog(LOG_WARNING, fmt, ## args); printf(fmt, ## args);}
@@ -62,6 +65,7 @@ static larodTensor** outputTensors = NULL;
 static larodTensor** ppInputTensors = NULL;
 static larodTensor** ppOutputTensors = 0;
 static size_t yuyvBufferSize = 0;
+static size_t outputBufferSize = 0;
 //For cropping
 static unsigned char* original_rgb_buffer = NULL;
 larodMap* ppMapHD               = NULL;
@@ -77,6 +81,17 @@ int ppInputFdHD                 = -1;
 int ppOutputFdHD                = -1;
 
 static cJSON* modelConfig = 0;
+
+// Runtime label parsing
+static char** modelLabels = NULL;
+static char* labelBuffer = NULL;
+static size_t numLabels = 0;
+static const char* MODEL_PATH = "model/model.tflite";
+static const char* LABELS_PATH = "model/labels.txt";
+
+// Preprocessing scale mode
+static PreprocessScaleMode scaleMode = SCALE_MODE_STRETCH;  // Default: balanced
+static PreprocessContext* preprocessCtx = NULL;
 
 static char PP_SD_INPUT_FILE_PATTERN[] = "/tmp/larod.pp.test-XXXXXX";
 static char OBJECT_DETECTOR_INPUT_FILE_PATTERN[] = "/tmp/larod.in.test-XXXXXX";
@@ -116,6 +131,7 @@ static void clear_crop_cache(void) {
 cJSON*
 Model_Inference(VdoBuffer* image) {
     larodError* error = NULL;
+    LOG_TRACE("%s: Called\n", __func__);
     if (!image) {
         LOG_TRACE("%s: No image\n", __func__);
         return 0;
@@ -182,22 +198,42 @@ Model_Inference(VdoBuffer* image) {
         return 0;
     }
 
-    // Process inference results (unchanged)
+    // Process inference results (uint8 quantized output)
     uint8_t* output_tensor = (uint8_t*)larodOutput1Addr;
     cJSON* list = cJSON_CreateArray();
     struct timeval tv;
     gettimeofday(&tv, NULL);
     long long timestamp = tv.tv_sec * 1000LL + tv.tv_usec / 1000;
 
+    LOG_TRACE("%s: Processing %u boxes, quant=%.6f, quant_zero=%.1f, objectnessThreshold=%.2f, confidenceThreshold=%.2f\n",
+              __func__, boxes, quant, quant_zero, objectnessThreshold, confidenceThreshold);
+
+    // Check first few raw values for debugging
+    LOG_TRACE("%s: First 10 raw output bytes: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+              __func__, output_tensor[0], output_tensor[1], output_tensor[2], output_tensor[3], output_tensor[4],
+              output_tensor[5], output_tensor[6], output_tensor[7], output_tensor[8], output_tensor[9]);
+
+    int candidates = 0;
+    int detections = 0;
+
     for (int i = 0; i < boxes; i++) {
         int box = i * (5 + classes);
-        float objectness = (float)(output_tensor[box + 4] - quant_zero) * quant;
-        if (objectness >= objectnessThreshold) {
 
-            float x = (output_tensor[box + 0] - quant_zero) * quant;
-            float y = (output_tensor[box + 1] - quant_zero) * quant;
-            float w = (output_tensor[box + 2] - quant_zero) * quant;
-            float h = (output_tensor[box + 3] - quant_zero) * quant;
+        // Dequantize uint8 to float using quantization parameters
+        float objectness = (float)(output_tensor[box + 4] - quant_zero) * quant;
+
+        if (i < 3 && objectness > 0.01) {  // Log first few non-zero boxes
+            LOG_TRACE("%s: Box %d: raw_obj=%u objectness=%.4f (threshold=%.2f)\n",
+                      __func__, i, output_tensor[box + 4], objectness, objectnessThreshold);
+        }
+
+        if (objectness >= objectnessThreshold) {
+            candidates++;
+
+            float x = (float)(output_tensor[box + 0] - quant_zero) * quant;
+            float y = (float)(output_tensor[box + 1] - quant_zero) * quant;
+            float w = (float)(output_tensor[box + 2] - quant_zero) * quant;
+            float h = (float)(output_tensor[box + 3] - quant_zero) * quant;
             int classId = -1;
             float maxConfidence = 0;
             for (int c = 0; c < classes; c++) {
@@ -208,11 +244,9 @@ Model_Inference(VdoBuffer* image) {
                 }
             }
             if (maxConfidence > confidenceThreshold) {
+                detections++;
                 cJSON* detection = cJSON_CreateObject();
-                const char* label = "Undefined";
-                cJSON* labels = cJSON_GetObjectItem(modelConfig, "labels");
-                if (labels && classId >= 0 && cJSON_GetArrayItem(labels, classId))
-                    label = cJSON_GetArrayItem(labels, classId)->valuestring;
+                const char* label = labels_get(modelLabels, numLabels, classId);
                 cJSON_AddStringToObject(detection, "label", label);
                 cJSON_AddNumberToObject(detection, "c", maxConfidence);
 
@@ -227,9 +261,20 @@ Model_Inference(VdoBuffer* image) {
                 cJSON_AddNumberToObject(detection, "timestamp", timestamp);
                 cJSON_AddNumberToObject(detection, "refId", currentRefId++);
                 cJSON_AddItemToArray(list, detection);
+
+                if (detections <= 3) {  // Log first few detections
+                    LOG_TRACE("%s: Detection %d: %s conf=%.2f obj=%.2f x=%.3f y=%.3f w=%.3f h=%.3f\n",
+                              __func__, detections, label, maxConfidence, objectness, x, y, w, h);
+                }
+            } else if (candidates <= 3) {  // Log why first few candidates were rejected
+                LOG_TRACE("%s: Rejected box %d: obj=%.4f, maxConf=%.4f (threshold=%.2f)\n",
+                          __func__, i, objectness, maxConfidence, confidenceThreshold);
             }
         }
     }
+
+    LOG_TRACE("%s: Found %d candidates, %d detections after confidence filtering\n",
+              __func__, candidates, detections);
 
     return non_maximum_suppression(list);
 }
@@ -489,9 +534,15 @@ Model_Cleanup() {
     // release the privately loaded model when the session is disconnected in
     // larodDisconnect().
     larodError* error = NULL;
-	
+
 	clear_crop_cache();
-	
+
+	// Free runtime-parsed labels
+	labels_free(modelLabels, labelBuffer);
+	modelLabels = NULL;
+	labelBuffer = NULL;
+	numLabels = 0;
+
 	if( ppMap ) larodDestroyMap(&ppMap);
     if( ppModel ) larodDestroyModel(&ppModel);
     larodDestroyModel(&InfModel);
@@ -501,7 +552,7 @@ Model_Cleanup() {
     if (larodInputFd >= 0) close(larodInputFd);
     if (ppInputAddr != MAP_FAILED) munmap(ppInputAddr, modelWidth * modelHeight * channels);
     if (ppInputFd >= 0) close(ppInputFd);
-    if (larodOutput1Addr != MAP_FAILED) munmap(larodOutput1Addr, boxes * (classes + 5));
+    if (larodOutput1Addr != MAP_FAILED) munmap(larodOutput1Addr, outputBufferSize);
     larodDestroyJobRequest(&ppReq);
     larodDestroyJobRequest(&infReq);
     larodDestroyTensors(conn, &inputTensors, inputs, &error);
@@ -518,23 +569,249 @@ cJSON* Model_Setup(void) {
     ACAP_STATUS_SetString("model", "status", "Model initialization failed. Check log file");
     ACAP_STATUS_SetBool("model", "state", 0);
 
-    modelConfig = ACAP_FILE_Read("model/model.json");
-    if (!modelConfig) {
-        LOG_WARN("%s: Unable to read model.json\n", __func__);
+    // ==== RUNTIME MODEL INTROSPECTION ====
+
+    // Step 1: Connect to larod
+    if (!larodConnect(&conn, &error)) {
+        LOG_WARN("%s: Could not connect to larod: %s\n", __func__, error ? error->msg : "unknown");
+        larodClearError(&error);
         return 0;
     }
-    modelWidth = cJSON_GetObjectItem(modelConfig, "modelWidth")->valueint;
-    modelHeight = cJSON_GetObjectItem(modelConfig, "modelHeight")->valueint;
-    videoWidth = cJSON_GetObjectItem(modelConfig, "videoWidth")->valueint;
-    videoHeight = cJSON_GetObjectItem(modelConfig, "videoHeight")->valueint;
-    boxes = cJSON_GetObjectItem(modelConfig, "boxes")->valueint;
-    classes = cJSON_GetObjectItem(modelConfig, "classes")->valueint;
-    quant = cJSON_GetObjectItem(modelConfig, "quant")->valuedouble;
-    quant_zero = cJSON_GetObjectItem(modelConfig, "zeroPoint")->valuedouble;
-    objectnessThreshold = cJSON_GetObjectItem(modelConfig, "objectness")->valuedouble;
-    nms = cJSON_GetObjectItem(modelConfig, "nms")->valuedouble;
 
-    LOG_TRACE("Boxes: %d Classes: %d Objectness: %f nms:%f", boxes, classes, objectnessThreshold, nms);
+    // Step 2: Load model to introspect
+    larodModelFd = open(MODEL_PATH, O_RDONLY);
+    if (larodModelFd < 0) {
+        LOG_WARN("%s: Could not open model %s: %s\n", __func__, MODEL_PATH, strerror(errno));
+        Model_Cleanup();
+        return 0;
+    }
+
+    // Detect platform and select appropriate chip
+    const char* platform = ACAP_DEVICE_Prop("platform");
+    const char* chipString = "cpu-tflite";  // Default fallback
+
+    if (platform) {
+        if (strstr(platform, "Artpec-8")) {
+            chipString = "axis-a8-dlpu-tflite";
+            LOG("Detected ARTPEC-8 platform\n");
+        } else if (strstr(platform, "Artpec-9")) {
+            chipString = "a9-dlpu-tflite";
+            LOG("Detected ARTPEC-9 platform\n");
+        } else {
+            LOG("Using CPU inference (platform: %s)\n", platform);
+        }
+    } else {
+        LOG_WARN("Could not detect platform, using CPU fallback\n");
+    }
+
+    const larodDevice* device = larodGetDevice(conn, chipString, 0, &error);
+    if (!device) {
+        LOG_WARN("%s: Could not get device %s: %s\n", __func__, chipString, error->msg);
+        larodClearError(&error);
+        Model_Cleanup();
+        return 0;
+    }
+
+    InfModel = larodLoadModel(conn, larodModelFd, device, LAROD_ACCESS_PRIVATE, "object_detection", NULL, &error);
+    if (!InfModel) {
+        LOG_WARN("%s: Unable to load model: %s\n", __func__, error->msg);
+        larodClearError(&error);
+        Model_Cleanup();
+        return 0;
+    }
+
+    // Step 3: Introspect model tensors
+    larodTensor** tempInputTensors = larodCreateModelInputs(InfModel, &inputs, &error);
+    if (!tempInputTensors) {
+        LOG_WARN("%s: Failed retrieving input tensors: %s\n", __func__, error->msg);
+        larodClearError(&error);
+        Model_Cleanup();
+        return 0;
+    }
+
+    larodTensor** tempOutputTensors = larodCreateModelOutputs(InfModel, &outputs, &error);
+    if (!tempOutputTensors) {
+        LOG_WARN("%s: Failed retrieving output tensors: %s\n", __func__, error->msg);
+        larodClearError(&error);
+        larodDestroyTensors(conn, &tempInputTensors, inputs, NULL);
+        Model_Cleanup();
+        return 0;
+    }
+
+    // Get input dimensions (YOLOv5 input is always NHWC: batch, height, width, channels)
+    const larodTensorDims* inputDims = larodGetTensorDims(tempInputTensors[0], &error);
+    if (!inputDims) {
+        LOG_WARN("%s: Failed to get input tensor dimensions\n", __func__);
+        larodDestroyTensors(conn, &tempInputTensors, inputs, NULL);
+        larodDestroyTensors(conn, &tempOutputTensors, outputs, NULL);
+        Model_Cleanup();
+        return 0;
+    }
+
+    modelHeight = inputDims->dims[1];
+    modelWidth = inputDims->dims[2];
+    channels = inputDims->dims[3];
+
+    LOG("Model input: %ux%ux%u\n", modelWidth, modelHeight, channels);
+
+    // Get output dimensions (YOLOv5 output is always [batch, boxes, stride])
+    const larodTensorDims* outputDims = larodGetTensorDims(tempOutputTensors[0], &error);
+    if (!outputDims) {
+        LOG_WARN("%s: Failed to get output tensor dimensions\n", __func__);
+        larodDestroyTensors(conn, &tempInputTensors, inputs, NULL);
+        larodDestroyTensors(conn, &tempOutputTensors, outputs, NULL);
+        Model_Cleanup();
+        return 0;
+    }
+
+    boxes = outputDims->dims[1];
+    int stride = outputDims->dims[2];
+    classes = stride - 5;  // YOLOv5 format: x,y,w,h,objectness,class1...classN
+
+    LOG("Model output: %u boxes, %u classes, stride=%d\n", boxes, classes, stride);
+
+    // Get quantization parameters (extracted at build time from model)
+    larodTensorDataType dataType = larodGetTensorDataType(tempOutputTensors[0], &error);
+    if (dataType == LAROD_TENSOR_DATA_TYPE_INT8 || dataType == LAROD_TENSOR_DATA_TYPE_UINT8) {
+        // Quantized model - use build-time extracted values
+        quant = QUANTIZATION_SCALE;
+        quant_zero = QUANTIZATION_ZERO_POINT;
+        LOG("Quantized model: data_type=%d, scale=%.15f, zero_point=%d\n",
+            dataType, quant, (int)quant_zero);
+    } else {
+        // Float model
+        quant = 1.0;
+        quant_zero = 0;
+        LOG("Float model detected (data_type=%d), no quantization needed\n", dataType);
+    }
+
+    // Clean up temporary tensors
+    larodDestroyTensors(conn, &tempInputTensors, inputs, &error);
+    larodDestroyTensors(conn, &tempOutputTensors, outputs, &error);
+
+    // Step 4: Read user settings (scaleMode, nms, objectness)
+    cJSON* settings = ACAP_Get_Config("settings");
+    if (settings) {
+        // Read scale mode (default: "balanced")
+        cJSON* scaleModeItem = cJSON_GetObjectItem(settings, "scaleMode");
+        if (scaleModeItem && scaleModeItem->valuestring) {
+            scaleMode = preprocess_mode_from_string(scaleModeItem->valuestring);
+            LOG("Scale mode: %s\n", preprocess_mode_to_string(scaleMode));
+        } else {
+            scaleMode = SCALE_MODE_STRETCH;  // Default: balanced
+            LOG("Scale mode: balanced (default)\n");
+        }
+
+        // Read NMS threshold
+        cJSON* nmsItem = cJSON_GetObjectItem(settings, "nms");
+        if (nmsItem) {
+            nms = nmsItem->valuedouble;
+        }
+
+        // Read objectness threshold
+        cJSON* objectnessItem = cJSON_GetObjectItem(settings, "objectness");
+        if (objectnessItem) {
+            objectnessThreshold = objectnessItem->valuedouble;
+        }
+
+        LOG("Detection thresholds: objectness=%.2f, nms=%.2f\n", objectnessThreshold, nms);
+    }
+
+    // Step 5: Calculate video dimensions based on model size and scale mode
+    // All dimensions must be divisible by 8 (VDO requirement)
+    if (scaleMode == SCALE_MODE_STRETCH) {
+        // Balanced mode: 4:3 aspect ratio
+        if (modelHeight == 640) {
+            videoWidth = 800;
+            videoHeight = 600;
+        } else if (modelHeight == 480) {
+            videoWidth = 640;
+            videoHeight = 480;
+        } else if (modelHeight == 768) {
+            videoWidth = 1024;
+            videoHeight = 768;
+        } else if (modelHeight == 960) {
+            videoWidth = 1280;
+            videoHeight = 960;
+        } else {
+            // Calculate 4:3 from model size, ensure divisible by 8
+            videoWidth = ((modelWidth * 4) / 3 + 7) & ~7;
+            videoHeight = (modelWidth + 7) & ~7;
+        }
+        LOG("Video: %ux%u (4:3 balanced mode)\n", videoWidth, videoHeight);
+    } else if (scaleMode == SCALE_MODE_CROP) {
+        // Center-crop mode: 1:1 aspect ratio (same as model)
+        videoWidth = (modelWidth + 7) & ~7;
+        videoHeight = (modelHeight + 7) & ~7;
+        LOG("Video: %ux%u (1:1 center-crop mode)\n", videoWidth, videoHeight);
+    } else if (scaleMode == SCALE_MODE_LETTERBOX) {
+        // Letterbox mode: 16:9 aspect ratio with padding
+        if (modelHeight == 640) {
+            videoWidth = 1136;  // 640 * 16/9 = 1136
+            videoHeight = 640;
+        } else if (modelHeight == 480) {
+            videoWidth = 848;  // Closest 16:9 to 480
+            videoHeight = 480;
+        } else if (modelHeight == 768) {
+            videoWidth = 1360;
+            videoHeight = 768;
+        } else {
+            // Calculate 16:9, ensure divisible by 8
+            videoWidth = ((modelHeight * 16) / 9 + 7) & ~7;
+            videoHeight = (modelHeight + 7) & ~7;
+        }
+        LOG("Video: %ux%u (16:9 letterbox mode)\n", videoWidth, videoHeight);
+    }
+
+    // Step 6: Load labels
+    if (!labels_parse_file(LABELS_PATH, &modelLabels, &labelBuffer, &numLabels)) {
+        LOG_WARN("%s: Failed to load labels from %s, using defaults\n", __func__, LABELS_PATH);
+        numLabels = 0;
+    } else {
+        LOG("Loaded %zu labels from %s\n", numLabels, LABELS_PATH);
+    }
+
+    // Step 7: Build model.json structure for frontend/API
+    modelConfig = cJSON_CreateObject();
+    cJSON_AddNumberToObject(modelConfig, "modelWidth", modelWidth);
+    cJSON_AddNumberToObject(modelConfig, "modelHeight", modelHeight);
+    cJSON_AddNumberToObject(modelConfig, "videoWidth", videoWidth);
+    cJSON_AddNumberToObject(modelConfig, "videoHeight", videoHeight);
+
+    // Video aspect and scale mode for frontend
+    const char* videoAspect = "4:3";
+    if (scaleMode == SCALE_MODE_CROP) {
+        videoAspect = "1:1";
+    } else if (scaleMode == SCALE_MODE_LETTERBOX) {
+        videoAspect = "16:9";
+    }
+    cJSON_AddStringToObject(modelConfig, "videoAspect", videoAspect);
+    cJSON_AddNumberToObject(modelConfig, "scaleMode", (int)scaleMode);
+    cJSON_AddStringToObject(modelConfig, "scaleModeName", preprocess_mode_to_string(scaleMode));
+
+    cJSON_AddNumberToObject(modelConfig, "boxes", boxes);
+    cJSON_AddNumberToObject(modelConfig, "classes", classes);
+    cJSON_AddNumberToObject(modelConfig, "quant", quant);
+    cJSON_AddNumberToObject(modelConfig, "zeroPoint", quant_zero);
+    cJSON_AddNumberToObject(modelConfig, "objectness", objectnessThreshold);
+    cJSON_AddNumberToObject(modelConfig, "nms", nms);
+    cJSON_AddStringToObject(modelConfig, "path", MODEL_PATH);
+    cJSON_AddStringToObject(modelConfig, "chip", chipString);
+
+    // Add labels array
+    cJSON* labelsArray = cJSON_CreateArray();
+    for (size_t i = 0; i < numLabels; i++) {
+        cJSON_AddItemToArray(labelsArray, cJSON_CreateString(modelLabels[i]));
+    }
+    cJSON_AddItemToObject(modelConfig, "labels", labelsArray);
+
+    // Store in ACAP config for other components
+    ACAP_Set_Config("model", modelConfig);
+
+    LOG("Model config: %ux%u model → %ux%u video (%s), %u boxes, %u classes\n",
+        modelWidth, modelHeight, videoWidth, videoHeight, videoAspect, boxes, classes);
+
+    // ==== END RUNTIME INTROSPECTION ====
 
     // Preprocessing (inference, 1:1 model)
     ppMap = larodCreateMap(&error);
@@ -592,44 +869,7 @@ cJSON* Model_Setup(void) {
         return 0;
     }
 
-    // Model (inference)
-    const char* modelPath = cJSON_GetObjectItem(modelConfig, "path") ? cJSON_GetObjectItem(modelConfig, "path")->valuestring : 0;
-    if (!modelPath) {
-        LOG_WARN("%s: Model path not found\n", __func__);
-        Model_Cleanup();
-        return 0;
-    }
-    larodModelFd = open(modelPath, O_RDONLY);
-    if (larodModelFd < 0) {
-        LOG_WARN("%s: Could not open model %s\n", __func__, modelPath);
-        Model_Cleanup();
-        return 0;
-    }
-    if (!larodConnect(&conn, &error)) {
-        LOG_WARN("%s: Could not connect to larod: %s\n", __func__, error->msg);
-        Model_Cleanup();
-        return 0;
-    }
-    const char* chipString = "cpu-tflite";
-    cJSON* chip = cJSON_GetObjectItem(modelConfig, "chip");
-    if (chip && chip->type == cJSON_String)
-        chipString = chip->valuestring;
-    const larodDevice* device = larodGetDevice(conn, chipString, 0, &error);
-    if (!device) {
-        LOG_WARN("%s: Could not get device %s: %s\n", __func__, chipString, error->msg);
-        larodClearError(&error);
-        Model_Cleanup();
-        return 0;
-    }
-    InfModel = larodLoadModel(conn, larodModelFd, device, LAROD_ACCESS_PRIVATE, "object_detection", NULL, &error);
-    if (!InfModel) {
-        LOG_WARN("%s: Unable to load model: %s\n", __func__, error->msg);
-        larodClearError(&error);
-        Model_Cleanup();
-        return 0;
-    }
-
-    // Pre-processing model (1:1 model image)
+    // Pre-processing model (1:1 model image) - model already loaded during introspection
     const char* larodLibyuvPP = "cpu-proc";
     const larodDevice* device_prePros = larodGetDevice(conn, larodLibyuvPP, 0, &error);
     if (!device_prePros) {
@@ -735,6 +975,10 @@ cJSON* Model_Setup(void) {
         return 0;
     }
 
+    outputBufferSize = outputPitches->pitches[0];
+    LOG("Output tensor buffer size: %zu bytes (boxes=%u, classes=%u, stride=%d)\n",
+        outputBufferSize, boxes, classes, classes + 5);
+
     // Allocate space for input tensors
     if (!createAndMapTmpFile(PP_SD_INPUT_FILE_PATTERN, yuyvBufferSize, &ppInputAddr, &ppInputFd)) {
         LOG_WARN("%s: Could not allocate pre-processor tensor\n", __func__);
@@ -747,7 +991,7 @@ cJSON* Model_Setup(void) {
         Model_Cleanup();
         return 0;
     }
-    if (!createAndMapTmpFile(OBJECT_DETECTOR_OUT1_FILE_PATTERN, boxes * (classes + 5), &larodOutput1Addr, &larodOutput1Fd)) {
+    if (!createAndMapTmpFile(OBJECT_DETECTOR_OUT1_FILE_PATTERN, outputBufferSize, &larodOutput1Addr, &larodOutput1Fd)) {
         LOG_WARN("%s: Could not allocate output tensor\n", __func__);
         Model_Cleanup();
         return 0;

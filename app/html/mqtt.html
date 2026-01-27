@@ -1,110 +1,308 @@
 <!DOCTYPE html>
+<!-- DetectX - Modern UI with Top Navigation -->
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title></title>
+    <title>MQTT Configuration</title>
     <link rel="stylesheet" href="css/bootstrap.min.css">
     <link rel="stylesheet" href="css/app.css">
     <script src="js/jquery-3.7.1.min.js"></script>
     <script src="js/bootstrap.bundle.min.js"></script>
+
+<style>
+    :root {
+        --primary-color: #2563eb;
+        --primary-dark: #1e40af;
+        --primary-light: #3b82f6;
+        --success-color: #10b981;
+        --danger-color: #ef4444;
+        --warning-color: #f59e0b;
+        --info-color: #06b6d4;
+        --bg-light: #f8fafc;
+        --bg-white: #ffffff;
+        --text-dark: #1e293b;
+        --text-muted: #64748b;
+        --border-color: #e2e8f0;
+        --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    }
+
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        background-color: var(--bg-light);
+        color: var(--text-dark);
+    }
+
+    .top-navbar {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+        box-shadow: var(--shadow-lg);
+        padding: 0;
+        min-height: 64px;
+    }
+
+    .navbar-brand {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: white !important;
+        padding: 0.75rem 1.5rem;
+    }
+
+    .nav-pills .nav-link {
+        color: rgba(255, 255, 255, 0.85);
+        border-radius: 8px;
+        padding: 0.65rem 1.25rem;
+        margin: 0 0.25rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+    .nav-pills .nav-link:hover {
+        background-color: rgba(255, 255, 255, 0.15);
+        color: white;
+    }
+
+    .nav-pills .nav-link.active {
+        background-color: rgba(255, 255, 255, 0.25);
+        color: white;
+        font-weight: 600;
+    }
+
+    .main-content {
+        padding: 2rem;
+        max-width: 1600px;
+        margin: 0 auto;
+    }
+
+    .card {
+        border: none;
+        border-radius: 12px;
+        box-shadow: var(--shadow-md);
+        background: var(--bg-white);
+        margin-bottom: 1.5rem;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .card-title {
+        color: var(--text-dark);
+        font-weight: 600;
+        font-size: 1.25rem;
+        margin-bottom: 1.25rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 2px solid var(--bg-light);
+    }
+
+    .card-text {
+        color: var(--text-muted);
+        font-size: 0.95rem;
+        line-height: 1.6;
+    }
+
+    .form-group {
+        margin-bottom: 1.25rem;
+    }
+
+    .form-label {
+        color: var(--text-dark);
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+    }
+
+    .form-control, .form-select {
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+        padding: 0.65rem 1rem;
+        transition: all 0.2s ease;
+    }
+
+    .form-control:focus, .form-select:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+
+    .form-control-plaintext {
+        color: var(--text-muted);
+        font-weight: 500;
+    }
+
+    .btn {
+        border-radius: 8px;
+        padding: 0.65rem 1.25rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        border: none;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-color) 100%);
+        transform: translateY(-1px);
+        box-shadow: var(--shadow-md);
+    }
+
+    .btn-danger {
+        background-color: var(--danger-color);
+        color: white;
+    }
+
+    .btn-danger:hover {
+        background-color: #dc2626;
+        transform: translateY(-1px);
+        box-shadow: var(--shadow-md);
+    }
+
+    .cert-link {
+        display: inline-block;
+        margin-top: 0.5rem;
+        color: var(--primary-color);
+        text-decoration: none;
+        font-size: 0.9rem;
+    }
+
+    .cert-link:hover {
+        color: var(--primary-dark);
+        text-decoration: underline;
+    }
+
+    .button-container {
+        margin-top: 1.5rem;
+    }
+
+    @media (max-width: 768px) {
+        .main-content {
+            padding: 1rem;
+        }
+
+        .navbar-brand {
+            font-size: 1.25rem;
+        }
+    }
+</style>
+
 </head>
 <body>
-<div class="d-flex" id="wrapper">
-	<!-- Sidebar -->
-	<div class="bg-light border-right" id="sidebar-wrapper">
-		<div class="sidebar-heading">&nbsp;</div>
-		<div class="list-group list-group-flush">
-            <a href="index.html" class="list-group-item list-group-item-action">Detections</a>
-            <a href="mqtt.html" class="list-group-item list-group-item-action active">MQTT</a>
-            <a href="advanced.html" class="list-group-item list-group-item-action">Events/Labels</a>
-			<a href="cropping.html" class="list-group-item list-group-item-action">Detection Export</a>
-            <a href="about.html" class="list-group-item list-group-item-action">About</a>
-		</div>
-	</div>
-	
-    <div id="page-content-wrapper" class="p-0">
+    <!-- Top Navigation -->
+    <nav class="navbar navbar-expand-lg top-navbar">
         <div class="container-fluid">
-            <div class="row mt-3">
-                <div class="col-xxl-4 col-xl-6 mb-4">
-                    <div class="card">
-                        <div class="card-body">
-                            <h3 class="card-title">MQTT Connection</h3>
-                            
-                            <div class="form-group">
-                                <label for="mqtt_status">Status</label>
-                                <input id="mqtt_status" type="text" readonly class="form-control-plaintext" value="Status">
-                            </div>
+            <span class="navbar-brand acapName">Custom Model</span>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                    aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation"
+                    style="background-color: rgba(255,255,255,0.2); border: none;">
+                <span class="navbar-toggler-icon" style="filter: invert(1);"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto nav-pills">
+                    <li class="nav-item">
+                        <a class="nav-link" href="index.html">Detections</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="mqtt.html">MQTT</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="advanced.html">Events/Labels</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="cropping.html">Detection Export</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="about.html">About</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
 
-                            <div class="form-group">
-                                <label for="mqtt_address">Address</label>
-                                <input id="mqtt_address" type="text" class="form-control">
-                            </div>
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="row g-4">
+            <div class="col-xxl-4 col-xl-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h3 class="card-title">MQTT Connection</h3>
 
-                            <div class="form-group">
-                                <label for="mqtt_port">Port</label>
-                                <input id="mqtt_port" type="text" class="form-control">
-                            </div>
+                        <div class="form-group">
+                            <label for="mqtt_status">Status</label>
+                            <input id="mqtt_status" type="text" readonly class="form-control-plaintext" value="Status">
+                        </div>
 
-                            <div class="form-group">
-                                <label for="mqtt_user">User</label>
-                                <input type="text" class="form-control" id="mqtt_user">
-                            </div>
+                        <div class="form-group">
+                            <label for="mqtt_address">Address</label>
+                            <input id="mqtt_address" type="text" class="form-control">
+                        </div>
 
-                            <div class="form-group">
-                                <label for="mqtt_password">Password</label>
-                                <input type="password" class="form-control" id="mqtt_password">
-                            </div>
+                        <div class="form-group">
+                            <label for="mqtt_port">Port</label>
+                            <input id="mqtt_port" type="text" class="form-control">
+                        </div>
 
-                            <div class="form-group">
-                                <label for="mqtt_preTopic">Pre-topic</label>
-                                <input id="mqtt_preTopic" type="text" class="form-control">
-                            </div>
+                        <div class="form-group">
+                            <label for="mqtt_user">User</label>
+                            <input type="text" class="form-control" id="mqtt_user">
+                        </div>
 
-                            <div class="form-group">
-                                <label for="mqtt_tls">TLS</label>
-                                <div class="input-wrapper">
-                                    <select id="mqtt_tls" class="form-control">
-                                        <option value="none">No TLS</option>
-                                        <option value="verify">Verify certificate</option>
-                                        <option value="noverify">Trust certificate</option>
-                                    </select>
-                                    <a href="certificate.html" class="cert-link">Set certificates (if required)</a>
-                                </div>
-                            </div>
+                        <div class="form-group">
+                            <label for="mqtt_password">Password</label>
+                            <input type="password" class="form-control" id="mqtt_password">
+                        </div>
 
-                            <div class="form-group">
-                                <div class="button-container">
-                                    <button id="connect" class="btn btn-primary">Connect</button>
-                                </div>
+                        <div class="form-group">
+                            <label for="mqtt_preTopic">Pre-topic</label>
+                            <input id="mqtt_preTopic" type="text" class="form-control">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="mqtt_tls">TLS</label>
+                            <div class="input-wrapper">
+                                <select id="mqtt_tls" class="form-control">
+                                    <option value="none">No TLS</option>
+                                    <option value="verify">Verify certificate</option>
+                                    <option value="noverify">Trust certificate</option>
+                                </select>
+                                <a href="certificate.html" class="cert-link">Set certificates (if required)</a>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="button-container">
+                                <button id="connect" class="btn btn-primary">Connect</button>
                             </div>
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <div class="col-xxl-4 col-xl-6 mb-4">
-                    <div class="card">
-                        <div class="card-body">
-                            <h3 class="card-title">System Payload Properties</h3>
-                            <p class="card-text">Additional properties can help a system with multiple devices.</p>
-                            <p class="card-text">Name is typically some sort of system device identifier.<br/></p>
-                            <p class="card-text">Location is typically a human readable location identifier such as City, Building, Address or network location such IP address or FQDN</p>
-                            <p class="card-text">These values may be left blank when not used</p>
-                            
-                            <div class="form-group">
-                                <label for="payload_name">Name</label>
-                                <input id="payload_name" type="text" class="form-control">
-                            </div>
+            <div class="col-xxl-4 col-xl-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h3 class="card-title">System Payload Properties</h3>
+                        <p class="card-text">Additional properties can help a system with multiple devices.</p>
+                        <p class="card-text">Name is typically some sort of system device identifier.</p>
+                        <p class="card-text">Location is typically a human readable location identifier such as City, Building, Address or network location such IP address or FQDN</p>
+                        <p class="card-text">These values may be left blank when not used</p>
 
-                            <div class="form-group">
-                                <label for="payload_location">Location</label>
-                                <input id="payload_location" type="text" class="form-control">
-                            </div>
+                        <div class="form-group">
+                            <label for="payload_name">Name</label>
+                            <input id="payload_name" type="text" class="form-control">
+                        </div>
 
-                            <div class="form-group">
-                                <div class="button-container">
-                                    <button id="update_payload" class="btn btn-primary">Update</button>
-                                </div>
+                        <div class="form-group">
+                            <label for="payload_location">Location</label>
+                            <input id="payload_location" type="text" class="form-control">
+                        </div>
+
+                        <div class="form-group">
+                            <div class="button-container">
+                                <button id="update_payload" class="btn btn-primary">Update</button>
                             </div>
                         </div>
                     </div>
@@ -112,9 +310,8 @@
             </div>
         </div>
     </div>
-	<div class="toast-container position-fixed top-0 end-0 p-3">
-	</div>
-</div>
+
+    <div class="toast-container position-fixed top-0 end-0 p-3"></div>
 
 <script>
 let MQTT_Client = 0;
@@ -130,7 +327,7 @@ $(document).ready(function() {
 		success: function(data) {
 			app = data;
 			document.title = app.manifest.acapPackageConf.setup.friendlyName;
-			$('.sidebar-heading').text(app.manifest.acapPackageConf.setup.friendlyName);
+			$('.acapName').text(app.manifest.acapPackageConf.setup.friendlyName);
 			$("#mqtt_status").val(app.status.mqtt.status);
 			$("#ws_port").val(app.settings.WS_Port);
 			$("#wss_port").val(app.settings.WSS_Port);
@@ -195,7 +392,7 @@ $(document).ready(function() {
 // Function to update button state
 function updateButtonState(mqtt) {
 	const button = $("#connect");
-	
+
 	if (mqtt.connected) {
 		// Connected state - show disconnect button
 		button.text("Disconnect")
@@ -211,17 +408,11 @@ function updateButtonState(mqtt) {
 	}
 }
 
-// Menu toggle handler
-$("#menu-toggle").click(function(e) {
-	e.preventDefault();
-	$("#wrapper").toggleClass("toggled");
-});
-
 // Connect button click handler
 $("#connect").click(function() {
 	const button = $(this);
 	const isConnected = button.hasClass("btn-danger");
-	
+
 	// Disable button during ajax call
 	button.prop("disabled", true);
 
@@ -254,7 +445,7 @@ $("#connect").click(function() {
 			settings.tls = true;
 			settings.verify = true;
 		}
-		
+
 		if(tlsMode === "noverify" ) {
 			settings.tls = true;
 			settings.verify = false;
@@ -287,7 +478,7 @@ $("#update_payload").click(function() {
 			location: $('#payload_location').val()
 		}
 	};
-	
+
 	$.ajax({
 		type: "GET",
 		url: 'mqtt?json=' + encodeURI(JSON.stringify(settings)),
@@ -304,10 +495,10 @@ $("#update_payload").click(function() {
 
 function showToast(message, type = 'danger') {
     const toastContainer = document.querySelector('.toast-container');
-    
+
     // Determine text color class based on type
     const textColorClass = type === 'warning' ? 'text-dark' : 'text-white';
-    
+
     // Create the toast HTML structure
     var toastHtml = '';
     toastHtml += '<div class="toast align-items-center ' + textColorClass + ' bg-' + type + ' border-0" role="alert" aria-live="assertive" aria-atomic="true">';
@@ -316,7 +507,7 @@ function showToast(message, type = 'danger') {
     toastHtml += '     <button type="button" class="btn-close' + (type === 'warning' ? '' : ' btn-close-white') + ' me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>';
     toastHtml += '   </div>';
     toastHtml += '</div>';
-    
+
     // Rest of the function remains the same
     toastContainer.insertAdjacentHTML('beforeend', toastHtml);
     const toastElement = toastContainer.lastElementChild;
@@ -329,7 +520,7 @@ function showToast(message, type = 'danger') {
         this.remove();
     });
 }
-	
+
 </script>
 </body>
 

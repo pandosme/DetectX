@@ -1,17 +1,20 @@
 {
   "confidence": 50,
+  "scaleMode": "balanced",
+  "objectness": 0.25,
+  "nms": 0.05,
   "aoi": {
-    "x1": 100,
-    "y1": 100,
-    "x2": 900,
-    "y2": 900
+    "x1": 0,
+    "y1": 0,
+    "x2": 1000,
+    "y2": 1000
   },
   "size": {
-    "x1": 490,
-    "y1": 490,
-    "x2": 510,
-    "y2": 510
-  },  
+    "x1": 0,
+    "y1": 0,
+    "x2": 20,
+    "y2": 20
+  },
   "ignore": [],
   "stabelizeTransition": 600,
   "minEventDuration": 3000,

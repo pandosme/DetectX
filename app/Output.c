@@ -282,8 +282,10 @@ void Output(cJSON* detections) {
                     if (mqtt_export) {
                         char crop_topic[64];
                         snprintf(crop_topic, sizeof(crop_topic), "crop/%s", ACAP_DEVICE_Prop("serial"));
-                        MQTT_Publish_JSON(crop_topic, payload, 0, 0);
-                        LOG_TRACE("Crop published on MQTT\n");
+                        int mqtt_ok = MQTT_Publish_JSON(crop_topic, payload, 0, 0);
+                        if (!mqtt_ok) {
+                            LOG_WARN("MQTT crop publish failed - message may be too large (JPEG size: %u bytes)\n", jpeg_size);
+                        }
                     }
                     if (http_export) {
                         cJSON_AddStringToObject(payload, "serial", ACAP_DEVICE_Prop("serial"));

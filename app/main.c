@@ -93,6 +93,15 @@ ImageProcess(gpointer data) {
 
 	//Apply Transform detection data and apply user filters
 	cJSON* processedDetections = cJSON_CreateArray();
+
+	// Get video aspect ratio for coordinate transformation
+	const char* videoAspect = "16:9"; // default
+	cJSON* aspectItem = cJSON_GetObjectItem(model, "videoAspect");
+	if (aspectItem && aspectItem->valuestring) {
+		videoAspect = aspectItem->valuestring;
+	}
+
+	// AOI and Size are always in display space (16:9)
 	cJSON* aoi = cJSON_GetObjectItem(settings,"aoi");
 	if(!aoi) {
 		ACAP_STATUS_SetString("model","status","Error. Check log");
@@ -161,10 +170,32 @@ ImageProcess(gpointer data) {
 		}
 		
 		//FILTER DETECTIONS
+		// Transform detection coordinates from capture space to display space (16:9)
+		// This matches the frontend transformCoordinates() function
+		unsigned int display_cx = cx;
+		unsigned int display_cy = cy;
+		unsigned int display_width = width;
+		unsigned int display_height = height;
+
+		if (strcmp(videoAspect, "4:3") == 0) {
+			// Capture is 4:3 (800x600), displayed in 16:9
+			// Content is 750 units wide (scale 0.75), offset by 125
+			display_cx = (unsigned int)(cx * 0.75 + 125);
+			display_width = (unsigned int)(width * 0.75);
+			// Y coordinates unchanged
+		} else if (strcmp(videoAspect, "1:1") == 0) {
+			// Capture is 1:1 (640x640), displayed in 16:9
+			// Content is 562.5 units wide (scale 0.5625), offset by 218.75
+			display_cx = (unsigned int)(cx * 0.5625 + 218.75);
+			display_width = (unsigned int)(width * 0.5625);
+			// Y coordinates unchanged
+		}
+		// For 16:9, no transformation needed
+
 		int insert = 0;
-		if( c >= confidenceThreshold && cx >= x1 && cx <= x2 && cy >= y1 && cy <= y2 )
+		if( c >= confidenceThreshold && display_cx >= x1 && display_cx <= x2 && display_cy >= y1 && display_cy <= y2 )
 			insert = 1;
-		if( width < minWidth || height < minHeight )
+		if( display_width < minWidth || display_height < minHeight )
 			insert = 0;
 		cJSON* ignore = cJSON_GetObjectItem(settings,"ignore");
 		if( insert && ignore && ignore->type == cJSON_Array && cJSON_GetArraySize(ignore) > 0 ) {
@@ -306,7 +337,7 @@ int main(void) {
 	openlog(APP_PACKAGE, LOG_PID|LOG_CONS, LOG_USER);
 
 	ACAP( APP_PACKAGE, ConfigUpdate );
-	LOG_TRACE("<%s\n",__func__);
+	LOG("------------ %s ----------\n",APP_PACKAGE);
 
 	settings = ACAP_Get_Config("settings");
 	if(!settings) {
@@ -321,6 +352,12 @@ int main(void) {
 	eventLabelCounter = cJSON_CreateObject();
 
 	model = Model_Setup();
+	const char* json = cJSON_PrintUnformatted(model);
+	if( json ) {
+		LOG("Model settings: %s\n",json);
+		free( (void*)json );
+	}
+	
 
 	videoWidth = cJSON_GetObjectItem(model,"videoWidth")?cJSON_GetObjectItem(model,"videoWidth")->valueint:800;
 	videoHeight = cJSON_GetObjectItem(model,"videoHeight")?cJSON_GetObjectItem(model,"videoHeight")->valueint:600;

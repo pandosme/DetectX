@@ -1,7 +1,23 @@
 # DetectX
 
-Run custom trained data models.  This package includes MobileNet SSD COCO model.  The idea is to replace this model with your own.  
-Please read [Train-Build.md](https://github.com/pandosme/DetectX/blob/main/Train-Build.md) to understand how to train and build the package.
+Run custom trained data models.  This package includes MobileNet SSD COCO model.  The idea is to replace this model with your own.
+Please read [Train-Build.md](https://github.com/pandosme/DetectX/blob/main/docs/Train-Build.md) to understand how to train and build the package.
+
+## Quick Start
+
+### Building the Application
+
+1. Clone the repository
+2. Replace the model and labels (if using your own):
+   - Place your TFLite model at `app/model/model.tflite`
+   - Place your labels file at `app/model/labels.txt`
+3. Run the build script:
+   ```bash
+   ./build.sh
+   ```
+4. Install the generated `.eap` file on your Axis camera
+
+**Note:** As of version 4.0.0, the `prepare.py` script is no longer required. Model parameters are now automatically extracted during the build process.
 
 
 ***
@@ -223,6 +239,48 @@ DetectX delivers three primary payload types, all enrichable with the configured
 - Monitor CPU and network on the About page to avoid overload (especially on ARTPEC-8 devices).
 
 ***
+
+## Version History
+
+## 4.0.0	January 27, 2026
+
+### Major Features
+- **Modern UI Redesign**: Complete redesign with top navigation bar replacing sidebar, modern card-based layouts, and improved visual hierarchy
+- **Runtime Model Configuration**: New scale mode selection (Balanced, Center-Crop, Letterbox) allows optimizing detection quality vs. coverage without rebuilding
+- **Multi-Aspect Ratio Support**: Full support for 4:3, 16:9, and 1:1 video capture formats with automatic coordinate transformation
+- **Enhanced Video Display**: Increased video viewer size to 1000x562px for improved detection overlay visibility
+- **Simplified Build Process**: Removed dependency on `prepare.py` - model parameters now automatically extracted during build
+
+### UI Improvements
+- Gradient blue navigation bar with improved contrast and readability
+- Modern CSS design system with consistent spacing, shadows, and animations
+- Responsive design optimized for mobile, tablet, and desktop viewing
+- Card hover effects and smooth transitions throughout interface
+- Improved form controls with better focus states and validation feedback
+
+### Technical Improvements
+- Automatic detection coordinate transformation between capture, display, and model spaces
+- Per-frame scale mode switching with preserved detection accuracy
+- Improved preprocessing pipeline with optimized memory usage
+- Enhanced MQTT payload handling with better error messages for oversized crops
+- Refactored model parameter extraction integrated into Docker build process
+
+### Bug Fixes
+- Fixed coordinate misalignment issues when using non-16:9 aspect ratios
+- Resolved detection display offset problems with different scale modes
+- Fixed memory handling in preprocessing context
+- Improved MQTT connection stability and error reporting
+
+### Breaking Changes
+- Model configuration now uses runtime `scaleMode` instead of build-time `preprocess` setting
+- Frontend now expects `videoAspect` field in model configuration
+- AOI and size filters now operate in display space (16:9) for consistency
+
+### Documentation
+- Moved training documentation to `docs/Train-Build.md`
+- Added `CLAUDE.md` with comprehensive project documentation for AI-assisted development
+- Updated README with simplified build instructions
+
 ## 3.5.3	Nov 29, 2025
 - Fixed a memory leak
 

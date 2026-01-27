@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- DetectX - Modern UI with Top Navigation -->
 <html lang="en">
 <head>
     <meta charset="utf-8">
@@ -8,129 +9,296 @@
     <link rel="stylesheet" href="css/app.css">
     <script src="js/jquery-3.7.1.min.js"></script>
     <script src="js/bootstrap.bundle.min.js"></script>
+
+<style>
+    :root {
+        --primary-color: #2563eb;
+        --primary-dark: #1e40af;
+        --primary-light: #3b82f6;
+        --success-color: #10b981;
+        --danger-color: #ef4444;
+        --warning-color: #f59e0b;
+        --info-color: #06b6d4;
+        --bg-light: #f8fafc;
+        --bg-white: #ffffff;
+        --text-dark: #1e293b;
+        --text-muted: #64748b;
+        --border-color: #e2e8f0;
+        --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    }
+
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        background-color: var(--bg-light);
+        color: var(--text-dark);
+    }
+
+    .top-navbar {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+        box-shadow: var(--shadow-lg);
+        padding: 0;
+        min-height: 64px;
+    }
+
+    .navbar-brand {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: white !important;
+        padding: 0.75rem 1.5rem;
+    }
+
+    .nav-pills .nav-link {
+        color: rgba(255, 255, 255, 0.85);
+        border-radius: 8px;
+        padding: 0.65rem 1.25rem;
+        margin: 0 0.25rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+    .nav-pills .nav-link:hover {
+        background-color: rgba(255, 255, 255, 0.15);
+        color: white;
+    }
+
+    .nav-pills .nav-link.active {
+        background-color: rgba(255, 255, 255, 0.25);
+        color: white;
+        font-weight: 600;
+    }
+
+    .main-content {
+        padding: 2rem;
+        max-width: 1600px;
+        margin: 0 auto;
+    }
+
+    .card {
+        border: none;
+        border-radius: 12px;
+        box-shadow: var(--shadow-md);
+        background: var(--bg-white);
+        margin-bottom: 1.5rem;
+        height: 100%;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .card-header {
+        font-weight: 600;
+        font-size: 1.15rem;
+        padding: 1rem 1.5rem;
+        border-radius: 12px 12px 0 0 !important;
+        border-bottom: 2px solid var(--bg-light);
+    }
+
+    .card-header.bg-success {
+        background: linear-gradient(135deg, var(--success-color) 0%, #059669 100%) !important;
+    }
+
+    .card-header.bg-secondary {
+        background: linear-gradient(135deg, var(--text-muted) 0%, #475569 100%) !important;
+    }
+
+    .card-header.bg-info {
+        background: linear-gradient(135deg, var(--info-color) 0%, #0891b2 100%) !important;
+    }
+
+    .card-header.bg-primary {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%) !important;
+    }
+
+    .card-header.bg-warning {
+        background: linear-gradient(135deg, var(--warning-color) 0%, #d97706 100%) !important;
+    }
+
+    .card-body {
+        padding: 1.5rem;
+    }
+
+    .card-body p {
+        margin-bottom: 0.75rem;
+        font-size: 1rem;
+        line-height: 1.6;
+    }
+
+    .card-body strong {
+        color: var(--text-dark);
+        font-weight: 600;
+    }
+
+    .card-body span {
+        color: var(--text-muted);
+    }
+
+    .card-body a {
+        color: var(--primary-color);
+        text-decoration: none;
+        word-break: break-word;
+    }
+
+    .card-body a:hover {
+        color: var(--primary-dark);
+        text-decoration: underline;
+    }
+
+    @media (max-width: 768px) {
+        .main-content {
+            padding: 1rem;
+        }
+
+        .navbar-brand {
+            font-size: 1.25rem;
+        }
+
+        .card-body {
+            font-size: 1rem !important;
+        }
+    }
+</style>
+
 </head>
 
 <body>
-    <div class="d-flex" id="wrapper">
-        <!-- Sidebar -->
-        <div class="bg-light border-right" id="sidebar-wrapper">
-            <div class="sidebar-heading">Custom Model</div>
-            <div class="list-group list-group-flush">
-                <a href="index.html" class="list-group-item list-group-item-action">Detections</a>
-                <a href="mqtt.html" class="list-group-item list-group-item-action">MQTT</a>
-                <a href="advanced.html" class="list-group-item list-group-item-action">Events/Labels</a>
-                <a href="cropping.html" class="list-group-item list-group-item-action">Detection Export</a>
-                <a href="about.html" class="list-group-item list-group-item-action active">About</a>
+    <!-- Top Navigation -->
+    <nav class="navbar navbar-expand-lg top-navbar">
+        <div class="container-fluid">
+            <span class="navbar-brand acapName">Custom Model</span>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                    aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation"
+                    style="background-color: rgba(255,255,255,0.2); border: none;">
+                <span class="navbar-toggler-icon" style="filter: invert(1);"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto nav-pills">
+                    <li class="nav-item">
+                        <a class="nav-link" href="index.html">Detections</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="mqtt.html">MQTT</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="advanced.html">Events/Labels</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="cropping.html">Detection Export</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="about.html">About</a>
+                    </li>
+                </ul>
             </div>
         </div>
-        <!-- /#sidebar-wrapper -->
+    </nav>
 
-        <!-- Page Content -->
-		<div id="page-content">
-			<div class="container mt-4">
-				<div class="row g-4">
-					<!-- Model Card -->
-					<div class="col-md-6">
-						<div class="card h-100">
-							<div class="card-header bg-success text-white">
-								<h5 class="mb-0">Model</h5>
-							</div>
-							<div class="card-body" style="font-size: 1.2rem;">
-								<p><strong>Description:</strong> <span class="modelDescription"></span></p>
-								<p><strong>Status:</strong> <span class="model_status"></span></p>
-								<p><strong>Size:</strong> <span class="modelSize"></span></p>
-								<p><strong>Inference:</strong> <span class="averageInference"></span> ms</p>
-								<p><strong>DLPU:</strong> <span class="dlpu"></span></p>
-							</div>
-						</div>
-					</div>
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="row g-4">
+            <!-- Model Card -->
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">Model</h5>
+                    </div>
+                    <div class="card-body" style="font-size: 1.2rem;">
+                        <p><strong>Description:</strong> <span class="modelDescription">Loading...</span></p>
+                        <p><strong>Status:</strong> <span class="model_status">Loading...</span></p>
+                        <p><strong>Size:</strong> <span class="modelSize">-</span></p>
+                        <p><strong>Inference:</strong> <span class="averageInference">-</span> ms</p>
+                        <p><strong>DLPU:</strong> <span class="dlpu">-</span></p>
+                    </div>
+                </div>
+            </div>
 
-					<!-- Device Card -->
-					<div class="col-md-6">
-						<div class="card h-100">
-							<div class="card-header bg-secondary text-white">
-								<h5 class="mb-0">Device</h5>
-							</div>
-							<div class="card-body" style="font-size: 1.2rem;">
-								<p><strong>Model:</strong> <span class="model"></span></p>
-								<p><strong>Firmware:</strong> <span class="firmware"></span></p>
-								<p><strong>Serial:</strong> <span class="serial"></span></p>
-								<p><strong>CPU Load:</strong> <span class="cpuLoad"></span>% (load avg 15 min)</p>
-								<p><strong>Network:</strong> <span class="bandwidth"></span> (1 min average)</p>
-							</div>
-						</div>
-					</div>
+            <!-- Device Card -->
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">Device</h5>
+                    </div>
+                    <div class="card-body" style="font-size: 1.2rem;">
+                        <p><strong>Model:</strong> <span class="model">Loading...</span></p>
+                        <p><strong>Firmware:</strong> <span class="firmware">-</span></p>
+                        <p><strong>Serial:</strong> <span class="serial">-</span></p>
+                        <p><strong>CPU Load:</strong> <span class="cpuLoad">-</span>% (load avg 15 min)</p>
+                        <p><strong>Network:</strong> <span class="bandwidth">-</span> (1 min average)</p>
+                    </div>
+                </div>
+            </div>
 
-					<!-- MQTT Card -->
-					<div class="col-md-6">
-						<div class="card h-100">
-							<div class="card-header bg-info text-white">
-								<h5 class="mb-0">MQTT</h5>
-							</div>
-							<div class="card-body" style="font-size: 1.2rem;">
-								<p><strong>Status:</strong> <span class="mqttStatus"></span></p>
-								<p><strong>Broker:</strong> <span class="mqttBroker"></span></p>
-								<p><strong>Port:</strong> <span class="mqttPort"></span></p>
-								<p><strong>Client ID:</strong> <span class="mqttClientId"></span></p>
-								<p><strong>Pre-topic:</strong> <span class="mqttPreTopic"></span></p>
-							</div>
-						</div>
-					</div>
+            <!-- MQTT Card -->
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">MQTT</h5>
+                    </div>
+                    <div class="card-body" style="font-size: 1.2rem;">
+                        <p><strong>Status:</strong> <span class="mqttStatus">Loading...</span></p>
+                        <p><strong>Broker:</strong> <span class="mqttBroker">-</span></p>
+                        <p><strong>Port:</strong> <span class="mqttPort">-</span></p>
+                        <p><strong>Pre-topic:</strong> <span class="mqttPreTopic">-</span></p>
+                    </div>
+                </div>
+            </div>
 
-					<!-- Application Card -->
-					<div class="col-md-6">
-						<div class="card h-100">
-							<div class="card-header bg-primary text-white">
-								<h5 class="mb-0">Application</h5>
-							</div>
-							<div class="card-body" style="font-size: 1.2rem;">
-								<p><strong>Name:</strong> <span class="acapName"></span></p>
-								<p><strong>Version:</strong> <span class="version"></span></p>
-								<p><strong>Vendor:</strong> <span class="vendor"></span></p>
-								<p><strong>URL:</strong> 
-									<a href="" target="_blank" style="word-break: break-word;" 
-									   class="vendorUrl"></a>
-								</p>
-							</div>
-						</div>
-					</div>
-					<div class="col-md-6">
-						<div class="card h-100">
-							<div class="card-header bg-warning text-black">
-								<h5 class="mb-0">MQTT Topics</h5>
-							</div>
-							<div class="card-body" style="font-size: 1.2rem;">
-								<p><strong>detectx/detections/[serial] </strong></p><p>List of all detection bounding boxes, labels and confidence</p>
-								<p><strong>detectx/events/[serial]/[label]/[true/false] </strong></p><p>Mimics events.  Only sent on state change if label is present or not</p>
-								<p><strong>detectx/crops/[serial] </strong></p><p>An object with the a cropped detection image data(base64), bounding box,label and confidence</p>
-							</div>
-						</div>
-					</div>
-				</div>
-			</div>
+            <!-- Application Card -->
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Application</h5>
+                    </div>
+                    <div class="card-body" style="font-size: 1.2rem;">
+                        <p><strong>Name:</strong> <span class="acapName">Loading...</span></p>
+                        <p><strong>Version:</strong> <span class="version">-</span></p>
+                        <p><strong>Vendor:</strong> <span class="vendor">-</span></p>
+                        <p><strong>URL:</strong>
+                            <a href="#" target="_blank" style="word-break: break-word;"
+                               class="vendorUrl">-</a>
+                        </p>
+                    </div>
+                </div>
+            </div>
 
-			<div class="modal fade" id="errorModal" tabindex="-1" aria-labelledby="errorModalLabel" aria-hidden="true">
-				<div class="modal-dialog">
-					<div class="modal-content">
-						<div class="modal-header">
-							<h5 class="modal-title" id="errorModalLabel">Error</h5>
-							<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-						</div>
-						<div class="modal-body">
-							The application is not running.
-						</div>
-						<div class="modal-footer">
-							<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-						</div>
-					</div>
-				</div>
-			</div>				
-
-		</div>
+            <!-- MQTT Topics Card -->
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-warning text-black">
+                        <h5 class="mb-0">MQTT Topics</h5>
+                    </div>
+                    <div class="card-body" style="font-size: 1.2rem;">
+                        <p><strong>detectx/detections/[serial] </strong></p><p>List of all detection bounding boxes, labels and confidence</p>
+                        <p><strong>detectx/events/[serial]/[label]/[true/false] </strong></p><p>Mimics events.  Only sent on state change if label is present or not</p>
+                        <p><strong>detectx/crops/[serial] </strong></p><p>An object with the a cropped detection image data(base64), bounding box,label and confidence</p>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <!-- JavaScript -->
-    <script>
+    <div class="modal fade" id="errorModal" tabindex="-1" aria-labelledby="errorModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="errorModalLabel">Error</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    The application is not running.
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
 $(document).ready(function() {
 	// Fetch application data
 	$.ajax({
@@ -143,55 +311,51 @@ $(document).ready(function() {
 
 			// Update UI elements
 			document.title = App.manifest.acapPackageConf.setup.friendlyName;
-			$(".sidebar-heading").html(App.manifest.acapPackageConf.setup.friendlyName);
+			$(".acapName").html(App.manifest.acapPackageConf.setup.friendlyName);
 
 			// Application
-			$('.acapName').text(App.manifest.acapPackageConf.setup.friendlyName);
-			$('.version').text(data.manifest.acapPackageConf.setup.version);
-			$('.vendor').text(data.manifest.acapPackageConf.setup.vendor);
-			$('.vendorUrl').attr('href', data.manifest.acapPackageConf.setup.vendorUrl).text(data.manifest.acapPackageConf.setup.vendorUrl);
+			$('.acapName').text(data.manifest?.acapPackageConf?.setup?.friendlyName || 'DetectX');
+			$('.version').text(data.manifest?.acapPackageConf?.setup?.version || '-');
+			$('.vendor').text(data.manifest?.acapPackageConf?.setup?.vendor || '-');
+			var vendorUrl = data.manifest?.acapPackageConf?.setup?.vendorUrl || '#';
+			$('.vendorUrl').attr('href', vendorUrl).text(vendorUrl === '#' ? '-' : vendorUrl);
 
 			// Device
-			$('.serial').text(data.device.serial);
-			$('.model').text(data.device.model);
-			$('.firmware').text(data.device.firmware);
-			if( data.status.device.cpu )
-				$('.cpuLoad').text(parseInt(data.status.device.cpu * 50));
-			else
+			$('.serial').text(data.device?.serial || '-');
+			$('.model').text(data.device?.model || '-');
+			$('.firmware').text(data.device?.firmware || '-');
+			// CPU Load: Divide by 2 to account for 2 cores (100% of one core = 50% of total)
+			if (data.status?.device?.cpu !== undefined) {
+				$('.cpuLoad').text(parseInt(data.status.device.cpu / 2));
+			} else {
 				$('.cpuLoad').text('-');
-			if( data.status.device.network )
+			}
+			if (data.status?.device?.network !== undefined) {
 				$('.bandwidth').text(formatBandwidth(data.status.device.network));
-			else
+			} else {
 				$('.bandwidth').text('-');
-				
+			}
+
 			// Model
-			$('.modelDescription').text(data.model.description || "");
-			if(data.status.model.status)
-				$('.model_status').text(data.status.model.status);
-			else
-				$('.model_status').text("Loading");
-			if( data.model.modelWidth && data.model.modelHeight )
+			$('.modelDescription').text(data.model?.description || 'COCO YOLOv5');
+			$('.model_status').text(data.status?.model?.status || 'Loading...');
+			if (data.model?.modelWidth && data.model?.modelHeight) {
 				$('.modelSize').text(data.model.modelWidth + 'x' + data.model.modelHeight);
-			else
-				$('.modelSize').text("");
-			var inference = "";
-			if( App.status.model.averageTime )
-				inference = App.status.model.averageTime.toString();
-			$('.averageInference').text(inference);
-			if(data.model.chip)
-				$('.dlpu').text(data.model.chip);
-			else
-				$('.dlpu').text("-");
+			} else {
+				$('.modelSize').text('-');
+			}
+			if (data.status?.model?.averageTime !== undefined) {
+				$('.averageInference').text(data.status.model.averageTime.toString());
+			} else {
+				$('.averageInference').text('-');
+			}
+			$('.dlpu').text(data.model?.chip || '-');
 
 			// MQTT
-			if( App.status.mqtt.status )
-				$('.mqttStatus').text(App.status.mqtt.status);
-			else
-				$('.mqttStatus').text("");
-			$('.mqttBroker').text(App.mqtt.address);
-			$('.mqttPort').text(App.mqtt.port);
-			$('.mqttClientId').text(App.mqtt.clientID);
-			$('.mqttPreTopic').text(App.mqtt.preTopic);
+			$('.mqttStatus').text(data.status?.mqtt?.status || 'Unknown');
+			$('.mqttBroker').text(data.mqtt?.address || '-');
+			$('.mqttPort').text(data.mqtt?.port || '-');
+			$('.mqttPreTopic').text(data.mqtt?.preTopic || '-');
 		},
 		error: function(response) {
 			$('#errorModal').modal('show');
@@ -206,33 +370,33 @@ $(document).ready(function() {
 			dataType: 'json',
 			cache: false,
 			success: function(data) {
-				$('#model_status').text('Status: ' + data.model.status);
-				var inference = "";
-				if( App.status.model.averageTime )
-					inference = App.status.model.averageTime.toString();
-				$('.averageInference').text(inference);
-				$('.mqttStatus').text(data.mqtt.status);
-				if( data.device.cpu )
-					$('.cpuLoad').text(parseInt(data.device.cpu * 50));
-				else
+				if (data.model?.status) {
+					$('.model_status').text(data.model.status);
+				}
+				if (data.model?.averageTime !== undefined) {
+					$('.averageInference').text(data.model.averageTime.toString());
+				}
+				if (data.mqtt?.status) {
+					$('.mqttStatus').text(data.mqtt.status);
+				}
+				// CPU Load: Divide by 2 to account for 2 cores
+				if (data.device?.cpu !== undefined) {
+					$('.cpuLoad').text(parseInt(data.device.cpu / 2));
+				} else {
 					$('.cpuLoad').text('-');
-				if( data.device.network )
+				}
+				if (data.device?.network !== undefined) {
 					$('.bandwidth').text(formatBandwidth(data.device.network));
-				else
+				} else {
 					$('.bandwidth').text('-');
+				}
 			},
 			error() {
-				$('#model_status').text('Status: No response');
+				$('.model_status').text('No response');
 				$('.mqttStatus').text('No response');
 			}
 		});
 	}, 4000);
-
-	// Sidebar toggle
-	$("#menu-toggle").click(function(e) {
-		e.preventDefault();
-		$("#wrapper").toggleClass("toggled");
-	});
 });
 
 function formatBandwidth(valueKbps) {
@@ -244,6 +408,6 @@ function formatBandwidth(valueKbps) {
 	}
 }
 
-    </script>
+</script>
 </body>
 </html>
