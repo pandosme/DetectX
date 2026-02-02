@@ -110,10 +110,9 @@ You do not need to alter any C or H files. However, to create a custom ACAP, you
 - `manifest.json`
 - `Makefile`
 
-1. Replace `app/model/labels.txt` with your labels.
+1. Replace `app/model/labels.txt` with your labels (one label per line).
 2. Replace `app/model/model.tflite` with your model.tflite.
-3. Run `python prepare.py` to update `app/html/config/model.json`.
-4. Run `./build.sh`.
+3. Run `./build.sh` - model parameters are automatically extracted during the build process.
 
 You should now have a new EAP file ready for installation on your camera.
 

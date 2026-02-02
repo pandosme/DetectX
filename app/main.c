@@ -43,7 +43,49 @@ ConfigUpdate( const char *setting, cJSON* data) {
 	if( json ) {
 		free(json);
 	}
-	LOG_TRACE("%s>\n",__func__);	
+	LOG_TRACE("%s>\n",__func__);
+}
+
+void
+migrate_settings_to_pixel_coordinates(cJSON* settings, int modelWidth, int modelHeight) {
+	cJSON* version = cJSON_GetObjectItem(settings, "coordinateVersion");
+	if (version && version->valueint >= 2) {
+		return;  // Already migrated
+	}
+
+	LOG("Migrating settings from normalized to pixel coordinates...\n");
+
+	// Migrate AOI
+	cJSON* aoi = cJSON_GetObjectItem(settings, "aoi");
+	if (aoi) {
+		cJSON* x1 = cJSON_GetObjectItem(aoi, "x1");
+		cJSON* y1 = cJSON_GetObjectItem(aoi, "y1");
+		cJSON* x2 = cJSON_GetObjectItem(aoi, "x2");
+		cJSON* y2 = cJSON_GetObjectItem(aoi, "y2");
+
+		if (x1) x1->valueint = (int)(x1->valueint * modelWidth / 1000);
+		if (y1) y1->valueint = (int)(y1->valueint * modelHeight / 1000);
+		if (x2) x2->valueint = (int)(x2->valueint * modelWidth / 1000);
+		if (y2) y2->valueint = (int)(y2->valueint * modelHeight / 1000);
+	}
+
+	// Migrate size filter
+	cJSON* size = cJSON_GetObjectItem(settings, "size");
+	if (size) {
+		cJSON* x1 = cJSON_GetObjectItem(size, "x1");
+		cJSON* y1 = cJSON_GetObjectItem(size, "y1");
+		cJSON* x2 = cJSON_GetObjectItem(size, "x2");
+		cJSON* y2 = cJSON_GetObjectItem(size, "y2");
+
+		if (x1) x1->valueint = (int)(x1->valueint * modelWidth / 1000);
+		if (y1) y1->valueint = (int)(y1->valueint * modelHeight / 1000);
+		if (x2) x2->valueint = (int)(x2->valueint * modelWidth / 1000);
+		if (y2) y2->valueint = (int)(y2->valueint * modelHeight / 1000);
+	}
+
+	cJSON_AddNumberToObject(settings, "coordinateVersion", 2);
+	ACAP_Set_Config("settings", settings);
+	LOG("Settings migration complete.\n");
 }
 
 
@@ -94,14 +136,11 @@ ImageProcess(gpointer data) {
 	//Apply Transform detection data and apply user filters
 	cJSON* processedDetections = cJSON_CreateArray();
 
-	// Get video aspect ratio for coordinate transformation
-	const char* videoAspect = "16:9"; // default
-	cJSON* aspectItem = cJSON_GetObjectItem(model, "videoAspect");
-	if (aspectItem && aspectItem->valuestring) {
-		videoAspect = aspectItem->valuestring;
-	}
+	// Extract model dimensions for pixel coordinate system
+	int modelWidth = cJSON_GetObjectItem(model,"modelWidth")?cJSON_GetObjectItem(model,"modelWidth")->valueint:640;
+	int modelHeight = cJSON_GetObjectItem(model,"modelHeight")?cJSON_GetObjectItem(model,"modelHeight")->valueint:640;
 
-	// AOI and Size are always in display space (16:9)
+	// AOI and Size are in pixel space relative to model dimensions
 	cJSON* aoi = cJSON_GetObjectItem(settings,"aoi");
 	if(!aoi) {
 		ACAP_STATUS_SetString("model","status","Error. Check log");
@@ -142,23 +181,23 @@ ImageProcess(gpointer data) {
 				c = property->valueint;
 			}
 			if( strcmp("x",property->string) == 0 ) {
-				property->valueint = property->valuedouble * 1000;
+				property->valueint = property->valuedouble * modelWidth;
 				property->valuedouble = property->valueint;
 				cx += property->valueint;
 			}
 			if( strcmp("y",property->string) == 0 ) {
-				property->valueint = property->valuedouble * 1000;
+				property->valueint = property->valuedouble * modelHeight;
 				property->valuedouble = property->valueint;
 				cy += property->valueint;
 			}
 			if( strcmp("w",property->string) == 0 ) {
-				property->valueint = property->valuedouble * 1000;
+				property->valueint = property->valuedouble * modelWidth;
 				width = property->valueint;
 				property->valuedouble = property->valueint;
 				cx += property->valueint / 2;
 			}
 			if( strcmp("h",property->string) == 0 ) {
-				property->valueint = property->valuedouble * 1000;
+				property->valueint = property->valuedouble * modelHeight;
 				height = property->valueint;
 				property->valuedouble = property->valueint;
 				cy += property->valueint / 2;
@@ -170,32 +209,17 @@ ImageProcess(gpointer data) {
 		}
 		
 		//FILTER DETECTIONS
-		// Transform detection coordinates from capture space to display space (16:9)
-		// This matches the frontend transformCoordinates() function
-		unsigned int display_cx = cx;
-		unsigned int display_cy = cy;
-		unsigned int display_width = width;
-		unsigned int display_height = height;
-
-		if (strcmp(videoAspect, "4:3") == 0) {
-			// Capture is 4:3 (800x600), displayed in 16:9
-			// Content is 750 units wide (scale 0.75), offset by 125
-			display_cx = (unsigned int)(cx * 0.75 + 125);
-			display_width = (unsigned int)(width * 0.75);
-			// Y coordinates unchanged
-		} else if (strcmp(videoAspect, "1:1") == 0) {
-			// Capture is 1:1 (640x640), displayed in 16:9
-			// Content is 562.5 units wide (scale 0.5625), offset by 218.75
-			display_cx = (unsigned int)(cx * 0.5625 + 218.75);
-			display_width = (unsigned int)(width * 0.5625);
-			// Y coordinates unchanged
-		}
-		// For 16:9, no transformation needed
+		// Coordinates are now in pixel space relative to model input (e.g., 640x640)
+		// No transformation needed - filter directly in pixel coordinates
+		unsigned int pixel_cx = cx;
+		unsigned int pixel_cy = cy;
+		unsigned int pixel_width = width;
+		unsigned int pixel_height = height;
 
 		int insert = 0;
-		if( c >= confidenceThreshold && display_cx >= x1 && display_cx <= x2 && display_cy >= y1 && display_cy <= y2 )
+		if( c >= confidenceThreshold && pixel_cx >= x1 && pixel_cx <= x2 && pixel_cy >= y1 && pixel_cy <= y2 )
 			insert = 1;
-		if( display_width < minWidth || display_height < minHeight )
+		if( pixel_width < minWidth || pixel_height < minHeight )
 			insert = 0;
 		cJSON* ignore = cJSON_GetObjectItem(settings,"ignore");
 		if( insert && ignore && ignore->type == cJSON_Array && cJSON_GetArraySize(ignore) > 0 ) {
@@ -217,7 +241,7 @@ ImageProcess(gpointer data) {
 
 	cJSON_Delete( detections );
 
-	Output( processedDetections );
+	Output( processedDetections, modelWidth, modelHeight );
 	Model_Reset();
 
 	cJSON_Delete(processedDetections);
@@ -361,6 +385,11 @@ int main(void) {
 
 	videoWidth = cJSON_GetObjectItem(model,"videoWidth")?cJSON_GetObjectItem(model,"videoWidth")->valueint:800;
 	videoHeight = cJSON_GetObjectItem(model,"videoHeight")?cJSON_GetObjectItem(model,"videoHeight")->valueint:600;
+	int modelWidth = cJSON_GetObjectItem(model,"modelWidth")?cJSON_GetObjectItem(model,"modelWidth")->valueint:640;
+	int modelHeight = cJSON_GetObjectItem(model,"modelHeight")?cJSON_GetObjectItem(model,"modelHeight")->valueint:640;
+
+	// Migrate settings if needed
+	migrate_settings_to_pixel_coordinates(settings, modelWidth, modelHeight);
 
 	if( model ) {
 		ACAP_Set_Config("model", model );

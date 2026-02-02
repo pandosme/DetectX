@@ -83,13 +83,13 @@ The build process automatically extracts all parameters from your new model!
 
 ## Comparison with Legacy prepare.py
 
-| Aspect | Legacy (prepare.py) | New (Build-time Extraction) |
-|--------|---------------------|----------------------------|
-| **Model dimensions** | Manual script before build | Auto-detected at runtime |
-| **Classes/boxes** | Manual script before build | Auto-detected at runtime |
-| **Labels** | Embedded in model.json | Loaded from labels.txt |
-| **Quantization** | Manual script before build | Auto-extracted during build |
-| **Video dimensions** | Calculated by script | Auto-calculated at runtime |
+| Aspect | Legacy (v3.x) | Current (v4.0+) |
+|--------|---------------|-----------------|
+| **Model dimensions** | Manual prepare.py script | Auto-detected at runtime |
+| **Classes/boxes** | Manual prepare.py script | Auto-detected at runtime |
+| **Labels** | Stored in model.json file | Loaded from labels.txt |
+| **Quantization** | Manual prepare.py script | Auto-extracted during build |
+| **Video dimensions** | Calculated by prepare.py | Auto-calculated at runtime |
 | **Platform detection** | Manual in model.json | Auto-detected at runtime |
 
 The new approach is **fully automatic**:

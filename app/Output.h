@@ -16,8 +16,10 @@
  * @brief Processes detections and exports as configured (MQTT, SD, HTTP, crop cache).
  *
  * @param detectionList cJSON array of detected objects (from model).
+ * @param modelWidth Model input width in pixels.
+ * @param modelHeight Model input height in pixels.
  */
-void Output(cJSON* detectionList);
+void Output(cJSON* detectionList, int modelWidth, int modelHeight);
 
 /**
  * @brief Resets all output and event/transient state (crop cache, timers).

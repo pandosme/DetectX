@@ -85,7 +85,7 @@ static gboolean Output_DeactivateExpired(gpointer user_data) {
     return TRUE;
 }
 
-void Output(cJSON* detections) {
+void Output(cJSON* detections, int modelWidth, int modelHeight) {
     if (!detections || cJSON_GetArraySize(detections) == 0) {
         cJSON* emptyArr = cJSON_CreateArray();
         ACAP_STATUS_SetObject("labels", "detections", emptyArr);
@@ -121,11 +121,18 @@ void Output(cJSON* detections) {
         sdcard_enable = 0;
     }
 
-    // --- Export all detections as MQTT (non-crop summary) ---
+    // --- Export all detections as MQTT (non-crop summary) with metadata ---
     char topic[256];
     snprintf(topic, sizeof(topic), "detection/%s", ACAP_DEVICE_Prop("serial"));
     cJSON* mqttPayload = cJSON_CreateObject();
     cJSON_AddItemToObject(mqttPayload, "detections", cJSON_Duplicate(detections, 1));
+
+    // Add metadata for coordinate interpretation
+    cJSON* metadata = cJSON_CreateObject();
+    cJSON_AddNumberToObject(metadata, "modelWidth", modelWidth);
+    cJSON_AddNumberToObject(metadata, "modelHeight", modelHeight);
+    cJSON_AddStringToObject(metadata, "coordinateSystem", "pixels");
+    cJSON_AddItemToObject(mqttPayload, "metadata", metadata);
 
     MQTT_Publish_JSON(topic, mqttPayload, 0, 0);
     cJSON_Delete(mqttPayload);

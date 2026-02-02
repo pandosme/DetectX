@@ -1,4 +1,5 @@
 {
+  "coordinateVersion": 2,
   "confidence": 50,
   "scaleMode": "balanced",
   "objectness": 0.25,
@@ -6,14 +7,14 @@
   "aoi": {
     "x1": 0,
     "y1": 0,
-    "x2": 1000,
-    "y2": 1000
+    "x2": 640,
+    "y2": 640
   },
   "size": {
     "x1": 0,
     "y1": 0,
-    "x2": 20,
-    "y2": 20
+    "x2": 13,
+    "y2": 13
   },
   "ignore": [],
   "stabelizeTransition": 600,

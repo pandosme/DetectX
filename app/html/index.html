@@ -7,11 +7,9 @@
     <title>Custom Model</title>
     <link rel="stylesheet" href="css/bootstrap.min.css">
     <link rel="stylesheet" href="css/app.css?v=3.6.0">
-    <link rel="stylesheet" href="css/imgareaselect-default.css">
     <script src="js/jquery-3.7.1.min.js"></script>
     <script src="js/bootstrap.bundle.min.js"></script>
     <script src="js/media-stream-player.min.js"></script>
-    <script src="js/jquery.imgareaselect.js"></script>
 
 <style>
     :root {
@@ -106,7 +104,6 @@
 
     /* Video Display */
     #view {
-        border-radius: 12px;
         overflow: hidden;
         box-shadow: var(--shadow-lg);
         background: black;
@@ -119,31 +116,47 @@
         overflow: hidden;
     }
 
-    #snapshot {
-        max-width: 100%;
-        max-height: 600px;
-        object-fit: contain;
-    }
-
     #video media-stream-player {
         width: 100% !important;
         height: 100% !important;
-        object-fit: contain !important;
+        object-fit: fill !important;
     }
 
-    /* Ensure imgAreaSelect appears above canvases */
-    .imgareaselect-border1,
-    .imgareaselect-border2,
-    .imgareaselect-border3,
-    .imgareaselect-border4,
-    .imgareaselect-outer,
-    .imgareaselect-selection {
-        z-index: 1000 !important;
+    /* Custom AOI Selection Overlay */
+    #aoi-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1000;
+        display: none;
+        pointer-events: all;
     }
 
-    .imgareaselect-handle {
-        z-index: 1001 !important;
+    #aoi-overlay.active {
+        display: block;
     }
+
+    .aoi-box {
+        position: absolute;
+        border: 2px solid #00ff00;
+        background: rgba(0, 255, 0, 0.1);
+        cursor: move;
+    }
+
+    .aoi-handle {
+        position: absolute;
+        width: 10px;
+        height: 10px;
+        background: #00ff00;
+        border: 1px solid #fff;
+    }
+
+    .aoi-handle.nw { top: -5px; left: -5px; cursor: nw-resize; }
+    .aoi-handle.ne { top: -5px; right: -5px; cursor: ne-resize; }
+    .aoi-handle.sw { bottom: -5px; left: -5px; cursor: sw-resize; }
+    .aoi-handle.se { bottom: -5px; right: -5px; cursor: se-resize; }
 
     /* Buttons */
     .btn {
@@ -258,10 +271,6 @@
             padding: 1rem;
         }
 
-        #snapshot {
-            max-height: 400px;
-        }
-
         .navbar-brand {
             font-size: 1.25rem;
         }
@@ -323,12 +332,20 @@
                 <!-- Video Display Card -->
                 <div class="card">
                     <div class="card-body">
-                        <div id="view" style="width:1000px; height:562px; max-width:100%; margin:0 auto;">
+                        <div id="view" style="width:1000px; height:1000px; max-width:100%; margin:0 auto;">
                             <div style="width:100%; height:100%; position:relative; background-color: black;">
-                                <img id="snapshot" src="" style="width:100%; height:100%; position:absolute; top:0px; left:0px; object-fit:contain;">
                                 <div id="video" style="width:100%; height:100%; position:absolute; top:0px; left:0px;"></div>
                                 <canvas id="overlayCanvas" width="1000" height="1000" style="width:100%; height:100%; position:absolute; top:0px; left:0px; pointer-events:none;"></canvas>
                                 <canvas id="canvas" width="1000" height="1000" style="width:100%; height:100%; position:absolute; top:0px; left:0px;"></canvas>
+                                <!-- AOI Selection Overlay -->
+                                <div id="aoi-overlay">
+                                    <div class="aoi-box">
+                                        <div class="aoi-handle nw"></div>
+                                        <div class="aoi-handle ne"></div>
+                                        <div class="aoi-handle sw"></div>
+                                        <div class="aoi-handle se"></div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -431,8 +448,21 @@ var videoHeight = 360;
 var viewWidth = 1000;
 var viewHeight = 562;
 var inferenceTimer = 0;
-var imgAreaSelectInstance = null;
 var selectionMode = "";
+
+// Custom AOI Selection State
+var aoiState = {
+	active: false,
+	dragging: false,
+	resizing: false,
+	resizeHandle: null,
+	startX: 0,
+	startY: 0,
+	x1: 0,
+	y1: 0,
+	x2: 0,
+	y2: 0
+};
 var setupComplete = false;
 		
 $(document).ready(function() {
@@ -476,92 +506,11 @@ function initializePage() {
 				$("#modelResolution").text(App.model.modelWidth + " x " + App.model.modelHeight);
 			}
 
-			SetupView(App.model.videoAspect);
+			SetupView(App.model.modelWidth, App.model.modelHeight);
 
-			// Calculate initial AOI position (direct mapping from 16:9 display space)
-			var aoi_x1 = parseInt(App.settings.aoi.x1 * viewWidth / 1000);
-			var aoi_x2 = parseInt(App.settings.aoi.x2 * viewWidth / 1000);
-			var aoi_y1 = parseInt(App.settings.aoi.y1 * viewHeight / 1000);
-			var aoi_y2 = parseInt(App.settings.aoi.y2 * viewHeight / 1000);
 
-			imgAreaSelectInstance = $("#video").imgAreaSelect({
-				x1: aoi_x1,
-				y1: aoi_y1,
-				x2: aoi_x2,
-				y2: aoi_y2,
-				handles: true, enable:true, movable:true, resizable:true, show:false,
-				instance: true,
-				onSelectEnd: function(img, selection) {
-					// Selection is in display space (viewWidth x viewHeight)
-					// Convert to 0-1000 range for 16:9 display (no capture space transformation)
-					// Backend will handle transforming detections to display space
-
-					var x1 = Math.round(selection.x1 * 1000 / viewWidth);
-					var x2 = Math.round(selection.x2 * 1000 / viewWidth);
-					var y1 = Math.round(selection.y1 * 1000 / viewHeight);
-					var y2 = Math.round(selection.y2 * 1000 / viewHeight);
-
-					// Ensure proper ordering (handle reverse dragging)
-					if (x1 > x2) { var temp = x1; x1 = x2; x2 = temp; }
-					if (y1 > y2) { var temp = y1; y1 = y2; y2 = temp; }
-
-					// Clamp to valid range [0, 1000]
-					x1 = Math.max(0, Math.min(1000, x1));
-					x2 = Math.max(0, Math.min(1000, x2));
-					y1 = Math.max(0, Math.min(1000, y1));
-					y2 = Math.max(0, Math.min(1000, y2));
-
-					// Ensure non-zero area
-					if (x2 - x1 < 10) x2 = Math.min(1000, x1 + 10);
-					if (y2 - y1 < 10) y2 = Math.min(1000, y1 + 10);
-					if( selectionMode === "aoi" ) {
-						// Validate: AOI must be at least as large as size filter
-						var sizeW = App.settings.size.x2 - App.settings.size.x1;
-						var sizeH = App.settings.size.y2 - App.settings.size.y1;
-						var aoiW = x2 - x1;
-						var aoiH = y2 - y1;
-
-						if (aoiW < sizeW || aoiH < sizeH) {
-							showToast("Area of Interest cannot be smaller than Minimum Size filter (" + sizeW + "x" + sizeH + ")", "danger");
-							return;
-						}
-
-						App.settings.aoi = { x1, y1, x2, y2 };
-						$.ajax({type: "POST",url: "settings",contentType: 'application/json',
-							data: JSON.stringify({ aoi: App.settings.aoi }),
-							success: function(response) {
-								showToast("Area of Interest updated successfully", "success");
-							},
-							error: function(response) {
-								showToast("Failed to update Area of Interest: " + response.statusText, "danger");
-							}
-						});
-					} else {
-						// Validate: Size cannot be larger than AOI
-						var aoiW = App.settings.aoi.x2 - App.settings.aoi.x1;
-						var aoiH = App.settings.aoi.y2 - App.settings.aoi.y1;
-						var sizeW = x2 - x1;
-						var sizeH = y2 - y1;
-
-						if (sizeW > aoiW || sizeH > aoiH) {
-							showToast("Minimum Size cannot be larger than Area of Interest (" + aoiW + "x" + aoiH + ")", "danger");
-							return;
-						}
-
-						App.settings.size = { x1, y1, x2, y2 };
-						$.ajax({type: "POST",url: "settings",contentType: 'application/json',
-							data: JSON.stringify({ size: App.settings.size }),
-							success: function(response) {
-								showToast("Minimum Size updated successfully", "success");
-							},
-							error: function(response) {
-								showToast("Failed to update Minimum Size: " + response.statusText, "danger");
-							}
-						});
-					}
-				}
-			});
-			imgAreaSelectInstance.setOptions({hide:true});
+			// Initialize custom AOI overlay
+			initializeAOIOverlay();
 		},
 		error: function(response) {
 			$(".modal-body").html('<b>The application is not responding<b/>');
@@ -573,7 +522,7 @@ function initializePage() {
 		var canvas = document.getElementById('canvas');
 		var ctx = canvas.getContext("2d");
 		ctx.beginPath();
-		ctx.clearRect(0, 0, 1000, 1000 );
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
 		ctx.stroke();
 		appendDataToTable([]);
 		$.ajax({type: "GET",url: 'detections?reset=yes',dataType: 'json',cache: false});
@@ -581,46 +530,17 @@ function initializePage() {
 
 	// Set AOI button click handler
 	$("#aoi_button").click(function() {
-		if (selectionMode === "aoi" ) {
-			selectionMode = "none";
-			imgAreaSelectInstance.setOptions({hide:true});
+		if (aoiState.active) {
+			// Hide AOI selection
+			toggleAOISelection(false);
 			$(this).removeClass('btn-primary').addClass('btn-secondary');
 		} else {
-			selectionMode = "aoi";
-
-			// Convert AOI from 0-1000 display space to pixel space (direct mapping)
-			var x1 = parseInt(App.settings.aoi.x1 * viewWidth / 1000);
-			var x2 = parseInt(App.settings.aoi.x2 * viewWidth / 1000);
-			var y1 = parseInt(App.settings.aoi.y1 * viewHeight / 1000);
-			var y2 = parseInt(App.settings.aoi.y2 * viewHeight / 1000);
-
-			imgAreaSelectInstance.setSelection(x1, y1, x2, y2, 0);
-			imgAreaSelectInstance.setOptions({show:true});
-			$("#size_button").removeClass('btn-primary').addClass('btn-secondary');
+			// Show AOI selection
+			toggleAOISelection(true);
 			$(this).removeClass('btn-secondary').addClass('btn-primary');
 		}
 	});
 
-	$("#size_button").click(function() {
-		if (selectionMode === "size" ) {
-			selectionMode = "none";
-			imgAreaSelectInstance.setOptions({hide:true});
-			$(this).removeClass('btn-primary').addClass('btn-secondary');
-		} else {
-			selectionMode = "size";
-
-			// Convert size from 0-1000 display space to pixel space (direct mapping)
-			var x1 = parseInt(App.settings.size.x1 * viewWidth / 1000);
-			var x2 = parseInt(App.settings.size.x2 * viewWidth / 1000);
-			var y1 = parseInt(App.settings.size.y1 * viewHeight / 1000);
-			var y2 = parseInt(App.settings.size.y2 * viewHeight / 1000);
-
-			imgAreaSelectInstance.setSelection(x1, y1, x2, y2, 0);
-			imgAreaSelectInstance.setOptions({show:true});
-			$(this).removeClass('btn-secondary').addClass('btn-primary');
-			$("#aoi_button").removeClass('btn-primary').addClass('btn-secondary');
-		}
-	});
 
 	$("#settings_confidence").change(function() {
 		var confidenceValue = parseInt($(this).val());
@@ -700,7 +620,7 @@ function initializePage() {
 				var ctx = canvas.getContext("2d");
 
 				ctx.beginPath();
-				ctx.clearRect(0, 0, 1000, 1000 );
+				ctx.clearRect(0, 0, canvas.width, canvas.height);
 				ctx.stroke();
 				ctx.lineWidth = 3;
 				ctx.strokeStyle = '#FFFF00';
@@ -711,7 +631,7 @@ function initializePage() {
 				    var detection = status.labels.detections[i];
 
 					// Transform coordinates from capture space to display space (16:9)
-					var transformed = transformCoordinates(detection.x, detection.y, detection.w, detection.h, App.model.videoAspect);
+					var transformed = transformCoordinates(detection.x, detection.y, detection.w, detection.h);
 
 					ctx.rect(transformed.x, transformed.y, transformed.w, transformed.h);
 					var text = detection.label + ': ' + detection.c;
@@ -736,61 +656,108 @@ function initializePage() {
 };			
 	  
 
-function transformCoordinates(x, y, w, h, aspect) {
-	// Coordinates come from backend in 0-1000 range representing capture image
-	// Display is always 16:9 (800x450), canvas is 1000x1000
-	// Need to transform based on how capture image is letterboxed in display
+function transformCoordinates(x, y, w, h) {
+	// Coordinates come from backend as pixels relative to model input (e.g., 640x640)
+	var scaleMode = App.settings.scaleMode || "balanced";
 
-	if (aspect === '4:3') {
-		// Capture is 4:3 (800x600), displayed in 16:9 (800x450)
-		// Image displayed as 600x450 (maintaining 4:3), centered horizontally
-		// In canvas coords: content is 750 units wide (600/800 * 1000), offset by 125
-		var scale = 0.75;  // 600/800
-		var offsetX = 125;  // (1000 - 750) / 2
+	if (scaleMode === "letterbox") {
+		// Letterbox mode: scale from model to displayed video size
+		// Model is 640x640, displayed video is e.g., 640x360 (scaled down 16:9)
+		var videoAspect = videoWidth / videoHeight;
+		var displayVideoWidth = App.model.modelWidth;  // Same as view width
+		var displayVideoHeight = App.model.modelWidth / videoAspect;
+
+		var scaleX = displayVideoWidth / App.model.modelWidth;
+		var scaleY = displayVideoHeight / App.model.modelHeight;
+
 		return {
-			x: x * scale + offsetX,
-			y: y,
-			w: w * scale,
-			h: h
+			x: x * scaleX,
+			y: y * scaleY,
+			w: w * scaleX,
+			h: h * scaleY
 		};
-	} else if (aspect === '1:1') {
-		// Capture is 1:1 (640x640), displayed in 16:9 (800x450)
-		// Image displayed as 450x450 (maintaining 1:1), centered horizontally
-		// In canvas coords: content is 562.5 units wide (450/800 * 1000), offset by 218.75
-		var scale = 0.5625;  // 450/800
-		var offsetX = 218.75;  // (1000 - 562.5) / 2
-		return {
-			x: x * scale + offsetX,
-			y: y,
-			w: w * scale,
-			h: h
-		};
-	} else if (aspect === '16:9') {
-		// Capture is 16:9, displayed in 16:9 - no transformation needed
-		return { x: x, y: y, w: w, h: h };
 	} else {
-		// Default: no transformation
-		return { x: x, y: y, w: w, h: h };
+		// Balanced and crop modes: scale from model space to video space
+		// For 640x640 model → 856x640 video: scaleX=1.3375, scaleY=1.0
+		var scaleX = videoWidth / App.model.modelWidth;
+		var scaleY = videoHeight / App.model.modelHeight;
+
+		return {
+			x: x * scaleX,
+			y: y * scaleY,
+			w: w * scaleX,
+			h: h * scaleY
+		};
 	}
 }
 
-function SetupView(aspect) {
-	// Always display in 16:9 format regardless of capture aspect ratio
-	viewWidth = 1000;
-	viewHeight = 562;
+function SetupView(modelWidth, modelHeight) {
+	// Store model dimensions for coordinate transformation
+	App.model.modelWidth = modelWidth;
+	App.model.modelHeight = modelHeight;
 
-	switch (aspect) {
-		case '4:3': videoWidth = 1280; videoHeight = 960; imageWidth = 800; imageHeight = 600; break;
-		case '16:9': videoWidth = 1280; videoHeight = 720; imageWidth = 800; imageHeight = 450; break;
-		case '1:1': videoWidth = 640; videoHeight = 640; imageWidth = 640; imageHeight = 640; break;
-		case '16:10': videoWidth = 800; videoHeight = 500; imageWidth = 800; imageHeight = 500; break;
+	// Use video dimensions from model config for view size
+	videoWidth = App.model.videoWidth;
+	videoHeight = App.model.videoHeight;
+	imageWidth = App.model.videoWidth;
+	imageHeight = App.model.videoHeight;
+
+	// For letterbox mode, use model dimensions for 1:1 square view
+	var scaleMode = App.settings.scaleMode || "balanced";
+
+	if (scaleMode === "letterbox") {
+		// View is 1:1 square using model dimensions (e.g., 640x640)
+		viewWidth = modelWidth;
+		viewHeight = modelWidth;
+
+		// Calculate video's displayed size when letterboxed in square view
+		// Video aspect ratio (e.g., 1136:640 = 1.775:1 for 16:9)
+		var videoAspect = videoWidth / videoHeight;
+		var displayVideoWidth = viewWidth;
+		var displayVideoHeight = viewWidth / videoAspect;
+
+		// Calculate letterbox offset (black bars on top/bottom)
+		var letterboxOffsetY = (viewHeight - displayVideoHeight) / 2;
+
+		// Canvas matches the displayed video size
+		$("#overlayCanvas").attr("width", displayVideoWidth).attr("height", displayVideoHeight);
+		$("#canvas").attr("width", displayVideoWidth).attr("height", displayVideoHeight);
+
+		// Set CSS dimensions to match canvas buffer size (not stretched)
+		$("#overlayCanvas").css({
+			"width": displayVideoWidth + "px",
+			"height": displayVideoHeight + "px",
+			"top": letterboxOffsetY + "px"
+		});
+		$("#canvas").css({
+			"width": displayVideoWidth + "px",
+			"height": displayVideoHeight + "px",
+			"top": letterboxOffsetY + "px"
+		});
+	} else {
+		// Balanced and crop modes: view matches video dimensions exactly
+		viewWidth = videoWidth;
+		viewHeight = videoHeight;
+
+		// Update canvas dimensions to match video
+		$("#overlayCanvas").attr("width", videoWidth).attr("height", videoHeight);
+		$("#canvas").attr("width", videoWidth).attr("height", videoHeight);
+
+		// Set CSS dimensions in pixels
+		$("#overlayCanvas").css({
+			"width": videoWidth + "px",
+			"height": videoHeight + "px",
+			"top": "0px"
+		});
+		$("#canvas").css({
+			"width": videoWidth + "px",
+			"height": videoHeight + "px",
+			"top": "0px"
+		});
 	}
 
 	$("#view").css("width", viewWidth + "px");
 	$("#view").css("height", viewHeight + "px");
-
-	var src = '/axis-cgi/jpg/image.cgi?resolution=' + imageWidth + 'x' + imageHeight + '&compression=25&camera=1';
-	$("#snapshot").attr("src", src);
 
 	var secureConnection = "";
 	if (location.protocol === 'https:')
@@ -798,53 +765,9 @@ function SetupView(aspect) {
 	var player = '<media-stream-player hostname="' + window.location.hostname + '" ' + secureConnection + '  format="RTP_H264" compression="40" audio="0" resolution="' + videoWidth + 'x' + videoHeight + '" variant="basic" autoplay></media-stream-player>';
 	$("#video").append(player);
 
-	// Draw overlay bars based on scale mode
-	drawScaleModeOverlay(aspect);
-
 	setupComplete = true;
 }
 
-function drawScaleModeOverlay(aspect) {
-	var overlayCanvas = document.getElementById('overlayCanvas');
-	if (!overlayCanvas) return;
-
-	var ctx = overlayCanvas.getContext("2d");
-	ctx.clearRect(0, 0, 1000, 1000);
-
-	// Semi-transparent black for non-detection areas
-	ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-
-	// Calculate bars based on aspect ratio
-	// Canvas coordinates are 0-1000, view is always 16:9 (800x450 in px)
-	// View aspect ratio: 16:9 = 1.778
-
-	if (aspect === '4:3') {
-		// Balanced mode: 4:3 capture (ratio 1.333) shown in 16:9 view
-		// Content width when fit by height: 450 * (4/3) = 600px out of 800px
-		// Black bars on left and right sides
-		// Canvas coordinates: (800-600)/2 = 100px margins = 125 in 1000-scale
-		var contentWidth = 1000 * (600 / 800); // 750
-		var barWidth = (1000 - contentWidth) / 2; // 125
-		ctx.fillRect(0, 0, barWidth, 1000); // Left bar
-		ctx.fillRect(1000 - barWidth, 0, barWidth, 1000); // Right bar
-	} else if (aspect === '1:1') {
-		// Center-crop mode: 1:1 capture (ratio 1.0) shown in 16:9 view
-		// Content width when fit by height: 450px out of 800px
-		// Black bars on left and right sides
-		// Canvas coordinates: (800-450)/2 = 175px margins = 218.75 in 1000-scale
-		var contentWidth = 1000 * (450 / 800); // 562.5
-		var barWidth = (1000 - contentWidth) / 2; // 218.75
-		ctx.fillRect(0, 0, barWidth, 1000); // Left bar
-		ctx.fillRect(1000 - barWidth, 0, barWidth, 1000); // Right bar
-	} else if (aspect === '16:9') {
-		// Letterbox mode: 16:9 video, 1:1 model
-		// Video is 16:9 (e.g., 1280x720), model is 1:1 (640x640)
-		// Padding is added internally during preprocessing to make 16:9 → 1:1
-		// But from user's perspective, the ENTIRE 16:9 video is visible and can have detections
-		// Display is also 16:9, so NO dark bars needed - perfect match
-		// No overlay bars to draw
-	}
-}
 
 function appendDataToTable(dataArray) {
 	var $tableBody = $("#detection-table");
@@ -881,6 +804,178 @@ function showToast(message, type = 'danger') {
     toastElement.addEventListener('hidden.bs.toast', function() {
         this.remove();
     });
+}
+
+// Custom AOI Selection Implementation
+function initializeAOIOverlay() {
+	var overlay = document.getElementById('aoi-overlay');
+	var box = overlay.querySelector('.aoi-box');
+	var handles = overlay.querySelectorAll('.aoi-handle');
+
+	// Set initial AOI position from settings (pixel coordinates)
+	aoiState.x1 = App.settings.aoi.x1;
+	aoiState.y1 = App.settings.aoi.y1;
+	aoiState.x2 = App.settings.aoi.x2;
+	aoiState.y2 = App.settings.aoi.y2;
+
+	// Update box position
+	updateAOIBox();
+
+	// Mouse down on box (start dragging)
+	box.addEventListener('mousedown', function(e) {
+		if (e.target.classList.contains('aoi-handle')) return; // Let handles handle themselves
+		aoiState.dragging = true;
+		aoiState.startX = e.clientX;
+		aoiState.startY = e.clientY;
+		aoiState.dragStartX1 = aoiState.x1;
+		aoiState.dragStartY1 = aoiState.y1;
+		aoiState.dragStartX2 = aoiState.x2;
+		aoiState.dragStartY2 = aoiState.y2;
+		e.preventDefault();
+	});
+
+	// Mouse down on handles (start resizing)
+	handles.forEach(function(handle) {
+		handle.addEventListener('mousedown', function(e) {
+			aoiState.resizing = true;
+			aoiState.resizeHandle = handle.className.split(' ')[1]; // nw, ne, sw, se
+			aoiState.startX = e.clientX;
+			aoiState.startY = e.clientY;
+			aoiState.dragStartX1 = aoiState.x1;
+			aoiState.dragStartY1 = aoiState.y1;
+			aoiState.dragStartX2 = aoiState.x2;
+			aoiState.dragStartY2 = aoiState.y2;
+			e.preventDefault();
+			e.stopPropagation();
+		});
+	});
+
+	// Mouse move (drag or resize)
+	document.addEventListener('mousemove', function(e) {
+		if (!aoiState.active) return;
+
+		if (aoiState.dragging) {
+			var viewRect = document.getElementById('view').getBoundingClientRect();
+			// Convert pixel delta to model space
+			var deltaX = (e.clientX - aoiState.startX) / viewRect.width * App.model.modelWidth;
+			var deltaY = (e.clientY - aoiState.startY) / viewRect.height * App.model.modelHeight;
+
+			var width = aoiState.dragStartX2 - aoiState.dragStartX1;
+			var height = aoiState.dragStartY2 - aoiState.dragStartY1;
+
+			aoiState.x1 = Math.max(0, Math.min(App.model.modelWidth - width, aoiState.dragStartX1 + deltaX));
+			aoiState.y1 = Math.max(0, Math.min(App.model.modelHeight - height, aoiState.dragStartY1 + deltaY));
+			aoiState.x2 = aoiState.x1 + width;
+			aoiState.y2 = aoiState.y1 + height;
+
+			updateAOIBox();
+		} else if (aoiState.resizing) {
+			var viewRect = document.getElementById('view').getBoundingClientRect();
+			var deltaX = (e.clientX - aoiState.startX) / viewRect.width * App.model.modelWidth;
+			var deltaY = (e.clientY - aoiState.startY) / viewRect.height * App.model.modelHeight;
+
+			var x1 = aoiState.dragStartX1;
+			var y1 = aoiState.dragStartY1;
+			var x2 = aoiState.dragStartX2;
+			var y2 = aoiState.dragStartY2;
+
+			// Update based on which handle
+			switch(aoiState.resizeHandle) {
+				case 'nw':
+					x1 += deltaX;
+					y1 += deltaY;
+					break;
+				case 'ne':
+					x2 += deltaX;
+					y1 += deltaY;
+					break;
+				case 'sw':
+					x1 += deltaX;
+					y2 += deltaY;
+					break;
+				case 'se':
+					x2 += deltaX;
+					y2 += deltaY;
+					break;
+			}
+
+			// Clamp and ensure minimum size (6 pixels)
+			x1 = Math.max(0, Math.min(x1, App.model.modelWidth - 6));
+			y1 = Math.max(0, Math.min(y1, App.model.modelHeight - 6));
+			x2 = Math.max(6, Math.min(x2, App.model.modelWidth));
+			y2 = Math.max(6, Math.min(y2, App.model.modelHeight));
+
+			// Ensure x1 < x2 and y1 < y2
+			if (x1 < x2 && y1 < y2 && (x2 - x1) >= 6 && (y2 - y1) >= 6) {
+				aoiState.x1 = x1;
+				aoiState.y1 = y1;
+				aoiState.x2 = x2;
+				aoiState.y2 = y2;
+				updateAOIBox();
+			}
+		}
+	});
+
+	// Mouse up (stop dragging/resizing)
+	document.addEventListener('mouseup', function(e) {
+		if (aoiState.dragging || aoiState.resizing) {
+			// Save AOI to backend
+			var aoi = {
+				x1: Math.round(aoiState.x1),
+				y1: Math.round(aoiState.y1),
+				x2: Math.round(aoiState.x2),
+				y2: Math.round(aoiState.y2)
+			};
+
+			$.ajax({
+				type: "POST",
+				url: "settings",
+				contentType: 'application/json',
+				data: JSON.stringify({ aoi: aoi }),
+				success: function(response) {
+					App.settings.aoi = aoi;
+					showToast("Area of Interest updated successfully", "success");
+				},
+				error: function(response) {
+					showToast("Failed to update Area of Interest: " + response.statusText, "danger");
+				}
+			});
+
+			aoiState.dragging = false;
+			aoiState.resizing = false;
+		}
+	});
+}
+
+function updateAOIBox() {
+	var box = document.querySelector('.aoi-box');
+	if (!box) return;
+
+	// Convert from pixel coordinates to percentage of view
+	var scaleX = 100.0 / App.model.modelWidth;
+	var scaleY = 100.0 / App.model.modelHeight;
+
+	var left = aoiState.x1 * scaleX;
+	var top = aoiState.y1 * scaleY;
+	var width = (aoiState.x2 - aoiState.x1) * scaleX;
+	var height = (aoiState.y2 - aoiState.y1) * scaleY;
+
+	box.style.left = left + '%';
+	box.style.top = top + '%';
+	box.style.width = width + '%';
+	box.style.height = height + '%';
+}
+
+function toggleAOISelection(active) {
+	var overlay = document.getElementById('aoi-overlay');
+	aoiState.active = active;
+
+	if (active) {
+		overlay.classList.add('active');
+		updateAOIBox();
+	} else {
+		overlay.classList.remove('active');
+	}
 }
 
 </script>

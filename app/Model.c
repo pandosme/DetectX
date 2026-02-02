@@ -33,8 +33,8 @@ static void clear_crop_cache(void);
 // Model and video dimensions
 static unsigned int modelWidth = 640;
 static unsigned int modelHeight = 640;
-static unsigned int videoWidth = 1280;
-static unsigned int videoHeight = 720;
+static unsigned int videoWidth = 856;  // Default for 640 model: 4:3 aspect (856x640)
+static unsigned int videoHeight = 640;
 static unsigned int channels = 3;
 static unsigned int boxes = 0;
 static unsigned int classes = 0;
@@ -91,7 +91,6 @@ static const char* LABELS_PATH = "model/labels.txt";
 
 // Preprocessing scale mode
 static PreprocessScaleMode scaleMode = SCALE_MODE_STRETCH;  // Default: balanced
-static PreprocessContext* preprocessCtx = NULL;
 
 static char PP_SD_INPUT_FILE_PATTERN[] = "/tmp/larod.pp.test-XXXXXX";
 static char OBJECT_DETECTOR_INPUT_FILE_PATTERN[] = "/tmp/larod.in.test-XXXXXX";
@@ -279,7 +278,7 @@ Model_Inference(VdoBuffer* image) {
     return non_maximum_suppression(list);
 }
 
-//The detection coordinates has been transformed to [0...1000][0...1000]
+//The detection coordinates are in pixels relative to model input dimensions
 const unsigned char*
 Model_GetImageData(const cJSON* detection, unsigned* jpeg_size, int* out_x, int* out_y, int* out_w, int* out_h, int* img_w, int* img_h ) {
     if (jpeg_size) *jpeg_size = 0;
@@ -338,10 +337,13 @@ Model_GetImageData(const cJSON* detection, unsigned* jpeg_size, int* out_x, int*
         return NULL;
     }
 
-	int det_pixel_x = (int)round(xObj->valuedouble * (double)videoWidth / 1000.0);
-	int det_pixel_y = (int)round(yObj->valuedouble * (double)videoHeight / 1000.0);
-	int det_pixel_w = (int)round(wObj->valuedouble * (double)videoWidth / 1000.0);
-	int det_pixel_h = (int)round(hObj->valuedouble * (double)videoHeight / 1000.0);
+	// Coordinates are in pixels relative to model input, scale to video frame pixels
+	double scale_x = (double)videoWidth / (double)modelWidth;
+	double scale_y = (double)videoHeight / (double)modelHeight;
+	int det_pixel_x = (int)round(xObj->valuedouble * scale_x);
+	int det_pixel_y = (int)round(yObj->valuedouble * scale_y);
+	int det_pixel_w = (int)round(wObj->valuedouble * scale_x);
+	int det_pixel_h = (int)round(hObj->valuedouble * scale_y);
 
     int crop_x = det_pixel_x - leftborder_px;
     int crop_y = det_pixel_y - topborder_px;
@@ -722,8 +724,8 @@ cJSON* Model_Setup(void) {
     if (scaleMode == SCALE_MODE_STRETCH) {
         // Balanced mode: 4:3 aspect ratio
         if (modelHeight == 640) {
-            videoWidth = 800;
-            videoHeight = 600;
+            videoWidth = 856;  // 640 * 4/3 = 853.33, rounded to nearest /8 = 856
+            videoHeight = 640;
         } else if (modelHeight == 480) {
             videoWidth = 640;
             videoHeight = 480;
