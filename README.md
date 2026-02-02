@@ -242,43 +242,59 @@ DetectX delivers three primary payload types, all enrichable with the configured
 
 ## Version History
 
-## 4.0.0	January 27, 2026
+## 4.0.0	February 2, 2026
 
 ### Major Features
+- **Pixel-Based Coordinate System**: Complete redesign from normalized [0-1000] coordinates to native pixel coordinates matching model input dimensions
+- **1:1 Display Aspect Ratio**: All scale modes now display in model-sized 1:1 view (typically 640x640) for "what you see is what you get" visualization
+- **Enhanced Scale Mode Support**: True visual representation for each mode:
+  - **Center-Crop**: 640x640 1:1 video with no black bars
+  - **Balanced**: 856x640 (4:3 aspect) squeezed into 1:1 display
+  - **Letterbox**: 1136x640 (16:9 aspect) displayed in 1:1 with visible padding
 - **Modern UI Redesign**: Complete redesign with top navigation bar replacing sidebar, modern card-based layouts, and improved visual hierarchy
-- **Runtime Model Configuration**: New scale mode selection (Balanced, Center-Crop, Letterbox) allows optimizing detection quality vs. coverage without rebuilding
-- **Multi-Aspect Ratio Support**: Full support for 4:3, 16:9, and 1:1 video capture formats with automatic coordinate transformation
-- **Enhanced Video Display**: Increased video viewer size to 1000x562px for improved detection overlay visibility
-- **Simplified Build Process**: Removed dependency on `prepare.py` - model parameters now automatically extracted during build
+- **Simplified Build Process**: Removed dependency on `prepare.py` - model parameters now automatically extracted during Docker build
+
+### Coordinate System Changes
+- **Pixel Coordinates Throughout**: All coordinates (detections, AOI, size filters) now use pixels relative to model input dimensions
+- **MQTT Metadata**: Detection payloads now include `metadata` object with `modelWidth`, `modelHeight`, and `coordinateSystem: "pixels"` for client compatibility
+- **Automatic Settings Migration**: Existing configurations automatically migrate from normalized to pixel coordinates via `coordinateVersion` flag
+- **Direct Model-to-Display Mapping**: Simplified coordinate transformation eliminates multi-stage conversions and aspect ratio calculations
+
+### Video Capture Optimization
+- **Optimized Resolutions**: Balanced mode uses 856x640 (4:3) to maximize 640px height while maintaining divisibility by 8
+- **Resolution Strategy**: Center-crop (640x640), Balanced (856x640), Letterbox (1136x640) - all optimized for model input size
+- **Improved Memory Efficiency**: Direct pixel scaling reduces processing overhead
 
 ### UI Improvements
-- Gradient blue navigation bar with improved contrast and readability
-- Modern CSS design system with consistent spacing, shadows, and animations
-- Responsive design optimized for mobile, tablet, and desktop viewing
-- Card hover effects and smooth transitions throughout interface
-- Improved form controls with better focus states and validation feedback
+- **Custom AOI Overlay**: Removed jQuery imgAreaSelect plugin (944 lines), implemented lightweight custom overlay with mouse drag handlers
+- **Canvas Alignment**: Perfect pixel-accurate alignment of detection overlays with video for all scale modes
+- **Gradient Navigation Bar**: Improved contrast and readability with modern design
+- **Responsive Design**: Optimized for mobile, tablet, and desktop viewing
+- **Improved Form Controls**: Better focus states and validation feedback
 
 ### Technical Improvements
-- Automatic detection coordinate transformation between capture, display, and model spaces
-- Per-frame scale mode switching with preserved detection accuracy
-- Improved preprocessing pipeline with optimized memory usage
-- Enhanced MQTT payload handling with better error messages for oversized crops
-- Refactored model parameter extraction integrated into Docker build process
+- **Direct Pixel Conversion**: Model outputs converted directly to pixels instead of intermediate [0-1000] normalization
+- **Removed Display Space Transformations**: Eliminated videoAspect-based coordinate scaling simplifies codebase
+- **Enhanced Crop Generation**: Crops use pixel-based scaling from model space to video frame space
+- **Settings Migration**: Automatic one-time migration from coordinateVersion 1 to 2
+- **Improved MQTT Payload Handling**: Better error messages for oversized crops
 
 ### Bug Fixes
-- Fixed coordinate misalignment issues when using non-16:9 aspect ratios
-- Resolved detection display offset problems with different scale modes
-- Fixed memory handling in preprocessing context
-- Improved MQTT connection stability and error reporting
+- Fixed coordinate misalignment in all scale modes with pixel-accurate canvas positioning
+- Resolved letterbox mode canvas stretching by using calculated pixel dimensions
+- Fixed canvas clearing to use actual dimensions instead of hardcoded values
+- Improved video and overlay synchronization with object-fit strategies
 
 ### Breaking Changes
-- Model configuration now uses runtime `scaleMode` instead of build-time `preprocess` setting
-- Frontend now expects `videoAspect` field in model configuration
-- AOI and size filters now operate in display space (16:9) for consistency
+- **MQTT Output Format**: Coordinates now in pixels with metadata (breaking for API consumers)
+- **Coordinate System**: Changed from normalized [0-1000] to pixels (coordinateVersion: 2)
+- **Display Aspect**: Changed from 16:9 to 1:1 aspect ratio for all visualizations
+- **Settings Format**: AOI and size filters now use pixel coordinates (automatic migration on first startup)
+- **API Clients**: MQTT consumers need to detect `metadata.coordinateSystem === "pixels"` and scale accordingly
 
 ### Documentation
-- Moved training documentation to `docs/Train-Build.md`
-- Added `CLAUDE.md` with comprehensive project documentation for AI-assisted development
+- Updated `CLAUDE.md` with coordinate system architecture
+- Added comprehensive implementation plan documentation
 - Updated README with simplified build instructions
 
 ## 3.5.3	Nov 29, 2025
