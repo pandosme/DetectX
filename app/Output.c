@@ -246,7 +246,7 @@ void Output(cJSON* detections, int modelWidth, int modelHeight) {
 
             // NOTE: Implement cache eviction in output_crop_cache_add for safety
             const char* imageDataBase64 = output_crop_cache_add(
-                jpeg_data, jpeg_size, label, conf, crop_x, crop_y, crop_w, crop_h);
+                jpeg_data, jpeg_size, label, conf, crop_x, crop_y, crop_w, crop_h, img_w, img_h);
 
             double now_ts = ACAP_DEVICE_Timestamp();
             if (imageDataBase64 && now_ts - last_output_time_ms > throttle) {

@@ -221,6 +221,21 @@ ImageProcess(gpointer data) {
 			insert = 1;
 		if( pixel_width < minWidth || pixel_height < minHeight )
 			insert = 0;
+
+		// Check exclude area - if detection center is inside exclude box, ignore it
+		if( insert ) {
+			cJSON* exclude = cJSON_GetObjectItem(settings,"exclude");
+			if( exclude ) {
+				unsigned int exclude_x1 = cJSON_GetObjectItem(exclude,"x1")?cJSON_GetObjectItem(exclude,"x1")->valueint:0;
+				unsigned int exclude_y1 = cJSON_GetObjectItem(exclude,"y1")?cJSON_GetObjectItem(exclude,"y1")->valueint:0;
+				unsigned int exclude_x2 = cJSON_GetObjectItem(exclude,"x2")?cJSON_GetObjectItem(exclude,"x2")->valueint:modelWidth;
+				unsigned int exclude_y2 = cJSON_GetObjectItem(exclude,"y2")?cJSON_GetObjectItem(exclude,"y2")->valueint:modelHeight;
+				
+				if( pixel_cx >= exclude_x1 && pixel_cx <= exclude_x2 && pixel_cy >= exclude_y1 && pixel_cy <= exclude_y2 )
+					insert = 0;
+			}
+		}
+
 		cJSON* ignore = cJSON_GetObjectItem(settings,"ignore");
 		if( insert && ignore && ignore->type == cJSON_Array && cJSON_GetArraySize(ignore) > 0 ) {
 			cJSON* ignoreLabel = ignore->child;

@@ -36,6 +36,8 @@ extern "C" {
  * @param y           Top left Y coordinate of crop.
  * @param w           Width of crop.
  * @param h           Height of crop.
+ * @param img_w       Full image width.
+ * @param img_h       Full image height.
  * @return Pointer to the (owned) base64 encoded string (may be freed), or NULL on error.
  */
 const char* output_crop_cache_add(
@@ -43,7 +45,8 @@ const char* output_crop_cache_add(
     unsigned jpeg_size,
     const char *label,
     int confidence,
-    int x, int y, int w, int h);
+    int x, int y, int w, int h,
+    int img_w, int img_h);
 
 /**
  * @brief Reset (clear) the crop cache and free any memory.

@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Custom Model</title>
+    <title>DetectX</title>
     <link rel="stylesheet" href="css/bootstrap.min.css">
     <link rel="stylesheet" href="css/app.css?v=3.6.0">
     <script src="js/jquery-3.7.1.min.js"></script>
@@ -390,7 +390,7 @@
 
                         <div class="d-flex gap-2">
                             <button id="aoi_button" class="btn btn-secondary flex-fill">Set Area Of Interest</button>
-                            <button id="size_button" class="btn btn-secondary flex-fill">Set Minimum Size</button>
+                            <button id="exclude_button" class="btn btn-secondary flex-fill">Set Exclude Area</button>
                         </div>
                     </div>
                 </div>
@@ -461,7 +461,8 @@ var aoiState = {
 	x1: 0,
 	y1: 0,
 	x2: 0,
-	y2: 0
+	y2: 0,
+	mode: 'aoi'  // 'aoi' or 'exclude'
 };
 var setupComplete = false;
 		
@@ -530,14 +531,31 @@ function initializePage() {
 
 	// Set AOI button click handler
 	$("#aoi_button").click(function() {
-		if (aoiState.active) {
+		if (aoiState.active && aoiState.mode === 'aoi') {
 			// Hide AOI selection
 			toggleAOISelection(false);
 			$(this).removeClass('btn-primary').addClass('btn-secondary');
 		} else {
 			// Show AOI selection
+			aoiState.mode = 'aoi';
 			toggleAOISelection(true);
 			$(this).removeClass('btn-secondary').addClass('btn-primary');
+			$("#exclude_button").removeClass('btn-primary').addClass('btn-secondary');
+		}
+	});
+
+	// Set Exclude Area button click handler
+	$("#exclude_button").click(function() {
+		if (aoiState.active && aoiState.mode === 'exclude') {
+			// Hide exclude selection
+			toggleAOISelection(false);
+			$(this).removeClass('btn-primary').addClass('btn-secondary');
+		} else {
+			// Show exclude selection
+			aoiState.mode = 'exclude';
+			toggleAOISelection(true);
+			$(this).removeClass('btn-secondary').addClass('btn-primary');
+			$("#aoi_button").removeClass('btn-primary').addClass('btn-secondary');
 		}
 	});
 
@@ -571,8 +589,10 @@ function initializePage() {
 						type: "GET",
 						url: "/axis-cgi/applications/control.cgi?action=restart&package=detectx",
 						success: function() {
-							showToast('ACAP is restarting. Please wait...', 'info');
+							showToast('ACAP is restarting. Page will refresh when ready...', 'info');
 							window.previousScaleMode = scaleModeValue;
+							// Poll for ACAP to come back online, then refresh
+							pollForAcapRestart();
 						},
 						error: function(xhr, status, error) {
 							showToast('Failed to restart ACAP: ' + error, 'danger');
@@ -806,6 +826,49 @@ function showToast(message, type = 'danger') {
     });
 }
 
+// Poll for ACAP restart completion
+function pollForAcapRestart() {
+	var pollInterval = 2000; // Check every 2 seconds
+	var maxAttempts = 30; // Give up after 60 seconds
+	var attempts = 0;
+
+	var checkAcap = function() {
+		attempts++;
+		$.ajax({
+			type: "GET",
+			url: "status",
+			dataType: "json",
+			cache: false,
+			timeout: 3000,
+			success: function(status) {
+				// ACAP is back online
+				if (status && status.model && status.model.state) {
+					showToast('ACAP restarted successfully. Refreshing page...', 'success');
+					setTimeout(function() {
+						location.reload();
+					}, 1000);
+				} else if (attempts < maxAttempts) {
+					// Model not ready yet, keep polling
+					setTimeout(checkAcap, pollInterval);
+				} else {
+					showToast('ACAP restart timeout. Please refresh manually.', 'warning');
+				}
+			},
+			error: function() {
+				// ACAP not responding yet, keep polling
+				if (attempts < maxAttempts) {
+					setTimeout(checkAcap, pollInterval);
+				} else {
+					showToast('ACAP restart timeout. Please refresh manually.', 'warning');
+				}
+			}
+		});
+	};
+
+	// Start polling after a brief delay
+	setTimeout(checkAcap, 3000);
+}
+
 // Custom AOI Selection Implementation
 function initializeAOIOverlay() {
 	var overlay = document.getElementById('aoi-overlay');
@@ -919,25 +982,34 @@ function initializeAOIOverlay() {
 	// Mouse up (stop dragging/resizing)
 	document.addEventListener('mouseup', function(e) {
 		if (aoiState.dragging || aoiState.resizing) {
-			// Save AOI to backend
-			var aoi = {
+			// Save to backend (AOI or exclude depending on mode)
+			var coords = {
 				x1: Math.round(aoiState.x1),
 				y1: Math.round(aoiState.y1),
 				x2: Math.round(aoiState.x2),
 				y2: Math.round(aoiState.y2)
 			};
 
+			var settingName = aoiState.mode === 'aoi' ? 'aoi' : 'exclude';
+			var settingData = {};
+			settingData[settingName] = coords;
+
 			$.ajax({
 				type: "POST",
 				url: "settings",
 				contentType: 'application/json',
-				data: JSON.stringify({ aoi: aoi }),
+				data: JSON.stringify(settingData),
 				success: function(response) {
-					App.settings.aoi = aoi;
-					showToast("Area of Interest updated successfully", "success");
+					if (aoiState.mode === 'aoi') {
+						App.settings.aoi = coords;
+						showToast("Area of Interest updated successfully", "success");
+					} else {
+						App.settings.exclude = coords;
+						showToast("Exclude Area updated successfully", "success");
+					}
 				},
 				error: function(response) {
-					showToast("Failed to update Area of Interest: " + response.statusText, "danger");
+					showToast("Failed to update " + (aoiState.mode === 'aoi' ? "Area of Interest" : "Exclude Area") + ": " + response.statusText, "danger");
 				}
 			});
 
@@ -964,6 +1036,19 @@ function updateAOIBox() {
 	box.style.top = top + '%';
 	box.style.width = width + '%';
 	box.style.height = height + '%';
+
+	// Change color based on mode
+	if (aoiState.mode === 'exclude') {
+		box.style.borderColor = '#ff0000';
+		box.style.backgroundColor = 'rgba(255, 0, 0, 0.1)';
+		var handles = box.querySelectorAll('.aoi-handle');
+		handles.forEach(function(h) { h.style.backgroundColor = '#ff0000'; });
+	} else {
+		box.style.borderColor = '#00ff00';
+		box.style.backgroundColor = 'rgba(0, 255, 0, 0.1)';
+		var handles = box.querySelectorAll('.aoi-handle');
+		handles.forEach(function(h) { h.style.backgroundColor = '#00ff00'; });
+	}
 }
 
 function toggleAOISelection(active) {
@@ -971,6 +1056,18 @@ function toggleAOISelection(active) {
 	aoiState.active = active;
 
 	if (active) {
+		// Load coordinates based on mode
+		if (aoiState.mode === 'aoi') {
+			aoiState.x1 = App.settings.aoi.x1;
+			aoiState.y1 = App.settings.aoi.y1;
+			aoiState.x2 = App.settings.aoi.x2;
+			aoiState.y2 = App.settings.aoi.y2;
+		} else {
+			aoiState.x1 = App.settings.exclude.x1;
+			aoiState.y1 = App.settings.exclude.y1;
+			aoiState.x2 = App.settings.exclude.x2;
+			aoiState.y2 = App.settings.exclude.y2;
+		}
 		overlay.classList.add('active');
 		updateAOIBox();
 	} else {

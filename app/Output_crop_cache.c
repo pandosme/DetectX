@@ -17,6 +17,7 @@ typedef struct {
     char label[64];            ///< Category name
     int confidence;            ///< Confidence 0..100
     int x, y, w, h;            ///< Crop rectangle
+    int img_w, img_h;          ///< Full image dimensions
 } CropEntry;
 
 // Crop cache ring buffer and synchronization
@@ -31,7 +32,8 @@ output_crop_cache_add(
     unsigned jpeg_size,
     const char *label,
     int confidence,
-    int x, int y, int w, int h)
+    int x, int y, int w, int h,
+    int img_w, int img_h)
 {
     // Defensive: null input
     if (!jpeg_data || jpeg_size == 0 || !label) return NULL;
@@ -54,6 +56,8 @@ output_crop_cache_add(
     entry->y = y;
     entry->w = w;
     entry->h = h;
+    entry->img_w = img_w;
+    entry->img_h = img_h;
 
     crop_history_head = (crop_history_head + 1) % CROP_HISTORY_SIZE;
     if (crop_history_count < CROP_HISTORY_SIZE) crop_history_count++;
@@ -75,6 +79,7 @@ void output_crop_cache_reset(void)
         crop_history[i].label[0] = '\0';
         crop_history[i].confidence = 0;
         crop_history[i].x = crop_history[i].y = crop_history[i].w = crop_history[i].h = 0;
+        crop_history[i].img_w = crop_history[i].img_h = 0;
     }
     crop_history_head = 0;
     crop_history_count = 0;
@@ -108,6 +113,8 @@ void output_crop_cache_http_callback(
         cJSON_AddNumberToObject(item, "y", entry->y);
         cJSON_AddNumberToObject(item, "w", entry->w);
         cJSON_AddNumberToObject(item, "h", entry->h);
+        cJSON_AddNumberToObject(item, "img_w", entry->img_w);
+        cJSON_AddNumberToObject(item, "img_h", entry->img_h);
         cJSON_AddItemToArray(arr, item);
 
         idx = (idx - 1 + CROP_HISTORY_SIZE) % CROP_HISTORY_SIZE;
