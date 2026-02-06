@@ -166,6 +166,8 @@ Model_Inference(VdoBuffer* image) {
 		// Run HD preprocessing job
 		if (!larodRunJob(conn, ppReqHD, &error)) {
 			LOG_WARN("%s: Unable to run HD pre-processing job: %s (%d)\n", __func__, error->msg, error->code);
+			ACAP_STATUS_SetString("output", "cropError", "HD preprocessing failed - crops unavailable");
+			ACAP_STATUS_SetNumber("output", "cropErrorTime", ACAP_DEVICE_Timestamp());
 			larodClearError(&error);
 			inferenceErrors--;
 			return 0;
@@ -178,6 +180,8 @@ Model_Inference(VdoBuffer* image) {
     // Run standard preprocessing for model inference
     if (!larodRunJob(conn, ppReq, &error)) {
         LOG_WARN("%s: Unable to run job to preprocess model: %s (%d)\n", __func__, error->msg, error->code);
+        ACAP_STATUS_SetString("model", "status", "Preprocessing failed");
+        ACAP_STATUS_SetString("model", "error", "Image preprocessing failed");
         larodClearError(&error);
         inferenceErrors--;
         return 0;
@@ -192,6 +196,8 @@ Model_Inference(VdoBuffer* image) {
     // Run inference
     if (!larodRunJob(conn, infReq, &error)) {
         LOG_WARN("%s: Unable to run inference on model: %s (%d)\n", __func__, error->msg, error->code);
+        ACAP_STATUS_SetString("model", "status", "Inference failed");
+        ACAP_STATUS_SetString("model", "error", "Model inference execution failed");
         larodClearError(&error);
         inferenceErrors--;
         return 0;
@@ -274,6 +280,10 @@ Model_Inference(VdoBuffer* image) {
 
     LOG_TRACE("%s: Found %d candidates, %d detections after confidence filtering\n",
               __func__, candidates, detections);
+
+    // Clear any previous errors on successful inference
+    ACAP_STATUS_SetNull("model", "error");
+    ACAP_STATUS_SetString("model", "status", "Running");
 
     return non_maximum_suppression(list);
 }
@@ -370,6 +380,8 @@ Model_GetImageData(const cJSON* detection, unsigned* jpeg_size, int* out_x, int*
 
     if (!original_rgb_buffer) {
         LOG_WARN("%s: Original RGB image buffer is NULL\n", __func__);
+        ACAP_STATUS_SetString("output", "cropError", "Image buffer unavailable - cropping may be disabled");
+        ACAP_STATUS_SetNumber("output", "cropErrorTime", ACAP_DEVICE_Timestamp());
         return NULL;
     }
 
@@ -400,9 +412,13 @@ Model_GetImageData(const cJSON* detection, unsigned* jpeg_size, int* out_x, int*
 
     if (!jpeg_buf || jpeglen == 0) {
         LOG_WARN("%s: JPEG encoding failed\n", __func__);
+        ACAP_STATUS_SetString("output", "cropError", "JPEG encoding failed");
+        ACAP_STATUS_SetNumber("output", "cropErrorTime", ACAP_DEVICE_Timestamp());
         return NULL;
     }
 
+    // Clear crop error on success
+    ACAP_STATUS_SetNull("output", "cropError");
 
     if (numCropCache < MODEL_MAX_CACHED_CROPS) {
         cropCache[numCropCache].refId = refId;
@@ -609,6 +625,9 @@ cJSON* Model_Setup(void) {
     const larodDevice* device = larodGetDevice(conn, chipString, 0, &error);
     if (!device) {
         LOG_WARN("%s: Could not get device %s: %s\n", __func__, chipString, error->msg);
+        ACAP_STATUS_SetString("model", "status", "Model load failed");
+        ACAP_STATUS_SetString("model", "error", "Could not access inference hardware");
+        ACAP_STATUS_SetBool("model", "state", 0);
         larodClearError(&error);
         Model_Cleanup();
         return 0;
@@ -617,6 +636,9 @@ cJSON* Model_Setup(void) {
     InfModel = larodLoadModel(conn, larodModelFd, device, LAROD_ACCESS_PRIVATE, "object_detection", NULL, &error);
     if (!InfModel) {
         LOG_WARN("%s: Unable to load model: %s\n", __func__, error->msg);
+        ACAP_STATUS_SetString("model", "status", "Model load failed");
+        ACAP_STATUS_SetString("model", "error", "Unable to load model file");
+        ACAP_STATUS_SetBool("model", "state", 0);
         larodClearError(&error);
         Model_Cleanup();
         return 0;

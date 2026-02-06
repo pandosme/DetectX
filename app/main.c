@@ -110,7 +110,8 @@ ImageProcess(gpointer data) {
 	VdoBuffer* buffer = Video_Capture_YUV();	
 	
 	if( !buffer ) {
-		ACAP_STATUS_SetString("model","status","Error. Check log");
+		ACAP_STATUS_SetString("model","status","Image capture failed");
+		ACAP_STATUS_SetString("model","error","Unable to capture video frames from camera");
 		ACAP_STATUS_SetBool("model","state", 0);
 		LOG_WARN("Image capture failed\n");
 		return G_SOURCE_REMOVE;
@@ -143,7 +144,8 @@ ImageProcess(gpointer data) {
 	// AOI and Size are in pixel space relative to model dimensions
 	cJSON* aoi = cJSON_GetObjectItem(settings,"aoi");
 	if(!aoi) {
-		ACAP_STATUS_SetString("model","status","Error. Check log");
+		ACAP_STATUS_SetString("model","status","Configuration error");
+		ACAP_STATUS_SetString("model","error","Missing AOI settings");
 		ACAP_STATUS_SetBool("model","state", 0);
 		LOG_WARN("No aoi settings\n");
 		return G_SOURCE_REMOVE;
@@ -155,7 +157,8 @@ ImageProcess(gpointer data) {
 
 	cJSON* size = cJSON_GetObjectItem(settings,"size");
 	if(!size) {
-		ACAP_STATUS_SetString("model","status","Error. Check log");
+		ACAP_STATUS_SetString("model","status","Configuration error");
+		ACAP_STATUS_SetString("model","error","Missing size filter settings");
 		ACAP_STATUS_SetBool("model","state", 0);
 		LOG_WARN("No size settings\n");
 		return G_SOURCE_REMOVE;
@@ -380,7 +383,8 @@ int main(void) {
 
 	settings = ACAP_Get_Config("settings");
 	if(!settings) {
-		ACAP_STATUS_SetString("model","status","Error. Check log");
+		ACAP_STATUS_SetString("model","status","Configuration error");
+		ACAP_STATUS_SetString("model","error","Unable to load application settings");
 		ACAP_STATUS_SetBool("model","state", 0);
 		LOG_WARN("No settings found\n");
 		return 1;

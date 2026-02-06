@@ -241,6 +241,79 @@
         color: var(--text-dark);
     }
 
+    /* Error Banner */
+    #error-banner {
+        position: fixed;
+        top: 64px;
+        left: 0;
+        right: 0;
+        z-index: 9999;
+        background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+        color: white;
+        padding: 1rem 2rem;
+        box-shadow: var(--shadow-lg);
+        display: none;
+        animation: slideDown 0.3s ease;
+    }
+
+    #error-banner.show {
+        display: block;
+    }
+
+    @keyframes slideDown {
+        from { transform: translateY(-100%); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+
+    #error-banner .error-content {
+        max-width: 1600px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    #error-banner .error-message {
+        font-weight: 500;
+        font-size: 1rem;
+    }
+
+    #error-banner .error-details {
+        font-size: 0.875rem;
+        opacity: 0.9;
+        margin-top: 0.25rem;
+    }
+
+    #error-banner .retry-button {
+        background: rgba(255, 255, 255, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    #error-banner .retry-button:hover {
+        background: rgba(255, 255, 255, 0.3);
+    }
+
+    /* Error Alerts Card */
+    #error-alerts-card .alert {
+        font-size: 0.9rem;
+        padding: 0.75rem;
+    }
+
+    #error-alerts-card .alert strong {
+        font-size: 1rem;
+    }
+
+    #error-alerts-card .alert-danger {
+        background-color: #fee;
+        border-left: 4px solid #dc2626;
+    }
+
     /* Loading Modal */
     #modal {
         backdrop-filter: blur(4px);
@@ -284,6 +357,17 @@
 </head>
 
 <body>
+    <!-- Error Notification Banner -->
+    <div id="error-banner">
+        <div class="error-content">
+            <div>
+                <div class="error-message" id="error-message">Backend connection lost</div>
+                <div class="error-details" id="error-details"></div>
+            </div>
+            <button class="retry-button" onclick="retryConnection()">Retry Now</button>
+        </div>
+    </div>
+
     <!-- Top Navigation -->
     <nav class="navbar navbar-expand-lg top-navbar">
         <div class="container-fluid">
@@ -398,6 +482,16 @@
 
             <!-- Right Column: Active Events -->
             <div class="col-lg-4">
+                <!-- Error Alerts Card -->
+                <div id="error-alerts-card" class="card mb-3" style="display: none;">
+                    <div class="card-body">
+                        <h5 class="card-title text-danger">⚠️ System Errors</h5>
+                        <div id="error-alerts-container">
+                            <!-- Errors will be inserted here -->
+                        </div>
+                    </div>
+                </div>
+
                 <div class="card">
                     <div class="card-body">
                         <h5 class="card-title">Active Event States</h5>
@@ -450,6 +544,16 @@ var viewHeight = 562;
 var inferenceTimer = 0;
 var selectionMode = "";
 
+// Backend error tracking
+var backendErrors = {
+    consecutiveFailures: 0,
+    lastError: null,
+    totalFailures: 0,
+    startTime: Date.now(),
+    showingBanner: false,
+    threshold: 3  // Show banner after 3 consecutive failures
+};
+
 // Custom AOI Selection State
 var aoiState = {
 	active: false,
@@ -479,9 +583,11 @@ $(document).ready(function() {
 			//	$('#errorModal').modal('show');
 			//	return;
 			// }
+			handleBackendSuccess();
 			initializePage();
 		},
-		error: function(response) {
+		error: function(xhr, status, error) {
+			handleBackendError('device info', error || status);
 			$('#errorModal').modal('show');
 		}
 	});
@@ -512,9 +618,11 @@ function initializePage() {
 
 			// Initialize custom AOI overlay
 			initializeAOIOverlay();
+			handleBackendSuccess();
 		},
-		error: function(response) {
-			$(".modal-body").html('<b>The application is not responding<b/>');
+		error: function(xhr, status, error) {
+			handleBackendError('app initialization', error || status);
+			$(".modal-body").html('<b>The application is not responding</b><br/><small>Check console for details</small>');
 			$('#errorModal').modal('show');
 		}
 	});
@@ -614,6 +722,9 @@ function initializePage() {
 	setInterval( function(){
 		$.ajax({type: "GET",url: 'status',dataType: 'json',cache: false,
 			success: function( status ) {
+				// Connection successful
+				handleBackendSuccess();
+				
 				if( !status.model || !status.model.state ) {
 					// Model is not ready - show loading modal
 					$('#modal').show();
@@ -628,6 +739,9 @@ function initializePage() {
 				};
 				
 				$("#model_status").text("Status: " + status.model.status);
+
+				// Check for system errors
+				updateErrorAlerts(status);
 
 				$('#events-table').empty();
 				if( !status.hasOwnProperty("labels") )
@@ -667,8 +781,9 @@ function initializePage() {
 					}
 				};
 			},
-			error: function() {
-				// ACAP is not responding - show loading modal
+			error: function(xhr, status, error) {
+				// ACAP is not responding
+				handleBackendError('status polling', error || status);
 				$('#modal').show();
 			}
 		});
@@ -796,6 +911,158 @@ function appendDataToTable(dataArray) {
 		var row = '<tr><td>' + item.label + ' </td><td>' + item.c + '</td></tr>';
 		$tableBody.append(row);
 	});
+}
+
+function showErrorBanner(message, details = '') {
+    backendErrors.showingBanner = true;
+    $('#error-banner').addClass('show');
+    $('#error-message').text(message);
+    $('#error-details').text(details);
+}
+
+function hideErrorBanner() {
+    backendErrors.showingBanner = false;
+    $('#error-banner').removeClass('show');
+}
+
+function handleBackendError(context, error) {
+    backendErrors.consecutiveFailures++;
+    backendErrors.totalFailures++;
+    backendErrors.lastError = {
+        context: context,
+        error: error,
+        timestamp: new Date().toISOString()
+    };
+
+    // Show banner after threshold consecutive failures
+    if (backendErrors.consecutiveFailures >= backendErrors.threshold) {
+        var uptime = Math.floor((Date.now() - backendErrors.startTime) / 1000);
+        var details = 'Failures: ' + backendErrors.consecutiveFailures + ' consecutive, ' + 
+                      backendErrors.totalFailures + ' total | Context: ' + context;
+        
+        if (backendErrors.consecutiveFailures >= 10) {
+            showErrorBanner('Backend appears to be down', details);
+        } else {
+            showErrorBanner('Backend connection issues detected', details);
+        }
+    } else if (backendErrors.consecutiveFailures === 1) {
+        // First failure - just log, don't notify yet
+        console.warn('Backend error in ' + context + ':', error);
+    }
+}
+
+function handleBackendSuccess() {
+    var hadConsecutiveFailures = backendErrors.consecutiveFailures > 0;
+    
+    if (backendErrors.showingBanner && hadConsecutiveFailures >= backendErrors.threshold) {
+        showToast('Backend connection restored', 'success');
+        hideErrorBanner();
+    }
+    
+    backendErrors.consecutiveFailures = 0;
+}
+
+function retryConnection() {
+    hideErrorBanner();
+    backendErrors.consecutiveFailures = 0;
+    showToast('Retrying connection...', 'info');
+    // The periodic polling will automatically retry
+}
+
+function updateErrorAlerts(status) {
+    var errors = [];
+    
+    // Check model errors
+    if (status.model && status.model.error) {
+        errors.push({
+            type: 'model',
+            title: 'Model Error',
+            message: status.model.error,
+            status: status.model.status
+        });
+    }
+    
+    // Check output/cropping errors
+    if (status.output) {
+        if (status.output.cropError) {
+            var timeAgo = '';
+            if (status.output.cropErrorTime) {
+                var now = Date.now();
+                var errorTime = status.output.cropErrorTime;
+                var seconds = Math.floor((now - errorTime) / 1000);
+                if (seconds < 60) {
+                    timeAgo = seconds + 's ago';
+                } else if (seconds < 3600) {
+                    timeAgo = Math.floor(seconds / 60) + 'm ago';
+                } else {
+                    timeAgo = Math.floor(seconds / 3600) + 'h ago';
+                }
+            }
+            errors.push({
+                type: 'crop',
+                title: 'Image Crop Error',
+                message: status.output.cropError,
+                time: timeAgo
+            });
+        }
+        
+        if (status.output.mqttCropError) {
+            var timeAgo = '';
+            if (status.output.mqttCropErrorTime) {
+                var seconds = Math.floor((Date.now() - status.output.mqttCropErrorTime) / 1000);
+                timeAgo = seconds < 60 ? seconds + 's ago' : Math.floor(seconds / 60) + 'm ago';
+            }
+            errors.push({
+                type: 'mqtt',
+                title: 'MQTT Export Error',
+                message: status.output.mqttCropError,
+                time: timeAgo
+            });
+        }
+        
+        if (status.output.httpCropError) {
+            var timeAgo = '';
+            if (status.output.httpCropErrorTime) {
+                var seconds = Math.floor((Date.now() - status.output.httpCropErrorTime) / 1000);
+                timeAgo = seconds < 60 ? seconds + 's ago' : Math.floor(seconds / 60) + 'm ago';
+            }
+            errors.push({
+                type: 'http',
+                title: 'HTTP Export Error',
+                message: status.output.httpCropError,
+                time: timeAgo,
+                url: status.output.httpCropErrorUrl || ''
+            });
+        }
+    }
+    
+    // Update UI
+    var container = $('#error-alerts-container');
+    var card = $('#error-alerts-card');
+    
+    if (errors.length > 0) {
+        container.empty();
+        errors.forEach(function(err) {
+            var html = '<div class="alert alert-danger alert-dismissible fade show mb-2" role="alert">';
+            html += '<strong>' + err.title + '</strong><br/>';
+            html += err.message;
+            if (err.status) {
+                html += '<br/><small>Status: ' + err.status + '</small>';
+            }
+            if (err.time) {
+                html += '<br/><small class="text-muted">' + err.time + '</small>';
+            }
+            if (err.url) {
+                html += '<br/><small class="text-muted">URL: ' + err.url + '</small>';
+            }
+            html += '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
+            html += '</div>';
+            container.append(html);
+        });
+        card.show();
+    } else {
+        card.hide();
+    }
 }
 
 function showToast(message, type = 'danger') {

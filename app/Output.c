@@ -292,6 +292,10 @@ void Output(cJSON* detections, int modelWidth, int modelHeight) {
                         int mqtt_ok = MQTT_Publish_JSON(crop_topic, payload, 0, 0);
                         if (!mqtt_ok) {
                             LOG_WARN("MQTT crop publish failed - message may be too large (JPEG size: %u bytes)\n", jpeg_size);
+                            ACAP_STATUS_SetString("output", "mqttCropError", "MQTT crop publish failed - message too large");
+                            ACAP_STATUS_SetNumber("output", "mqttCropErrorTime", ACAP_DEVICE_Timestamp());
+                        } else {
+                            ACAP_STATUS_SetNull("output", "mqttCropError");
                         }
                     }
                     if (http_export) {
@@ -311,9 +315,16 @@ void Output(cJSON* detections, int modelWidth, int modelHeight) {
                             int http_ok = output_http_post_json(url, payload, authentication, username, password, token);
                             if (!http_ok) {
                                 LOG_WARN("HTTP POST failed: %s\n", url);
+                                ACAP_STATUS_SetString("output", "httpCropError", "HTTP POST failed");
+                                ACAP_STATUS_SetString("output", "httpCropErrorUrl", url);
+                                ACAP_STATUS_SetNumber("output", "httpCropErrorTime", ACAP_DEVICE_Timestamp());
+                            } else {
+                                ACAP_STATUS_SetNull("output", "httpCropError");
                             }
                         } else {
                             LOG_WARN("HTTP export enabled, but URL is not set.\n");
+                            ACAP_STATUS_SetString("output", "httpCropError", "HTTP export enabled but URL not configured");
+                            ACAP_STATUS_SetNumber("output", "httpCropErrorTime", ACAP_DEVICE_Timestamp());
                         }
                     }
                     cJSON_Delete(payload);
