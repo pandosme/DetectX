@@ -1,7 +1,7 @@
 ARG ARCH=aarch64
 ARG VERSION=12.8.0
 ARG UBUNTU_VERSION=24.04
-ARG REPO=axisecp
+ARG REPO=docker.io/axisecp
 ARG SDK=acap-native-sdk
 
 #-------------------------------------------------------------------------------
