@@ -31,11 +31,14 @@ To ensure the model is compatible with the camera, follow steps:
 git clone https://github.com/ultralytics/yolov5
 cd yolov5
 git checkout 95ebf68f92196975e53ebc7e971d0130432ad107
-curl -L https://acap-ml-model-storage.s3.amazonaws.com/yolov5/A9/yolov5-axis-A9.patch | git apply
+# For ARTPEC-9 cameras
+curl -L https://acap-ml-models.s3.amazonaws.com/yolov5/yolov5_artpec9.patch | git apply
+# For ARTPEC-8 cameras
+curl -L https://acap-ml-models.s3.amazonaws.com/yolov5/yolov5_artpec8.patch | git apply
 pip install -r requirements.txt
 ```
 
-More info found in [YOLOv5 on ARTPEC-8](https://github.com/AxisCommunications/axis-model-zoo/blob/main/docs/yolov5-on-artpec8.md)
+More info found in [YOLOv5 on Axis Cameras](https://github.com/AxisCommunications/axis-model-zoo/blob/main/docs/yolov5.md)
 
 Create a directory for images and label files.
 [Read more here on labels and training](https://docs.ultralytics.com/yolov5/tutorials/train_custom_data/).
@@ -120,4 +123,5 @@ Remember, tools like Perplexity or other LLMs can assist you with any challenges
 
 ## Running and configuring the ACAP
 Install the EAP in your Camera.
+
 
