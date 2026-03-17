@@ -45,15 +45,16 @@ fi
 # Install new version
 echo '
 4. Installing new version...'
-if [ ! -f '/tmp/DetectX_COCO_3_6_0_aarch64.eap' ]; then
-	echo '   ERROR: /tmp/DetectX_COCO_3_6_0_aarch64.eap not found!
+cd /tmp
+# Find the .eap file (use the highest version number if multiple exist)
+EAP_FILE=$(find . -name 'DetectX_COCO_*_aarch64.eap' 2>/dev/null | sort -V | tail -n 1)
+if [ -z "$EAP_FILE" ]; then
+	echo '   ERROR: No DetectX_COCO_*_aarch64.eap file found in /tmp!
 Please copy the .eap file to /tmp first:
-scp DetectX_COCO_3_6_0_aarch64.eap root@<camera-ip>:/tmp/' >&2
+scp DetectX_COCO_*_aarch64.eap root@<camera-ip>:/tmp/' >&2
 	exit 1
 fi
-
-cd /tmp
-gunzip -c DetectX_COCO_3_6_0_aarch64.eap | tar -xf -
+tar -xzf "$EAP_FILE"
 
 # Find and run the install script
 INSTALL_SCRIPT=$(find . -maxdepth 1 -name 'detectx_*.sh' -print -quit 2>/dev/null)
