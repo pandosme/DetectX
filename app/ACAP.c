@@ -438,7 +438,7 @@ void ACAP_HTTP_Process() {
     // Handle POST data
     if (requestData.method && strcmp(requestData.method, "POST") == 0) {
         size_t contentLength = ACAP_HTTP_Get_Content_Length(&requestData);
-        if (contentLength > 0 && contentLength < ACAP_MAX_BUFFER_SIZE) {
+        if (contentLength > 0 && contentLength <= ACAP_MAX_BUFFER_SIZE) {
             char* postData = malloc(contentLength + 1);
 				if (postData) {
 					size_t bytesRead = FCGX_GetStr(postData, contentLength, request.in);
@@ -1568,6 +1568,41 @@ int ACAP_FILE_Write(const char* filepath, cJSON* object) {
         return 0;
     }
 
+    return 1;
+}
+
+int ACAP_FILE_WriteData(const char* filepath, const char* data) {
+    if (!filepath || !data) {
+        LOG_WARN("Invalid parameters for file write data\n");
+        return 0;
+    }
+
+    FILE* file = ACAP_FILE_Open(filepath, "w");
+    if (!file) {
+        LOG_WARN("Error opening %s for writing data\n", filepath);
+        return 0;
+    }
+
+    int result = fputs(data, file);
+    fclose(file);
+
+    if (result < 0) {
+        LOG_WARN("Could not save raw data to %s\n", filepath);
+        return 0;
+    }
+
+    return 1;
+}
+
+int ACAP_FILE_Exists(const char* filepath) {
+    if (!filepath)
+        return 0;
+
+    FILE* file = ACAP_FILE_Open(filepath, "rb");
+    if (!file)
+        return 0;
+
+    fclose(file);
     return 1;
 }
 

@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2025 Fred Juhlin <fred.juhlin@gmail.com>
+Copyright (c) 2026 Fred Juhlin <fred.juhlin@gmail.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,3 +19,95 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+## Third-Party Open Source Components
+
+This software incorporates the following open source components:
+
+---
+
+### cJSON
+- **File(s):** `app/cJSON.c`, `app/cJSON.h`
+- **Copyright:** Copyright (c) 2009-2017 Dave Gamble and cJSON contributors
+- **License:** MIT License
+- **Source:** https://github.com/DaveGamble/cJSON
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+### Eclipse Paho MQTT C Client (Asynchronous API)
+- **File(s):** `app/MQTTAsync.h`, `app/MQTTClient.h`, `app/MQTTClientPersistence.h`,
+  `app/MQTTExportDeclarations.h`, `app/MQTTProperties.h`, `app/MQTTReasonCodes.h`,
+  `app/MQTTSubscribeOpts.h`
+- **Copyright:** Copyright (c) 2009, 2025 IBM Corp., Ian Craggs and others
+- **License:** Eclipse Public License v2.0 and Eclipse Distribution License v1.0
+- **Source:** https://github.com/eclipse/paho.mqtt.c
+
+  Eclipse Public License v2.0: https://www.eclipse.org/legal/epl-2.0/
+  Eclipse Distribution License v1.0: http://www.eclipse.org/org/documents/edl-v10.php
+
+---
+
+### Axis Communications ACAP Example Code
+- **File(s):** `app/imgprovider.c`, `app/imgprovider.h`, `app/imgutils.c`, `app/imgutils.h`
+- **Copyright:** Copyright (C) 2018-2021 Axis Communications AB, Lund, Sweden
+- **License:** Apache License, Version 2.0
+- **Source:** https://github.com/AxisCommunications/acap-native-sdk-examples
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at:
+      https://www.apache.org/licenses/LICENSE-2.0
+
+---
+
+### jQuery
+- **File(s):** `app/html/js/jquery-3.7.1.min.js`, `app/html/js/jquery.min.js`
+- **Copyright:** Copyright OpenJS Foundation and other contributors
+- **License:** MIT License
+- **Source:** https://jquery.com
+
+---
+
+### Bootstrap
+- **File(s):** `app/html/js/bootstrap.bundle.min.js`, `app/html/js/bootstrap.min.js`,
+  `app/html/css/bootstrap.min.css`
+- **Copyright:** Copyright (c) 2011-2024 The Bootstrap Authors
+- **License:** MIT License
+- **Source:** https://getbootstrap.com
+
+---
+
+### Font Awesome (Free)
+- **File(s):** `app/html/css/regular.min.css`
+- **Copyright:** Copyright (c) Fonticons, Inc.
+- **License:** Font Awesome Free License (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License)
+- **Source:** https://fontawesome.com
+
+---
+
+### media-stream-player
+- **File(s):** `app/html/js/media-stream-player.min.js`
+- **Copyright:** Copyright (c) Axis Communications AB
+- **License:** MIT License
+- **Source:** https://github.com/AxisCommunications/media-stream-player-js
+

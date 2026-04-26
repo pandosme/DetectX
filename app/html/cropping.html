@@ -435,6 +435,9 @@
                         <a class="nav-link active" href="cropping.html">Detection Export</a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link" href="model.html">Model</a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link" href="about.html">About</a>
                     </li>
                 </ul>
@@ -477,11 +480,13 @@
                         <!-- Border Adjustment Section -->
                         <h6 class="mb-3">Border Adjustment</h6>
                         <div class="preset-buttons mb-3">
-                            <div class="d-flex gap-2">
+                            <div class="d-flex gap-2 flex-wrap">
                                 <button class="btn btn-sm btn-outline-secondary flex-fill" type="button" onclick="setPreset(0, 0, 0, 0)">None</button>
                                 <button class="btn btn-sm btn-outline-secondary flex-fill" type="button" onclick="setPreset(25, 25, 25, 25)">25px</button>
                                 <button class="btn btn-sm btn-outline-secondary flex-fill" type="button" onclick="setPreset(50, 50, 50, 50)">50px</button>
                                 <button class="btn btn-sm btn-outline-secondary flex-fill" type="button" onclick="setPreset(100, 100, 100, 100)">100px</button>
+                                <button class="btn btn-sm btn-outline-secondary flex-fill" type="button" onclick="setPreset(150, 150, 150, 150)">150px</button>
+                                <button class="btn btn-sm btn-outline-secondary flex-fill" type="button" onclick="setPreset(200, 200, 200, 200)">200px</button>
                             </div>
                         </div>
                         <p class="text-muted small">Drag the blue handles to expand the crop area around detections. Values are in pixels.</p>
@@ -828,7 +833,6 @@ function loadCroppingSettings() {
 
 function updateUI() {
     $('#cropping_active').prop('checked', croppingSettings.active);
-    $('#sdcard_output').prop('checked', croppingSettings.sdcard || false);
     $('#mqtt_output').prop('checked', croppingSettings.mqtt || false);
     $('#http_output').prop('checked', croppingSettings.http || false);
     $('#http_url').val(croppingSettings.http_url || '');
@@ -869,25 +873,12 @@ function updateStatus() {
         dataType: 'json',
         cache: false,
         success: function(status) {
-            // SD Card status (optional)
-            if (status.SDCARD && status.SDCARD.available !== undefined) {
-                if (status.SDCARD.available) {
-                    $('#sdcard_status').removeClass('status-unavailable').addClass('status-available');
-                    $('#sdcard_status_text').text('Available');
-                    $('#sdcard_output').prop('disabled', false);
-                } else {
-                    $('#sdcard_status').removeClass('status-available').addClass('status-unavailable');
-                    $('#sdcard_status_text').text('Not Available');
-                    $('#sdcard_output').prop('disabled', true).prop('checked', false);
-                }
-            }
         }
     });
 }
 
 function saveSettings() {
     croppingSettings.active = $('#cropping_active').is(':checked');
-    croppingSettings.sdcard = $('#sdcard_output').is(':checked');
     croppingSettings.mqtt = $('#mqtt_output').is(':checked');
     croppingSettings.http = $('#http_output').is(':checked');
     croppingSettings.http_url = $('#http_url').val();

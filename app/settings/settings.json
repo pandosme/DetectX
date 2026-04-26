@@ -10,6 +10,8 @@
     "x2": 640,
     "y2": 640
   },
+  "aoi_polygon": [],
+  "exclude_polygons": [],
   "size": {
     "x1": 0,
     "y1": 0,
@@ -17,9 +19,14 @@
     "y2": 13
   },
   "ignore": [],
+  "modelDescription": "",
   "stabelizeTransition": 600,
   "minEventDuration": 3000,
   "prioritize": "accuracy",  
+  "sd_capture": {
+    "enabled": false,
+    "interval": 2
+  },
   "cropping": {
 	  "active": false,
 	  "throttle": 500,
