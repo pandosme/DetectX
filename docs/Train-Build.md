@@ -55,17 +55,17 @@ Decide on the image input size and base model (weights). These choices impact pe
 5. yolov5x (extra large) 86.7M parameters
 
 Observered time including preprocessing, inference and postprocessing (box validation + NMS)
-| Model | Resolution | ARTPEC-8 |
-|-------|------------|-----------|
-| YOLOv5 nano | 480x480 | 40-60 ms |
-| YOLOv5 nano | 960x960 | 70-90 ms |
-| YOLOv5 nano | 1440x1440 | 120-140 ms |
-| YOLOv5 small | 480x480 | 55-75 ms |
-| YOLOv5 small | 960x960 | 190-210 ms |
-| YOLOv5 small | 1440x1440 | 480-500 ms |
-| YOLOv5 medium | 480x480 | Not tested |
-| YOLOv5 medium | 960x960 | Not tested |
-| YOLOv5 medium | 1440x1440 | 700-740 ms |
+| Model | Resolution | ARTPEC-8 | ARTPEC-9 |
+|-------|------------|-----------|-----------|
+| YOLOv5 nano | 480x480 | 40-60 ms | 15-25 ms |
+| YOLOv5 nano | 960x960 | 70-90 ms | 60-70 ms |
+| YOLOv5 nano | 1440x1440 | 120-140 ms | 110-120 ms |
+| YOLOv5 small | 480x480 | 55-75 ms | 20-30 ms |
+| YOLOv5 small | 960x960 | 190-210 ms | 60-70 ms |
+| YOLOv5 small | 1440x1440 | 480-500 ms | 160-180 ms |
+| YOLOv5 medium | 480x480 | Not tested | Not tested |
+| YOLOv5 medium | 960x960 | Not tested | Not tested |
+| YOLOv5 medium | 1440x1440 | 700-740 ms | 200-210 ms |
 
 Start with yolov5n and move to yolov5s if needed. Choose a model size that is a multiple of 32 (default is 640). Smaller sizes reduce inference time, while larger sizes improve detection quality.
 
