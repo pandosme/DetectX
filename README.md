@@ -66,7 +66,9 @@ Allows you to see object detections overlayed on the video, and to adjust detect
 - **Adjust Confidence Threshold:**  
   Set the minimum confidence (0–100) for labeling a detection as valid.
 - **Set Area of Interest (AOI):**  
-  Drag and resize a region to receive detections from only a selected area of the scene.
+  Draw a **polygon** to receive detections only from the area inside the polygon. Click to add vertices; drag vertices to reshape.
+- **Add Exclude Zones:**  
+  Draw one or more **exclude polygons** to suppress detections in specific areas (e.g. tree, reflection, road sign). Multiple zones are supported.
 - **Configure Minimum Object Size:**  
   Exclude detections smaller than the specified pixel area.
 
@@ -106,6 +108,8 @@ This section allows you to tailor detection and event signaling to your applicat
 - **Event State Settings:**  
   - *Prioritize*: Opt for accuracy (suppresses false triggers) or responsiveness.
   - *Minimum Event State Duration*: Avoid chattering by forcing a minimum active/inactive state period for each label.
+- **SD Card Training Capture:**  
+  When enabled, full-frame JPEG images and matching YOLO-format label files are saved to the SD card whenever a detection event is active. Images are captured at a configurable interval (1–60 s); the first image is captured immediately on the event going active. A **Download Archive** button packages all captured images and labels into a zip file ready for import into your training pipeline. A **Clear All** button removes all stored files. Capture stops automatically at 2 000 images to protect SD card space.
 
 **Note:**  
 Each label produces an independent event state. Tuning event parameters is crucial for noisy or high-traffic scenes.
@@ -120,7 +124,7 @@ When downstream systems require not only detection data but *cropped images* for
 
 - **Enable/Disable Detection Cropping**
 - **Set Border Adjustment:**  
-  Expand or shrink the crop region around detected objects (e.g., add 25px margin).
+  Expand or shrink the crop region around detected objects (e.g., add 25px margin). Presets available for common use cases.
 - **Output Methods:**  
   - **MQTT:** Sends cropped images as base64 payloads.
   - **HTTP POST:** Posts the payload to a configurable endpoint.
@@ -241,6 +245,20 @@ DetectX delivers three primary payload types, all enrichable with the configured
 ***
 
 ## Version History
+
+## 4.1.0	April 26, 2026
+
+### New Features
+- **Polygon Area of Interest**: The AOI is now defined as a free-form polygon instead of a rectangle. Click on the AOI canvas to add vertices and drag them to any shape. The area *outside* the polygon is dimmed so the active zone is immediately visible.
+- **Polygon Exclude Zones**: Multiple exclude zones can be drawn as polygons. Each zone suppresses detections inside it, useful for masking persistent false-positive areas such as trees, reflections, or road signs.
+- **Upload Custom Model**: A new *Model* page lets you upload a replacement `.tflite` model file and `labels.txt` directly from the browser — no SSH or Docker rebuild required.
+- **SD Card Training Capture**: Configurable event-driven capture of full-frame JPEG images and YOLO-format label files to the SD card, designed for collecting site-specific training data for model fine-tuning. Includes a Download Archive button (zip of `images/` + `labels/`) and a Clear button. Capture triggers immediately when a detection event goes active, then repeats at a user-defined interval (1–60 s). Stops automatically at 2 000 images.
+- **Bounding-Box Overlay Accuracy**: Reworked canvas/video alignment for all scale modes (center-crop, balanced, letterbox) so detection overlays are pixel-accurate regardless of browser window size.
+
+### UI Improvements
+- Border preset buttons on the Detection Export page for common crop-margin adjustments.
+- Polygon vertices are clamped to the canvas boundary during drag.
+- Polygon drag operations complete correctly even when the mouse is released outside the canvas.
 
 ## 4.0.0	February 2, 2026
 

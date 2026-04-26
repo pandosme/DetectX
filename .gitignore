@@ -1,3 +1,6 @@
+*.eap
+*.zip
+
 # Prerequisites
 *.d
 

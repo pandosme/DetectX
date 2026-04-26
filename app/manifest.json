@@ -2,13 +2,13 @@
     "schemaVersion": "1.7.3",
     "acapPackageConf": {
         "setup": {
-            "friendlyName": "DetectX COCO",
+            "friendlyName": "DetectX",
             "appName": "detectx",
             "vendor": "Fred Juhlin",
             "embeddedSdkVersion": "3.0",
             "vendorUrl": "https://pandosme.github.io",
             "runMode": "once",
-            "version": "4.0.0"
+			"version": "4.1.0"
         },
         "configuration": {
 			"settingPage": "index.html",
@@ -20,11 +20,18 @@
 				{"name": "model","access": "admin","type": "fastCgi"},
 				{"name": "mqtt","access": "admin","type": "fastCgi"},
 				{"name": "certs","access": "admin","type": "fastCgi"},
-				{"name": "crops","access": "admin","type": "fastCgi"}
+				{"name": "crops","access": "admin","type": "fastCgi"},
+				{"name": "sd_download","access": "admin","type": "fastCgi"},
+				{"name": "sd_clear","access": "admin","type": "fastCgi"}
 			]
 		}
     },
 	"resources": {
+		"linux": {
+			"user": {
+				"groups": ["storage"]
+			}
+		},
 		"dbus": {
 			"requiredMethods": [
 				"com.axis.HTTPConf1.VAPIXServiceAccounts1.GetCredentials"
