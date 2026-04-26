@@ -33,6 +33,286 @@ cJSON* model = 0;
 cJSON* eventsTransition = 0;
 cJSON* eventLabelCounter = 0;
 GTimer *cleanupTransitionTimer = 0;
+static int restartPending = 0;
+
+static int point_in_polygon(cJSON* points, double px, double py) {
+	if (!points || !cJSON_IsArray(points) || cJSON_GetArraySize(points) < 3)
+		return 0;
+
+	int inside = 0;
+	int count = cJSON_GetArraySize(points);
+	for (int i = 0, j = count - 1; i < count; j = i++) {
+		cJSON* pi = cJSON_GetArrayItem(points, i);
+		cJSON* pj = cJSON_GetArrayItem(points, j);
+		if (!cJSON_IsObject(pi) || !cJSON_IsObject(pj))
+			continue;
+
+		double xi = cJSON_GetObjectItem(pi, "x") ? cJSON_GetObjectItem(pi, "x")->valuedouble : 0.0;
+		double yi = cJSON_GetObjectItem(pi, "y") ? cJSON_GetObjectItem(pi, "y")->valuedouble : 0.0;
+		double xj = cJSON_GetObjectItem(pj, "x") ? cJSON_GetObjectItem(pj, "x")->valuedouble : 0.0;
+		double yj = cJSON_GetObjectItem(pj, "y") ? cJSON_GetObjectItem(pj, "y")->valuedouble : 0.0;
+
+		if (((yi > py) != (yj > py)) &&
+			(px < (xj - xi) * (py - yi) / (((yj - yi) == 0.0) ? 1e-9 : (yj - yi)) + xi)) {
+			inside = !inside;
+		}
+	}
+
+	return inside;
+}
+
+static cJSON* rect_to_polygon(int x1, int y1, int x2, int y2) {
+	cJSON* polygon = cJSON_CreateArray();
+	if (!polygon)
+		return NULL;
+
+	cJSON* p1 = cJSON_CreateObject();
+	cJSON* p2 = cJSON_CreateObject();
+	cJSON* p3 = cJSON_CreateObject();
+	cJSON* p4 = cJSON_CreateObject();
+	if (!p1 || !p2 || !p3 || !p4) {
+		cJSON_Delete(p1);
+		cJSON_Delete(p2);
+		cJSON_Delete(p3);
+		cJSON_Delete(p4);
+		cJSON_Delete(polygon);
+		return NULL;
+	}
+
+	cJSON_AddNumberToObject(p1, "x", x1);
+	cJSON_AddNumberToObject(p1, "y", y1);
+	cJSON_AddNumberToObject(p2, "x", x2);
+	cJSON_AddNumberToObject(p2, "y", y1);
+	cJSON_AddNumberToObject(p3, "x", x2);
+	cJSON_AddNumberToObject(p3, "y", y2);
+	cJSON_AddNumberToObject(p4, "x", x1);
+	cJSON_AddNumberToObject(p4, "y", y2);
+
+	cJSON_AddItemToArray(polygon, p1);
+	cJSON_AddItemToArray(polygon, p2);
+	cJSON_AddItemToArray(polygon, p3);
+	cJSON_AddItemToArray(polygon, p4);
+	return polygon;
+}
+
+static int polygon_list_contains_point(cJSON* list, double px, double py) {
+	if (!list || !cJSON_IsArray(list))
+		return 0;
+
+	cJSON* item = NULL;
+	cJSON_ArrayForEach(item, list) {
+		if (!cJSON_IsObject(item))
+			continue;
+
+		cJSON* active = cJSON_GetObjectItem(item, "active");
+		if (active && cJSON_IsBool(active) && !cJSON_IsTrue(active))
+			continue;
+
+		cJSON* polygon = cJSON_GetObjectItem(item, "polygon");
+		if (point_in_polygon(polygon, px, py))
+			return 1;
+	}
+
+	return 0;
+}
+
+static int label_is_active(cJSON* settingsObj, const char* label) {
+	if (!settingsObj || !label)
+		return 1;
+
+	cJSON* ignore = cJSON_GetObjectItem(settingsObj, "ignore");
+	if (!ignore || !cJSON_IsArray(ignore))
+		return 1;
+
+	cJSON* item = NULL;
+	cJSON_ArrayForEach(item, ignore) {
+		if (cJSON_IsString(item) && item->valuestring && strcmp(item->valuestring, label) == 0)
+			return 0;
+	}
+
+	return 1;
+}
+
+static int write_binary_file(const char* path, const unsigned char* data, size_t length) {
+	if (!path || !data || length == 0)
+		return 0;
+
+	FILE* fp = ACAP_FILE_Open(path, "wb");
+	if (!fp)
+		return 0;
+
+	size_t written = fwrite((void*)data, 1, length, fp);
+	fclose(fp);
+	return written == length;
+}
+
+static gboolean restart_acap_cb(gpointer user_data) {
+	(void)user_data;
+	LOG("Restart requested from model endpoint\n");
+	raise(SIGTERM);
+	return G_SOURCE_REMOVE;
+}
+
+static void migrate_legacy_regions_to_polygons(cJSON* settingsObj) {
+	int changed = 0;
+	if (!settingsObj)
+		return;
+
+	if (!cJSON_GetObjectItem(settingsObj, "modelDescription")) {
+		cJSON_AddStringToObject(settingsObj, "modelDescription", "");
+		changed = 1;
+	}
+
+	cJSON* aoiPolygon = cJSON_GetObjectItem(settingsObj, "aoi_polygon");
+	if (!aoiPolygon || !cJSON_IsArray(aoiPolygon) || cJSON_GetArraySize(aoiPolygon) < 3) {
+		cJSON* aoi = cJSON_GetObjectItem(settingsObj, "aoi");
+		if (aoi) {
+			int x1 = cJSON_GetObjectItem(aoi, "x1") ? cJSON_GetObjectItem(aoi, "x1")->valueint : 0;
+			int y1 = cJSON_GetObjectItem(aoi, "y1") ? cJSON_GetObjectItem(aoi, "y1")->valueint : 0;
+			int x2 = cJSON_GetObjectItem(aoi, "x2") ? cJSON_GetObjectItem(aoi, "x2")->valueint : 0;
+			int y2 = cJSON_GetObjectItem(aoi, "y2") ? cJSON_GetObjectItem(aoi, "y2")->valueint : 0;
+			if (x2 > x1 && y2 > y1) {
+				cJSON* polygon = rect_to_polygon(x1, y1, x2, y2);
+				if (polygon) {
+					if (aoiPolygon)
+						cJSON_ReplaceItemInObject(settingsObj, "aoi_polygon", polygon);
+					else
+						cJSON_AddItemToObject(settingsObj, "aoi_polygon", polygon);
+					changed = 1;
+				}
+			}
+		}
+	}
+
+	cJSON* excludePolygons = cJSON_GetObjectItem(settingsObj, "exclude_polygons");
+	if (!excludePolygons || !cJSON_IsArray(excludePolygons)) {
+		excludePolygons = cJSON_CreateArray();
+		if (excludePolygons) {
+			if (cJSON_GetObjectItem(settingsObj, "exclude_polygons"))
+				cJSON_ReplaceItemInObject(settingsObj, "exclude_polygons", excludePolygons);
+			else
+				cJSON_AddItemToObject(settingsObj, "exclude_polygons", excludePolygons);
+			changed = 1;
+		}
+	}
+
+	if (excludePolygons && cJSON_GetArraySize(excludePolygons) == 0) {
+		cJSON* exclude = cJSON_GetObjectItem(settingsObj, "exclude");
+		if (exclude) {
+			int x1 = cJSON_GetObjectItem(exclude, "x1") ? cJSON_GetObjectItem(exclude, "x1")->valueint : 0;
+			int y1 = cJSON_GetObjectItem(exclude, "y1") ? cJSON_GetObjectItem(exclude, "y1")->valueint : 0;
+			int x2 = cJSON_GetObjectItem(exclude, "x2") ? cJSON_GetObjectItem(exclude, "x2")->valueint : 0;
+			int y2 = cJSON_GetObjectItem(exclude, "y2") ? cJSON_GetObjectItem(exclude, "y2")->valueint : 0;
+			if (x2 > x1 && y2 > y1) {
+				cJSON* polygon = rect_to_polygon(x1, y1, x2, y2);
+				cJSON* zone = cJSON_CreateObject();
+				if (polygon && zone) {
+					cJSON_AddNumberToObject(zone, "id", 1);
+					cJSON_AddStringToObject(zone, "name", "Exclude 1");
+					cJSON_AddBoolToObject(zone, "active", 1);
+					cJSON_AddItemToObject(zone, "polygon", polygon);
+					cJSON_AddItemToArray(excludePolygons, zone);
+					changed = 1;
+				} else {
+					cJSON_Delete(zone);
+					cJSON_Delete(polygon);
+				}
+			}
+		}
+	}
+
+	if (changed) {
+		ACAP_Set_Config("settings", settingsObj);
+		ACAP_FILE_Write("localdata/settings.json", settingsObj);
+	}
+}
+
+static void HTTP_ENDPOINT_model(const ACAP_HTTP_Response response, const ACAP_HTTP_Request request) {
+	const char* method = ACAP_HTTP_Get_Method(request);
+	if (!method) {
+		ACAP_HTTP_Respond_Error(response, 400, "Invalid request method");
+		return;
+	}
+
+	if (strcmp(method, "GET") == 0) {
+		cJSON* payload = model ? cJSON_Duplicate(model, 1) : cJSON_CreateObject();
+		if (!payload)
+			payload = cJSON_CreateObject();
+
+		cJSON* description = settings ? cJSON_GetObjectItem(settings, "modelDescription") : NULL;
+		cJSON_AddStringToObject(payload, "description", (description && cJSON_IsString(description) && description->valuestring) ? description->valuestring : "");
+		ACAP_HTTP_Respond_JSON(response, payload);
+		cJSON_Delete(payload);
+		return;
+	}
+
+	if (strcmp(method, "POST") == 0) {
+		const char* contentType = ACAP_HTTP_Get_Content_Type(request);
+		if (!contentType || strstr(contentType, "application/json") == NULL) {
+			ACAP_HTTP_Respond_Error(response, 415, "Unsupported media type");
+			return;
+		}
+
+		if (!request->postData || request->postDataLength == 0) {
+			ACAP_HTTP_Respond_Error(response, 400, "Missing POST data");
+			return;
+		}
+
+		cJSON* payload = cJSON_Parse(request->postData);
+		if (!payload) {
+			ACAP_HTTP_Respond_Error(response, 400, "Invalid JSON payload");
+			return;
+		}
+
+		int restartNeeded = 0;
+		cJSON* description = cJSON_GetObjectItem(payload, "description");
+		if (description && cJSON_IsString(description)) {
+			cJSON* value = cJSON_CreateString(description->valuestring ? description->valuestring : "");
+			if (cJSON_GetObjectItem(settings, "modelDescription"))
+				cJSON_ReplaceItemInObject(settings, "modelDescription", value);
+			else
+				cJSON_AddItemToObject(settings, "modelDescription", value);
+		}
+
+		cJSON* tfliteB64 = cJSON_GetObjectItem(payload, "tflite_b64");
+		if (tfliteB64 && cJSON_IsString(tfliteB64) && tfliteB64->valuestring && strlen(tfliteB64->valuestring) > 0) {
+			gsize modelLength = 0;
+			guchar* modelData = g_base64_decode(tfliteB64->valuestring, &modelLength);
+			if (!modelData || modelLength == 0 || !write_binary_file("localdata/model.tflite", modelData, modelLength)) {
+				if (modelData)
+					g_free(modelData);
+				cJSON_Delete(payload);
+				ACAP_HTTP_Respond_Error(response, 500, "Failed to write uploaded TFLite model");
+				return;
+			}
+			g_free(modelData);
+			restartNeeded = 1;
+		}
+
+		cJSON* labelsContent = cJSON_GetObjectItem(payload, "labels_content");
+		if (labelsContent && cJSON_IsString(labelsContent) && labelsContent->valuestring) {
+			if (!ACAP_FILE_WriteData("localdata/labels.txt", labelsContent->valuestring)) {
+				cJSON_Delete(payload);
+				ACAP_HTTP_Respond_Error(response, 500, "Failed to write uploaded labels file");
+				return;
+			}
+			restartNeeded = 1;
+		}
+
+		ACAP_FILE_Write("localdata/settings.json", settings);
+		cJSON_Delete(payload);
+
+		if (restartNeeded && !restartPending) {
+			restartPending = 1;
+			g_timeout_add(800, restart_acap_cb, NULL);
+		}
+
+		ACAP_HTTP_Respond_Text(response, restartNeeded ? "Model update accepted. Restarting ACAP." : "Model settings saved.");
+		return;
+	}
+
+	ACAP_HTTP_Respond_Error(response, 405, "Method Not Allowed - Use GET or POST");
+}
 
 void
 ConfigUpdate( const char *setting, cJSON* data) {
@@ -166,7 +446,12 @@ ImageProcess(gpointer data) {
 	unsigned int minWidth = cJSON_GetObjectItem(size,"x2")->valueint - cJSON_GetObjectItem(size,"x1")->valueint;
 	unsigned int minHeight = cJSON_GetObjectItem(size,"y2")->valueint - cJSON_GetObjectItem(size,"y1")->valueint;
 
-	int confidenceThreshold = cJSON_GetObjectItem(settings,"confidence")?cJSON_GetObjectItem(settings,"confidence")->valueint:0.5;
+	if ((int)minWidth < 0)
+		minWidth = (unsigned int)(-(int)minWidth);
+	if ((int)minHeight < 0)
+		minHeight = (unsigned int)(-(int)minHeight);
+
+	int confidenceThreshold = cJSON_GetObjectItem(settings,"confidence")?cJSON_GetObjectItem(settings,"confidence")->valueint:50;
 		
 	cJSON* detection = detections->child;
 	while(detection) {
@@ -220,15 +505,28 @@ ImageProcess(gpointer data) {
 		unsigned int pixel_height = height;
 
 		int insert = 0;
-		if( c >= confidenceThreshold && pixel_cx >= x1 && pixel_cx <= x2 && pixel_cy >= y1 && pixel_cy <= y2 )
+		if( c >= confidenceThreshold )
 			insert = 1;
 		if( pixel_width < minWidth || pixel_height < minHeight )
 			insert = 0;
 
+		if (insert) {
+			cJSON* aoiPolygon = cJSON_GetObjectItem(settings, "aoi_polygon");
+			if (aoiPolygon && cJSON_IsArray(aoiPolygon) && cJSON_GetArraySize(aoiPolygon) >= 3) {
+				insert = point_in_polygon(aoiPolygon, pixel_cx, pixel_cy);
+			} else if (!(pixel_cx >= x1 && pixel_cx <= x2 && pixel_cy >= y1 && pixel_cy <= y2)) {
+				insert = 0;
+			}
+		}
+
 		// Check exclude area - if detection center is inside exclude box, ignore it
 		if( insert ) {
-			cJSON* exclude = cJSON_GetObjectItem(settings,"exclude");
-			if( exclude ) {
+			cJSON* excludePolygons = cJSON_GetObjectItem(settings, "exclude_polygons");
+			if (excludePolygons && cJSON_IsArray(excludePolygons) && polygon_list_contains_point(excludePolygons, pixel_cx, pixel_cy)) {
+				insert = 0;
+			} else {
+				cJSON* exclude = cJSON_GetObjectItem(settings,"exclude");
+				if( exclude ) {
 				unsigned int exclude_x1 = cJSON_GetObjectItem(exclude,"x1")?cJSON_GetObjectItem(exclude,"x1")->valueint:0;
 				unsigned int exclude_y1 = cJSON_GetObjectItem(exclude,"y1")?cJSON_GetObjectItem(exclude,"y1")->valueint:0;
 				unsigned int exclude_x2 = cJSON_GetObjectItem(exclude,"x2")?cJSON_GetObjectItem(exclude,"x2")->valueint:modelWidth;
@@ -236,18 +534,12 @@ ImageProcess(gpointer data) {
 				
 				if( pixel_cx >= exclude_x1 && pixel_cx <= exclude_x2 && pixel_cy >= exclude_y1 && pixel_cy <= exclude_y2 )
 					insert = 0;
+				}
 			}
 		}
 
-		cJSON* ignore = cJSON_GetObjectItem(settings,"ignore");
-		if( insert && ignore && ignore->type == cJSON_Array && cJSON_GetArraySize(ignore) > 0 ) {
-			cJSON* ignoreLabel = ignore->child;
-			while( ignoreLabel && insert ) {
-				if( strcmp( label, ignoreLabel->valuestring) == 0 )
-					insert = 0;
-				ignoreLabel = ignoreLabel->next;
-			}
-		}
+		if (insert && !label_is_active(settings, label))
+			insert = 0;
 		//Add custom filter here.  Set "insert = 0" if you want to exclude the detection
 
 		if( insert ) {
@@ -409,6 +701,7 @@ int main(void) {
 
 	// Migrate settings if needed
 	migrate_settings_to_pixel_coordinates(settings, modelWidth, modelHeight);
+	migrate_legacy_regions_to_polygons(settings);
 
 	if( model ) {
 		ACAP_Set_Config("model", model );
@@ -422,6 +715,7 @@ int main(void) {
 		LOG_WARN("Model setup failed\n");
 	}
 	ACAP_Set_Config("model",model);
+	ACAP_HTTP_Node("model", HTTP_ENDPOINT_model);
 	Output_init();
 	MQTT_Init( Main_MQTT_Status, Main_MQTT_Subscription_Message  );	
 	ACAP_Set_Config("mqtt", MQTT_Settings() );

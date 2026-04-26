@@ -1,448 +1,280 @@
 <!DOCTYPE html>
-<!-- DetectX v3.6.0 - Modern UI with Top Navigation -->
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DetectX</title>
     <link rel="stylesheet" href="css/bootstrap.min.css">
-    <link rel="stylesheet" href="css/app.css?v=3.6.0">
+    <link rel="stylesheet" href="css/app.css?v=4.1.0">
     <script src="js/jquery-3.7.1.min.js"></script>
     <script src="js/bootstrap.bundle.min.js"></script>
     <script src="js/media-stream-player.min.js"></script>
+    <script src="js/polygon-editor.js"></script>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --primary-dark: #1e40af;
+            --success-color: #10b981;
+            --danger-color: #ef4444;
+            --bg-light: #f8fafc;
+            --bg-white: #ffffff;
+            --text-dark: #1e293b;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
 
-<style>
-    :root {
-        --primary-color: #2563eb;
-        --primary-dark: #1e40af;
-        --primary-light: #3b82f6;
-        --success-color: #10b981;
-        --danger-color: #ef4444;
-        --warning-color: #f59e0b;
-        --info-color: #06b6d4;
-        --bg-light: #f8fafc;
-        --bg-white: #ffffff;
-        --text-dark: #1e293b;
-        --text-muted: #64748b;
-        --border-color: #e2e8f0;
-        --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-    }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-light);
+            color: var(--text-dark);
+        }
 
-    body {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-        background-color: var(--bg-light);
-        color: var(--text-dark);
-    }
-
-    /* Top Navigation Bar */
-    .top-navbar {
-        background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
-        box-shadow: var(--shadow-lg);
-        padding: 0;
-        min-height: 64px;
-    }
-
-    .navbar-brand {
-        font-size: 1.5rem;
-        font-weight: 600;
-        color: white !important;
-        padding: 0.75rem 1.5rem;
-    }
-
-    .nav-pills .nav-link {
-        color: rgba(255, 255, 255, 0.85);
-        border-radius: 8px;
-        padding: 0.65rem 1.25rem;
-        margin: 0 0.25rem;
-        font-weight: 500;
-        transition: all 0.2s ease;
-    }
-
-    .nav-pills .nav-link:hover {
-        background-color: rgba(255, 255, 255, 0.15);
-        color: white;
-    }
-
-    .nav-pills .nav-link.active {
-        background-color: rgba(255, 255, 255, 0.25);
-        color: white;
-        font-weight: 600;
-    }
-
-    /* Main Content Area */
-    .main-content {
-        padding: 2rem;
-        max-width: 1600px;
-        margin: 0 auto;
-    }
-
-    /* Cards */
-    .card {
-        border: none;
-        border-radius: 12px;
-        box-shadow: var(--shadow-md);
-        background: var(--bg-white);
-        margin-bottom: 1.5rem;
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .card:hover {
-        transform: translateY(-2px);
-        box-shadow: var(--shadow-lg);
-    }
-
-    .card-title {
-        color: var(--text-dark);
-        font-weight: 600;
-        font-size: 1.25rem;
-        margin-bottom: 1.25rem;
-        padding-bottom: 0.75rem;
-        border-bottom: 2px solid var(--bg-light);
-    }
-
-    /* Video Display */
-    #view {
-        overflow: hidden;
-        box-shadow: var(--shadow-lg);
-        background: black;
-    }
-
-    #viewgroup {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        overflow: hidden;
-    }
-
-    #video media-stream-player {
-        width: 100% !important;
-        height: 100% !important;
-        object-fit: fill !important;
-    }
-
-    /* Custom AOI Selection Overlay */
-    #aoi-overlay {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        z-index: 1000;
-        display: none;
-        pointer-events: all;
-    }
-
-    #aoi-overlay.active {
-        display: block;
-    }
-
-    .aoi-box {
-        position: absolute;
-        border: 2px solid #00ff00;
-        background: rgba(0, 255, 0, 0.1);
-        cursor: move;
-    }
-
-    .aoi-handle {
-        position: absolute;
-        width: 10px;
-        height: 10px;
-        background: #00ff00;
-        border: 1px solid #fff;
-    }
-
-    .aoi-handle.nw { top: -5px; left: -5px; cursor: nw-resize; }
-    .aoi-handle.ne { top: -5px; right: -5px; cursor: ne-resize; }
-    .aoi-handle.sw { bottom: -5px; left: -5px; cursor: sw-resize; }
-    .aoi-handle.se { bottom: -5px; right: -5px; cursor: se-resize; }
-
-    /* Buttons */
-    .btn {
-        border-radius: 8px;
-        padding: 0.65rem 1.25rem;
-        font-weight: 500;
-        transition: all 0.2s ease;
-        border: none;
-    }
-
-    .btn-primary {
-        background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
-        color: white;
-    }
-
-    .btn-primary:hover {
-        background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-color) 100%);
-        transform: translateY(-1px);
-        box-shadow: var(--shadow-md);
-    }
-
-    .btn-secondary {
-        background-color: var(--text-muted);
-        color: white;
-    }
-
-    .btn-secondary:hover {
-        background-color: var(--text-dark);
-        transform: translateY(-1px);
-        box-shadow: var(--shadow-md);
-    }
-
-    /* Form Controls */
-    .form-control, .form-select {
-        border-radius: 8px;
-        border: 1px solid var(--border-color);
-        padding: 0.65rem 1rem;
-        transition: all 0.2s ease;
-    }
-
-    .form-control:focus, .form-select:focus {
-        border-color: var(--primary-color);
-        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-    }
-
-    .form-label {
-        color: var(--text-dark);
-        font-weight: 500;
-        margin-bottom: 0.5rem;
-    }
-
-    /* Table */
-    .table {
-        margin-bottom: 0;
-    }
-
-    .table thead th {
-        background-color: var(--bg-light);
-        color: var(--text-dark);
-        font-weight: 600;
-        border-bottom: 2px solid var(--border-color);
-        padding: 1rem;
-    }
-
-    .table tbody td {
-        padding: 1rem;
-        border-bottom: 1px solid var(--border-color);
-    }
-
-    .table-striped tbody tr:nth-of-type(odd) {
-        background-color: rgba(248, 250, 252, 0.5);
-    }
-
-    /* Info Display */
-    .info-item {
-        padding: 0.5rem 0;
-        color: var(--text-muted);
-        font-size: 0.95rem;
-    }
-
-    .info-item strong {
-        color: var(--text-dark);
-    }
-
-    /* Error Banner */
-    #error-banner {
-        position: fixed;
-        top: 64px;
-        left: 0;
-        right: 0;
-        z-index: 9999;
-        background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
-        color: white;
-        padding: 1rem 2rem;
-        box-shadow: var(--shadow-lg);
-        display: none;
-        animation: slideDown 0.3s ease;
-    }
-
-    #error-banner.show {
-        display: block;
-    }
-
-    @keyframes slideDown {
-        from { transform: translateY(-100%); opacity: 0; }
-        to { transform: translateY(0); opacity: 1; }
-    }
-
-    #error-banner .error-content {
-        max-width: 1600px;
-        margin: 0 auto;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-    }
-
-    #error-banner .error-message {
-        font-weight: 500;
-        font-size: 1rem;
-    }
-
-    #error-banner .error-details {
-        font-size: 0.875rem;
-        opacity: 0.9;
-        margin-top: 0.25rem;
-    }
-
-    #error-banner .retry-button {
-        background: rgba(255, 255, 255, 0.2);
-        border: 1px solid rgba(255, 255, 255, 0.3);
-        color: white;
-        padding: 0.5rem 1rem;
-        border-radius: 6px;
-        font-weight: 500;
-        cursor: pointer;
-        transition: all 0.2s ease;
-    }
-
-    #error-banner .retry-button:hover {
-        background: rgba(255, 255, 255, 0.3);
-    }
-
-    /* Error Alerts Card */
-    #error-alerts-card .alert {
-        font-size: 0.9rem;
-        padding: 0.75rem;
-    }
-
-    #error-alerts-card .alert strong {
-        font-size: 1rem;
-    }
-
-    #error-alerts-card .alert-danger {
-        background-color: #fee;
-        border-left: 4px solid #dc2626;
-    }
-
-    /* Loading Modal */
-    #modal {
-        backdrop-filter: blur(4px);
-    }
-
-    #modal > div {
-        background: white;
-        border-radius: 12px;
-        box-shadow: var(--shadow-lg);
-        padding: 2rem;
-        text-align: center;
-    }
-
-    #modal h2 {
-        color: var(--text-dark);
-        font-weight: 600;
-        margin-bottom: 1rem;
-    }
-
-    #modal p {
-        color: var(--text-muted);
-        margin-bottom: 0;
-    }
-
-    /* Responsive */
-    @media (max-width: 768px) {
-        .main-content {
-            padding: 1rem;
+        .top-navbar {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+            box-shadow: var(--shadow-lg);
+            padding: 0;
+            min-height: 64px;
         }
 
         .navbar-brand {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: white !important;
+            padding: 0.75rem 1.5rem;
+        }
+
+        .nav-pills .nav-link {
+            color: rgba(255, 255, 255, 0.85);
+            border-radius: 8px;
+            padding: 0.65rem 1.25rem;
+            margin: 0 0.25rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .nav-pills .nav-link:hover {
+            background-color: rgba(255, 255, 255, 0.15);
+            color: white;
+        }
+
+        .nav-pills .nav-link.active {
+            background-color: rgba(255, 255, 255, 0.25);
+            color: white;
+            font-weight: 600;
+        }
+
+        .main-content {
+            padding: 2rem;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: var(--shadow-md);
+            background: var(--bg-white);
+            margin-bottom: 1.5rem;
+        }
+
+        .card-title {
+            color: var(--text-dark);
+            font-weight: 600;
             font-size: 1.25rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid var(--bg-light);
         }
 
-        .nav-pills {
-            flex-wrap: wrap;
+        #view {
+            overflow: hidden;
+            box-shadow: var(--shadow-lg);
+            background: black;
+            margin: 0 auto;
+            max-width: 100%;
         }
-    }
-</style>
 
+        #view-frame {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: black;
+        }
+
+        #video,
+        #overlayCanvas,
+        #polygonCanvas {
+            position: absolute;
+            left: 0;
+        }
+
+        #video media-stream-player {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: fill !important;
+        }
+
+        #overlayCanvas {
+            pointer-events: none;
+            z-index: 3;
+        }
+
+        #polygonCanvas {
+            z-index: 4;
+        }
+
+        #polygonCanvas.draw-mode {
+            cursor: crosshair;
+        }
+
+        .hint-box {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            color: #1d4ed8;
+            border-radius: 10px;
+            padding: 0.75rem 0.9rem;
+            font-size: 0.92rem;
+        }
+
+        .zone-item {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            background: #f8fafc;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 0.6rem 0.7rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .zone-color {
+            width: 14px;
+            height: 14px;
+            border-radius: 3px;
+            flex-shrink: 0;
+        }
+
+        .zone-name {
+            flex: 1;
+            border: none;
+            background: transparent;
+            outline: none;
+            font-weight: 600;
+            min-width: 0;
+        }
+
+        .status-pill {
+            display: inline-block;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            color: #1d4ed8;
+            border-radius: 999px;
+            padding: 0.35rem 0.75rem;
+            font-size: 0.85rem;
+            margin-left: 0.4rem;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 1rem;
+            }
+
+            .nav-pills {
+                flex-wrap: wrap;
+            }
+        }
+    </style>
 </head>
-
 <body>
-    <!-- Error Notification Banner -->
-    <div id="error-banner">
-        <div class="error-content">
-            <div>
-                <div class="error-message" id="error-message">Backend connection lost</div>
-                <div class="error-details" id="error-details"></div>
-            </div>
-            <button class="retry-button" onclick="retryConnection()">Retry Now</button>
-        </div>
-    </div>
-
-    <!-- Top Navigation -->
     <nav class="navbar navbar-expand-lg top-navbar">
         <div class="container-fluid">
-            <span class="navbar-brand acapName">Custom Model</span>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
-                    aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation"
-                    style="background-color: rgba(255,255,255,0.2); border: none;">
+            <span class="navbar-brand acapName">DetectX</span>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" style="background-color: rgba(255,255,255,0.2); border: none;">
                 <span class="navbar-toggler-icon" style="filter: invert(1);"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto nav-pills">
-                    <li class="nav-item">
-                        <a class="nav-link active" href="index.html">Detections</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="mqtt.html">MQTT</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="advanced.html">Events/Labels</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="cropping.html">Detection Export</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="about.html">About</a>
-                    </li>
+                    <li class="nav-item"><a class="nav-link active" href="index.html">Detections</a></li>
+                    <li class="nav-item"><a class="nav-link" href="mqtt.html">MQTT</a></li>
+                    <li class="nav-item"><a class="nav-link" href="advanced.html">Events/Labels</a></li>
+                    <li class="nav-item"><a class="nav-link" href="cropping.html">Detection Export</a></li>
+                    <li class="nav-item"><a class="nav-link" href="model.html">Model</a></li>
+                    <li class="nav-item"><a class="nav-link" href="about.html">About</a></li>
                 </ul>
             </div>
         </div>
     </nav>
 
-    <!-- Main Content -->
     <div class="main-content">
-        <!-- Loading Modal -->
-        <div id='modal' style='display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.2); z-index:1000;'>
-            <div style='position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:2rem; border-radius:12px; box-shadow:var(--shadow-lg); text-align:center;'>
-                <h2>Model Offline</h2>
-                <p>The model is currently loading. Please wait.</p>
+        <div id="modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.25); z-index:1000;">
+            <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:2rem; border-radius:12px; box-shadow:var(--shadow-lg); text-align:center; min-width:280px;">
+                <h2 style="font-size:1.4rem; margin-bottom:0.75rem;">Model Offline</h2>
+                <p style="margin:0; color:var(--text-muted);">The model is loading. Please wait.</p>
             </div>
         </div>
 
-        <!-- Main Content Grid -->
         <div class="row g-4">
-            <!-- Left Column: Video and Settings -->
             <div class="col-lg-8">
-                <!-- Video Display Card -->
                 <div class="card">
                     <div class="card-body">
-                        <div id="view" style="width:1000px; height:1000px; max-width:100%; margin:0 auto;">
-                            <div style="width:100%; height:100%; position:relative; background-color: black;">
-                                <div id="video" style="width:100%; height:100%; position:absolute; top:0px; left:0px;"></div>
-                                <canvas id="overlayCanvas" width="1000" height="1000" style="width:100%; height:100%; position:absolute; top:0px; left:0px; pointer-events:none;"></canvas>
-                                <canvas id="canvas" width="1000" height="1000" style="width:100%; height:100%; position:absolute; top:0px; left:0px;"></canvas>
-                                <!-- AOI Selection Overlay -->
-                                <div id="aoi-overlay">
-                                    <div class="aoi-box">
-                                        <div class="aoi-handle nw"></div>
-                                        <div class="aoi-handle ne"></div>
-                                        <div class="aoi-handle sw"></div>
-                                        <div class="aoi-handle se"></div>
-                                    </div>
-                                </div>
+                        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                            <h5 class="card-title mb-0 border-0 pb-0">Live Detection View</h5>
+                            <div>
+                                <span class="status-pill" id="model-status-pill">Model: -</span>
+                                <span class="status-pill" id="time-pill">Inference: -</span>
                             </div>
                         </div>
+                        <div id="view">
+                            <div id="view-frame">
+                                <div id="video"></div>
+                                <canvas id="overlayCanvas"></canvas>
+                                <canvas id="polygonCanvas"></canvas>
+                            </div>
+                        </div>
+                        <div class="hint-box mt-3" id="editor-hint">Select AOI or Exclusion, then draw polygons on top of the live video.</div>
                     </div>
                 </div>
 
-                <!-- Detection Settings Card -->
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                            <div class="btn-group" role="group">
+                                <button id="tab-aoi" class="btn btn-success">Area Of Interest</button>
+                                <button id="tab-exclude" class="btn btn-outline-danger">Exclude Areas</button>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button id="draw-btn" class="btn btn-primary">Draw Polygon</button>
+                                <button id="cancel-draw-btn" class="btn btn-secondary" style="display:none;">Cancel</button>
+                                <button id="save-zones-btn" class="btn btn-success">Save Zones</button>
+                            </div>
+                        </div>
+
+                        <div id="aoi-panel">
+                            <div class="text-muted small mb-2">Detections are accepted only when the detection center point is inside the AOI polygon. If no AOI polygon exists, the full configured rectangle is used.</div>
+                            <div id="aoi-summary" class="small fst-italic text-muted">No AOI polygon saved yet.</div>
+                            <div class="mt-2">
+                                <button id="convert-rect-btn" class="btn btn-sm btn-outline-success">Convert rectangle to polygon</button>
+                            </div>
+                        </div>
+
+                        <div id="exclude-panel" style="display:none;">
+                            <div class="text-muted small mb-2">Detections are discarded when the center point is inside any active exclusion polygon.</div>
+                            <div id="exclude-list"></div>
+                            <div id="exclude-empty" class="small fst-italic text-muted">No exclusion polygons saved.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
                 <div class="card">
                     <div class="card-body">
                         <h5 class="card-title">Detection Settings</h5>
-
                         <div class="mb-3 d-flex align-items-center">
                             <label for="settings_confidence" class="form-label fw-bold mb-0" style="min-width: 180px;">Confidence Threshold</label>
-                            <select id="settings_confidence" class="setting form-select" style="width: 120px;">
+                            <select id="settings_confidence" class="form-select" style="width: 120px;">
                                 <option value="20">20%</option>
                                 <option value="30">30%</option>
                                 <option value="40">40%</option>
@@ -459,7 +291,7 @@
 
                         <div class="mb-3 d-flex align-items-center">
                             <label for="settings_scaleMode" class="form-label fw-bold mb-0" style="min-width: 180px;">Scale Mode</label>
-                            <select id="settings_scaleMode" class="setting form-select" style="flex: 1;">
+                            <select id="settings_scaleMode" class="form-select" style="flex: 1;">
                                 <option value="balanced">Balanced - Reduced area, good quality</option>
                                 <option value="crop">Center-Crop - Smallest area, best quality</option>
                                 <option value="letterbox">Letterbox - Full area, less quality</option>
@@ -468,26 +300,12 @@
 
                         <div class="mb-3">
                             <label class="form-label fw-bold">Video Information</label>
-                            <div class="info-item">Capture Resolution: <strong><span id="captureResolution">-</span></strong></div>
-                            <div class="info-item">Model Input: <strong><span id="modelResolution">-</span></strong></div>
+                            <div class="small text-muted">Capture Resolution: <strong id="captureResolution" class="text-dark">-</strong></div>
+                            <div class="small text-muted">Model Input: <strong id="modelResolution" class="text-dark">-</strong></div>
                         </div>
 
-                        <div class="d-flex gap-2">
-                            <button id="aoi_button" class="btn btn-secondary flex-fill">Set Area Of Interest</button>
-                            <button id="exclude_button" class="btn btn-secondary flex-fill">Set Exclude Area</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Right Column: Active Events -->
-            <div class="col-lg-4">
-                <!-- Error Alerts Card -->
-                <div id="error-alerts-card" class="card mb-3" style="display: none;">
-                    <div class="card-body">
-                        <h5 class="card-title text-danger">⚠️ System Errors</h5>
-                        <div id="error-alerts-container">
-                            <!-- Errors will be inserted here -->
+                        <div class="d-grid">
+                            <button id="save-detection-settings-btn" class="btn btn-primary">Save Detection Settings</button>
                         </div>
                     </div>
                 </div>
@@ -496,854 +314,527 @@
                     <div class="card-body">
                         <h5 class="card-title">Active Event States</h5>
                         <div class="table-responsive">
-                            <table class="table table-striped">
+                            <table class="table table-striped mb-0">
                                 <thead>
-                                    <tr>
-                                        <th>Event</th>
-                                    </tr>
+                                    <tr><th>Event</th></tr>
                                 </thead>
-                                <tbody id="events-table">
-                                    <!-- Data will be appended here -->
-                                </tbody>
+                                <tbody id="events-table"></tbody>
                             </table>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+
+        <div class="toast-container position-fixed top-0 end-0 p-3"></div>
     </div>
 
-	<div class="modal fade" id="errorModal" tabindex="-1" aria-labelledby="errorModalLabel" aria-hidden="true">
-		<div class="modal-dialog">
-			<div class="modal-content">
-				<div class="modal-header">
-					<h5 class="modal-title" id="errorModalLabel">Error</h5>
-					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-				</div>
-				<div class="modal-body">
-					The application is not running.
-				</div>
-				<div class="modal-footer">
-					<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-				</div>
-			</div>
-		</div>
-	</div>				
+    <script>
+        let App = null;
+        let editor = null;
+        let detectionList = [];
+        let activeTab = 'aoi';
+        let aoiPolygon = null;
+        let excludePolygons = [];
+        let modelWidth = 640;
+        let modelHeight = 640;
+        let videoWidth = 640;
+        let videoHeight = 640;
+        let viewWidth = 640;
+        let viewHeight = 640;
+        let canvasWidth = 640;
+        let canvasHeight = 640;
+        let previousScaleMode = 'balanced';
+        const AOI_COLORS = ['#22c55e'];
+        const EXCLUDE_COLORS = ['#ef4444', '#f97316', '#ec4899', '#dc2626', '#b91c1c'];
 
-    <div class="toast-container position-fixed top-0 end-0 p-3">
-    </div>
-
-<script>
-var App = 0;
-var imageWidth = 800;
-var imageHeight = 450;
-var videoWidth = 640;
-var videoHeight = 360;
-var viewWidth = 1000;
-var viewHeight = 562;
-var inferenceTimer = 0;
-var selectionMode = "";
-
-// Backend error tracking
-var backendErrors = {
-    consecutiveFailures: 0,
-    lastError: null,
-    totalFailures: 0,
-    startTime: Date.now(),
-    showingBanner: false,
-    threshold: 3  // Show banner after 3 consecutive failures
-};
-
-// Custom AOI Selection State
-var aoiState = {
-	active: false,
-	dragging: false,
-	resizing: false,
-	resizeHandle: null,
-	startX: 0,
-	startY: 0,
-	x1: 0,
-	y1: 0,
-	x2: 0,
-	y2: 0,
-	mode: 'aoi'  // 'aoi' or 'exclude'
-};
-var setupComplete = false;
-		
-$(document).ready(function() {
-	$.ajax({
-		type: "POST",
-		url: '/axis-cgi/basicdeviceinfo.cgi',
-		dataType: 'json',
-		data: '{"apiVersion": "1.0","context": "DetectX","method": "getAllProperties"}',
-		cache: false,
-		success: function( response ) {
-			// if( response.data.propertyList.Soc !== "Axis Artpec-8" ) {
-			//	$(".modal-body").html('<b>This camera is not supported.<br/>The camera needs to be based on ARTPEC-8</b>');
-			//	$('#errorModal').modal('show');
-			//	return;
-			// }
-			handleBackendSuccess();
-			initializePage();
-		},
-		error: function(xhr, status, error) {
-			handleBackendError('device info', error || status);
-			$('#errorModal').modal('show');
-		}
-	});
-});
-
-function initializePage() {	
-	$.ajax({type: "GET",url: 'app',dataType: 'json',cache: false,
-		success: function(data) {
-			App = data;
-			// Update UI elements
-			document.title = App.manifest.acapPackageConf.setup.friendlyName;
-			$(".acapName").html(App.manifest.acapPackageConf.setup.friendlyName);
-			$("#model_status").text("Status: " + App.status.model.status);
-			$("#settings_confidence").val(App.settings.confidence);
-			$("#settings_scaleMode").val(App.settings.scaleMode || "balanced");
-
-			// Store initial scale mode for revert functionality
-			window.previousScaleMode = App.settings.scaleMode || "balanced";
-
-			// Update resolution displays
-			if (App.model) {
-				$("#captureResolution").text(App.model.videoWidth + " x " + App.model.videoHeight);
-				$("#modelResolution").text(App.model.modelWidth + " x " + App.model.modelHeight);
-			}
-
-			SetupView(App.model.modelWidth, App.model.modelHeight);
-
-
-			// Initialize custom AOI overlay
-			initializeAOIOverlay();
-			handleBackendSuccess();
-		},
-		error: function(xhr, status, error) {
-			handleBackendError('app initialization', error || status);
-			$(".modal-body").html('<b>The application is not responding</b><br/><small>Check console for details</small>');
-			$('#errorModal').modal('show');
-		}
-	});
-
-	$("#reset_detections").click(function() {
-		var canvas = document.getElementById('canvas');
-		var ctx = canvas.getContext("2d");
-		ctx.beginPath();
-		ctx.clearRect(0, 0, canvas.width, canvas.height);
-		ctx.stroke();
-		appendDataToTable([]);
-		$.ajax({type: "GET",url: 'detections?reset=yes',dataType: 'json',cache: false});
-	});
-
-	// Set AOI button click handler
-	$("#aoi_button").click(function() {
-		if (aoiState.active && aoiState.mode === 'aoi') {
-			// Hide AOI selection
-			toggleAOISelection(false);
-			$(this).removeClass('btn-primary').addClass('btn-secondary');
-		} else {
-			// Show AOI selection
-			aoiState.mode = 'aoi';
-			toggleAOISelection(true);
-			$(this).removeClass('btn-secondary').addClass('btn-primary');
-			$("#exclude_button").removeClass('btn-primary').addClass('btn-secondary');
-		}
-	});
-
-	// Set Exclude Area button click handler
-	$("#exclude_button").click(function() {
-		if (aoiState.active && aoiState.mode === 'exclude') {
-			// Hide exclude selection
-			toggleAOISelection(false);
-			$(this).removeClass('btn-primary').addClass('btn-secondary');
-		} else {
-			// Show exclude selection
-			aoiState.mode = 'exclude';
-			toggleAOISelection(true);
-			$(this).removeClass('btn-secondary').addClass('btn-primary');
-			$("#aoi_button").removeClass('btn-primary').addClass('btn-secondary');
-		}
-	});
-
-
-	$("#settings_confidence").change(function() {
-		var confidenceValue = parseInt($(this).val());
-		App.settings.confidence = confidenceValue;
-		$.ajax({type: "POST",url: "settings",contentType: 'application/json',
-			data: JSON.stringify({ confidence: confidenceValue }),
-			success: function(response) {
-				currentSettings = newSettings;
-			},
-			error: function(xhr, status, error) {
-				alert('Failed to save settings: ' + error);
-			}
-		});
-	});
-
-	$("#settings_scaleMode").change(function() {
-		var scaleModeValue = $(this).val();
-
-		// Show confirmation dialog
-		if (confirm("This will restart the ACAP. Proceed?")) {
-			// User clicked OK - save and restart
-			App.settings.scaleMode = scaleModeValue;
-			$.ajax({type: "POST",url: "settings",contentType: 'application/json',
-				data: JSON.stringify({ scaleMode: scaleModeValue }),
-				success: function(response) {
-					// Send VAPIX request to restart the ACAP
-					$.ajax({
-						type: "GET",
-						url: "/axis-cgi/applications/control.cgi?action=restart&package=detectx",
-						success: function() {
-							showToast('ACAP is restarting. Page will refresh when ready...', 'info');
-							window.previousScaleMode = scaleModeValue;
-							// Poll for ACAP to come back online, then refresh
-							pollForAcapRestart();
-						},
-						error: function(xhr, status, error) {
-							showToast('Failed to restart ACAP: ' + error, 'danger');
-						}
-					});
-				},
-				error: function(xhr, status, error) {
-					showToast('Failed to save scale mode: ' + error, 'danger');
-					// Revert selection
-					$("#settings_scaleMode").val(window.previousScaleMode);
-				}
-			});
-		} else {
-			// User clicked Cancel - revert to previous value
-			$("#settings_scaleMode").val(window.previousScaleMode);
-		}
-	});
-
-	setInterval( function(){
-		$.ajax({type: "GET",url: 'status',dataType: 'json',cache: false,
-			success: function( status ) {
-				// Connection successful
-				handleBackendSuccess();
-				
-				if( !status.model || !status.model.state ) {
-					// Model is not ready - show loading modal
-					$('#modal').show();
-					return;
-				}
-
-				// Model is ready - hide loading modal
-				$('#modal').hide();
-
-				if ($('.modal:visible').length && $('body').hasClass('modal-open')) {
-					$('#errorModal').modal('hide');
-				};
-				
-				$("#model_status").text("Status: " + status.model.status);
-
-				// Check for system errors
-				updateErrorAlerts(status);
-
-				$('#events-table').empty();
-				if( !status.hasOwnProperty("labels") )
-					return;
-
-				if( !status.labels.hasOwnProperty("detections") )
-					return;
-				
-				var canvas = document.getElementById('canvas');
-				var ctx = canvas.getContext("2d");
-
-				ctx.beginPath();
-				ctx.clearRect(0, 0, canvas.width, canvas.height);
-				ctx.stroke();
-				ctx.lineWidth = 3;
-				ctx.strokeStyle = '#FFFF00';
-				ctx.font = '24px Arial';  // Set font style and size
-				ctx.fillStyle = '#FFFF00'; // Same color as the box
-				ctx.beginPath();
-				for( var i = 0; i < status.labels.detections.length; i++ ) {
-				    var detection = status.labels.detections[i];
-
-					// Transform coordinates from capture space to display space (16:9)
-					var transformed = transformCoordinates(detection.x, detection.y, detection.w, detection.h);
-
-					ctx.rect(transformed.x, transformed.y, transformed.w, transformed.h);
-					var text = detection.label + ': ' + detection.c;
-					ctx.fillText(text, transformed.x, transformed.y - 10); // -10 to position
-				}
-				ctx.stroke();	
-
-				var events = status.events;
-				for( var label in events ) {
-					if( events[label] ) {
-						var row = '<tr><td>' + label + '</td></tr>';
-						$('#events-table').append(row);
-					}
-				};
-			},
-			error: function(xhr, status, error) {
-				// ACAP is not responding
-				handleBackendError('status polling', error || status);
-				$('#modal').show();
-			}
-		});
-	},300);
-};			
-	  
-
-function transformCoordinates(x, y, w, h) {
-	// Coordinates come from backend as pixels relative to model input (e.g., 640x640)
-	var scaleMode = App.settings.scaleMode || "balanced";
-
-	if (scaleMode === "letterbox") {
-		// Letterbox mode: scale from model to displayed video size
-		// Model is 640x640, displayed video is e.g., 640x360 (scaled down 16:9)
-		var videoAspect = videoWidth / videoHeight;
-		var displayVideoWidth = App.model.modelWidth;  // Same as view width
-		var displayVideoHeight = App.model.modelWidth / videoAspect;
-
-		var scaleX = displayVideoWidth / App.model.modelWidth;
-		var scaleY = displayVideoHeight / App.model.modelHeight;
-
-		return {
-			x: x * scaleX,
-			y: y * scaleY,
-			w: w * scaleX,
-			h: h * scaleY
-		};
-	} else {
-		// Balanced and crop modes: scale from model space to video space
-		// For 640x640 model → 856x640 video: scaleX=1.3375, scaleY=1.0
-		var scaleX = videoWidth / App.model.modelWidth;
-		var scaleY = videoHeight / App.model.modelHeight;
-
-		return {
-			x: x * scaleX,
-			y: y * scaleY,
-			w: w * scaleX,
-			h: h * scaleY
-		};
-	}
-}
-
-function SetupView(modelWidth, modelHeight) {
-	// Store model dimensions for coordinate transformation
-	App.model.modelWidth = modelWidth;
-	App.model.modelHeight = modelHeight;
-
-	// Use video dimensions from model config for view size
-	videoWidth = App.model.videoWidth;
-	videoHeight = App.model.videoHeight;
-	imageWidth = App.model.videoWidth;
-	imageHeight = App.model.videoHeight;
-
-	// For letterbox mode, use model dimensions for 1:1 square view
-	var scaleMode = App.settings.scaleMode || "balanced";
-
-	if (scaleMode === "letterbox") {
-		// View is 1:1 square using model dimensions (e.g., 640x640)
-		viewWidth = modelWidth;
-		viewHeight = modelWidth;
-
-		// Calculate video's displayed size when letterboxed in square view
-		// Video aspect ratio (e.g., 1136:640 = 1.775:1 for 16:9)
-		var videoAspect = videoWidth / videoHeight;
-		var displayVideoWidth = viewWidth;
-		var displayVideoHeight = viewWidth / videoAspect;
-
-		// Calculate letterbox offset (black bars on top/bottom)
-		var letterboxOffsetY = (viewHeight - displayVideoHeight) / 2;
-
-		// Canvas matches the displayed video size
-		$("#overlayCanvas").attr("width", displayVideoWidth).attr("height", displayVideoHeight);
-		$("#canvas").attr("width", displayVideoWidth).attr("height", displayVideoHeight);
-
-		// Set CSS dimensions to match canvas buffer size (not stretched)
-		$("#overlayCanvas").css({
-			"width": displayVideoWidth + "px",
-			"height": displayVideoHeight + "px",
-			"top": letterboxOffsetY + "px"
-		});
-		$("#canvas").css({
-			"width": displayVideoWidth + "px",
-			"height": displayVideoHeight + "px",
-			"top": letterboxOffsetY + "px"
-		});
-	} else {
-		// Balanced and crop modes: view matches video dimensions exactly
-		viewWidth = videoWidth;
-		viewHeight = videoHeight;
-
-		// Update canvas dimensions to match video
-		$("#overlayCanvas").attr("width", videoWidth).attr("height", videoHeight);
-		$("#canvas").attr("width", videoWidth).attr("height", videoHeight);
-
-		// Set CSS dimensions in pixels
-		$("#overlayCanvas").css({
-			"width": videoWidth + "px",
-			"height": videoHeight + "px",
-			"top": "0px"
-		});
-		$("#canvas").css({
-			"width": videoWidth + "px",
-			"height": videoHeight + "px",
-			"top": "0px"
-		});
-	}
-
-	$("#view").css("width", viewWidth + "px");
-	$("#view").css("height", viewHeight + "px");
-
-	var secureConnection = "";
-	if (location.protocol === 'https:')
-		secureConnection = "secure=true"
-	var player = '<media-stream-player hostname="' + window.location.hostname + '" ' + secureConnection + '  format="RTP_H264" compression="40" audio="0" resolution="' + videoWidth + 'x' + videoHeight + '" variant="basic" autoplay></media-stream-player>';
-	$("#video").append(player);
-
-	setupComplete = true;
-}
-
-
-function appendDataToTable(dataArray) {
-	var $tableBody = $("#detection-table");
-	$tableBody.empty(); // Clear existing data
-	dataArray.forEach(function(item) {
-		var row = '<tr><td>' + item.label + ' </td><td>' + item.c + '</td></tr>';
-		$tableBody.append(row);
-	});
-}
-
-function showErrorBanner(message, details = '') {
-    backendErrors.showingBanner = true;
-    $('#error-banner').addClass('show');
-    $('#error-message').text(message);
-    $('#error-details').text(details);
-}
-
-function hideErrorBanner() {
-    backendErrors.showingBanner = false;
-    $('#error-banner').removeClass('show');
-}
-
-function handleBackendError(context, error) {
-    backendErrors.consecutiveFailures++;
-    backendErrors.totalFailures++;
-    backendErrors.lastError = {
-        context: context,
-        error: error,
-        timestamp: new Date().toISOString()
-    };
-
-    // Show banner after threshold consecutive failures
-    if (backendErrors.consecutiveFailures >= backendErrors.threshold) {
-        var uptime = Math.floor((Date.now() - backendErrors.startTime) / 1000);
-        var details = 'Failures: ' + backendErrors.consecutiveFailures + ' consecutive, ' + 
-                      backendErrors.totalFailures + ' total | Context: ' + context;
-        
-        if (backendErrors.consecutiveFailures >= 10) {
-            showErrorBanner('Backend appears to be down', details);
-        } else {
-            showErrorBanner('Backend connection issues detected', details);
+        function showToast(message, type) {
+            type = type || 'info';
+            const closeClass = type === 'warning' ? '' : ' btn-close-white';
+            const textClass = type === 'warning' ? 'text-dark' : 'text-white';
+            const html = '<div class="toast align-items-center ' + textClass + ' bg-' + type + ' border-0" role="alert">'
+                + '<div class="d-flex"><div class="toast-body">' + message + '</div>'
+                + '<button type="button" class="btn-close' + closeClass + ' me-2 m-auto" data-bs-dismiss="toast"></button>'
+                + '</div></div>';
+            const container = document.querySelector('.toast-container');
+            container.insertAdjacentHTML('beforeend', html);
+            const element = container.lastElementChild;
+            new bootstrap.Toast(element, { delay: 4000 }).show();
+            element.addEventListener('hidden.bs.toast', function () {
+                this.remove();
+            });
         }
-    } else if (backendErrors.consecutiveFailures === 1) {
-        // First failure - just log, don't notify yet
-        console.warn('Backend error in ' + context + ':', error);
-    }
-}
 
-function handleBackendSuccess() {
-    var hadConsecutiveFailures = backendErrors.consecutiveFailures > 0;
-    
-    if (backendErrors.showingBanner && hadConsecutiveFailures >= backendErrors.threshold) {
-        showToast('Backend connection restored', 'success');
-        hideErrorBanner();
-    }
-    
-    backendErrors.consecutiveFailures = 0;
-}
+        function escapeHtml(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
 
-function retryConnection() {
-    hideErrorBanner();
-    backendErrors.consecutiveFailures = 0;
-    showToast('Retrying connection...', 'info');
-    // The periodic polling will automatically retry
-}
+        function canvasPointFromModel(point) {
+            return {
+                x: Math.round((point.x || 0) * canvasWidth / modelWidth),
+                y: Math.round((point.y || 0) * canvasHeight / modelHeight)
+            };
+        }
 
-function updateErrorAlerts(status) {
-    var errors = [];
-    
-    // Check model errors
-    if (status.model && status.model.error) {
-        errors.push({
-            type: 'model',
-            title: 'Model Error',
-            message: status.model.error,
-            status: status.model.status
-        });
-    }
-    
-    // Check output/cropping errors
-    if (status.output) {
-        if (status.output.cropError) {
-            var timeAgo = '';
-            if (status.output.cropErrorTime) {
-                var now = Date.now();
-                var errorTime = status.output.cropErrorTime;
-                var seconds = Math.floor((now - errorTime) / 1000);
-                if (seconds < 60) {
-                    timeAgo = seconds + 's ago';
-                } else if (seconds < 3600) {
-                    timeAgo = Math.floor(seconds / 60) + 'm ago';
-                } else {
-                    timeAgo = Math.floor(seconds / 3600) + 'h ago';
+        function modelPointFromCanvas(point) {
+            return {
+                x: Math.round((point.x || 0) * modelWidth / canvasWidth),
+                y: Math.round((point.y || 0) * modelHeight / canvasHeight)
+            };
+        }
+
+        function toCanvasPolygon(polygon) {
+            if (!Array.isArray(polygon))
+                return [];
+            return polygon.map(canvasPointFromModel);
+        }
+
+        function toModelPolygon(polygon) {
+            if (!Array.isArray(polygon))
+                return [];
+            return polygon.map(modelPointFromCanvas);
+        }
+
+        function polygonBounds(polygon) {
+            if (!polygon || !polygon.length) {
+                return { x1: 0, y1: 0, x2: modelWidth, y2: modelHeight };
+            }
+            const xs = polygon.map(function (point) { return point.x; });
+            const ys = polygon.map(function (point) { return point.y; });
+            return {
+                x1: Math.max(0, Math.min.apply(null, xs)),
+                y1: Math.max(0, Math.min.apply(null, ys)),
+                x2: Math.min(modelWidth, Math.max.apply(null, xs)),
+                y2: Math.min(modelHeight, Math.max.apply(null, ys))
+            };
+        }
+
+        function drawDetections(ctx) {
+            if (!detectionList.length)
+                return;
+            // Use the canvas's actual rendered CSS size so the overlay tracks
+            // the video even when the container is scaled by the browser.
+            var rect = ctx.canvas.getBoundingClientRect();
+            var renderScaleX = rect.width  > 0 ? rect.width  / ctx.canvas.width  : 1;
+            var renderScaleY = rect.height > 0 ? rect.height / ctx.canvas.height : 1;
+            ctx.save();
+            ctx.scale(renderScaleX, renderScaleY);
+            ctx.lineWidth = 3 / renderScaleX;
+            ctx.strokeStyle = '#facc15';
+            ctx.fillStyle = '#facc15';
+            ctx.font = 'bold ' + Math.round(20 / renderScaleX) + 'px Arial';
+            ctx.beginPath();
+            detectionList.forEach(function (detection) {
+                const x = detection.x * canvasWidth / modelWidth;
+                const y = detection.y * canvasHeight / modelHeight;
+                const w = detection.w * canvasWidth / modelWidth;
+                const h = detection.h * canvasHeight / modelHeight;
+                ctx.rect(x, y, w, h);
+                ctx.fillText((detection.label || 'Unknown') + ': ' + detection.c, x, y > 20 ? y - 8 : y + h + 20);
+            });
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        function renderAoiSummary() {
+            if (aoiPolygon && aoiPolygon.polygon && aoiPolygon.polygon.length >= 3) {
+                $('#aoi-summary').html('<span class="text-success fw-semibold">AOI active.</span> Detections must stay inside the green polygon.');
+            } else {
+                $('#aoi-summary').text('No AOI polygon saved yet. Legacy rectangle fallback remains active.');
+            }
+        }
+
+        function renderExcludeList() {
+            const container = $('#exclude-list');
+            container.empty();
+            if (!excludePolygons.length) {
+                $('#exclude-empty').show();
+                return;
+            }
+            $('#exclude-empty').hide();
+
+            excludePolygons.forEach(function (item, index) {
+                const color = EXCLUDE_COLORS[index % EXCLUDE_COLORS.length];
+                const html = '<div class="zone-item">'
+                    + '<span class="zone-color" style="background:' + color + '"></span>'
+                    + '<input class="zone-name" data-index="' + index + '" value="' + escapeHtml(item.name || ('Exclude ' + (index + 1))) + '">'
+                    + '<div class="form-check m-0">'
+                    + '<input class="form-check-input exclude-active" type="checkbox" id="exclude-active-' + index + '" data-index="' + index + '" ' + (item.active !== false ? 'checked' : '') + '>'
+                    + '<label class="form-check-label" for="exclude-active-' + index + '">Active</label>'
+                    + '</div>'
+                    + '<button class="btn btn-sm btn-outline-danger delete-exclude" data-index="' + index + '">Delete</button>'
+                    + '</div>';
+                container.append(html);
+            });
+
+            $('.zone-name').off('change').on('change', function () {
+                excludePolygons[parseInt(this.dataset.index, 10)].name = this.value;
+            });
+            $('.exclude-active').off('change').on('change', function () {
+                excludePolygons[parseInt(this.dataset.index, 10)].active = this.checked;
+                if (activeTab === 'exclude')
+                    syncEditorPolygons();
+            });
+            $('.delete-exclude').off('click').on('click', function () {
+                excludePolygons.splice(parseInt(this.dataset.index, 10), 1);
+                excludePolygons.forEach(function (item, idx) { item.id = idx + 1; });
+                renderExcludeList();
+                syncEditorPolygons();
+            });
+        }
+
+        function syncEditorPolygons() {
+            if (!editor)
+                return;
+            if (activeTab === 'aoi') {
+                editor.colors = AOI_COLORS;
+                editor.setPolygons(aoiPolygon ? [aoiPolygon] : []);
+            } else {
+                editor.colors = EXCLUDE_COLORS;
+                editor.setPolygons(excludePolygons);
+            }
+            editor.redraw(drawDetections);
+        }
+
+        function switchTab(tab) {
+            activeTab = tab;
+            if (tab === 'aoi') {
+                $('#tab-aoi').removeClass('btn-outline-success').addClass('btn-success');
+                $('#tab-exclude').removeClass('btn-danger').addClass('btn-outline-danger');
+                $('#aoi-panel').show();
+                $('#exclude-panel').hide();
+            } else {
+                $('#tab-aoi').removeClass('btn-success').addClass('btn-outline-success');
+                $('#tab-exclude').removeClass('btn-outline-danger').addClass('btn-danger');
+                $('#aoi-panel').hide();
+                $('#exclude-panel').show();
+            }
+            if (editor)
+                editor.cancelDraw();
+            $('#draw-btn').show();
+            $('#cancel-draw-btn').hide();
+            syncEditorPolygons();
+        }
+
+        function saveSettings(payload, callback) {
+            $.ajax({
+                type: 'POST',
+                url: 'settings',
+                contentType: 'application/json',
+                data: JSON.stringify(payload),
+                success: function () {
+                    if (callback)
+                        callback();
+                },
+                error: function (xhr) {
+                    showToast('Failed to save settings: ' + (xhr.responseText || 'unknown error'), 'danger');
                 }
-            }
-            errors.push({
-                type: 'crop',
-                title: 'Image Crop Error',
-                message: status.output.cropError,
-                time: timeAgo
             });
         }
-        
-        if (status.output.mqttCropError) {
-            var timeAgo = '';
-            if (status.output.mqttCropErrorTime) {
-                var seconds = Math.floor((Date.now() - status.output.mqttCropErrorTime) / 1000);
-                timeAgo = seconds < 60 ? seconds + 's ago' : Math.floor(seconds / 60) + 'm ago';
+
+        function saveZones() {
+            const payload = {};
+            if (aoiPolygon && aoiPolygon.polygon && aoiPolygon.polygon.length >= 3) {
+                payload.aoi_polygon = toModelPolygon(aoiPolygon.polygon);
+                payload.aoi = polygonBounds(payload.aoi_polygon);
+            } else {
+                payload.aoi_polygon = [];
             }
-            errors.push({
-                type: 'mqtt',
-                title: 'MQTT Export Error',
-                message: status.output.mqttCropError,
-                time: timeAgo
+
+            payload.exclude_polygons = excludePolygons.map(function (item, index) {
+                return {
+                    id: item.id || (index + 1),
+                    name: item.name || ('Exclude ' + (index + 1)),
+                    active: item.active !== false,
+                    polygon: toModelPolygon(item.polygon || [])
+                };
+            });
+            if (payload.exclude_polygons.length) {
+                payload.exclude = polygonBounds(payload.exclude_polygons[0].polygon);
+            }
+
+            saveSettings(payload, function () {
+                App.settings.aoi_polygon = payload.aoi_polygon;
+                if (payload.aoi)
+                    App.settings.aoi = payload.aoi;
+                App.settings.exclude_polygons = payload.exclude_polygons;
+                if (payload.exclude)
+                    App.settings.exclude = payload.exclude;
+                showToast('Zone settings saved.', 'success');
             });
         }
-        
-        if (status.output.httpCropError) {
-            var timeAgo = '';
-            if (status.output.httpCropErrorTime) {
-                var seconds = Math.floor((Date.now() - status.output.httpCropErrorTime) / 1000);
-                timeAgo = seconds < 60 ? seconds + 's ago' : Math.floor(seconds / 60) + 'm ago';
+
+        function setupView() {
+            modelWidth = App.model.modelWidth;
+            modelHeight = App.model.modelHeight;
+            videoWidth = App.model.videoWidth;
+            videoHeight = App.model.videoHeight;
+
+            let canvasTop = 0;
+            const scaleMode = App.settings.scaleMode || 'balanced';
+            if (scaleMode === 'letterbox') {
+                viewWidth = modelWidth;
+                viewHeight = modelWidth;
+                canvasWidth = viewWidth;
+                canvasHeight = Math.round(viewWidth / (videoWidth / videoHeight));
+                canvasTop = Math.round((viewHeight - canvasHeight) / 2);
+            } else {
+                viewWidth = videoWidth;
+                viewHeight = videoHeight;
+                canvasWidth = viewWidth;
+                canvasHeight = viewHeight;
             }
-            errors.push({
-                type: 'http',
-                title: 'HTTP Export Error',
-                message: status.output.httpCropError,
-                time: timeAgo,
-                url: status.output.httpCropErrorUrl || ''
+
+            $('#view').css({ width: viewWidth + 'px', height: viewHeight + 'px' });
+            $('#view-frame').css({ width: viewWidth + 'px', height: viewHeight + 'px' });
+
+            $('#overlayCanvas').attr({ width: canvasWidth, height: canvasHeight }).css({ width: canvasWidth + 'px', height: canvasHeight + 'px', top: canvasTop + 'px' });
+            $('#polygonCanvas').attr({ width: canvasWidth, height: canvasHeight }).css({ width: canvasWidth + 'px', height: canvasHeight + 'px', top: canvasTop + 'px' });
+            $('#video').css({ width: canvasWidth + 'px', height: canvasHeight + 'px', top: canvasTop + 'px' });
+
+            const secureConnection = location.protocol === 'https:' ? 'secure=true' : '';
+            const player = '<media-stream-player hostname="' + window.location.hostname + '" ' + secureConnection + ' format="RTP_H264" compression="40" audio="0" resolution="' + videoWidth + 'x' + videoHeight + '" variant="basic" autoplay></media-stream-player>';
+            $('#video').html(player);
+
+            $('#captureResolution').text(videoWidth + ' x ' + videoHeight);
+            $('#modelResolution').text(modelWidth + ' x ' + modelHeight);
+        }
+
+        function initEditor() {
+            const canvas = document.getElementById('polygonCanvas');
+            editor = new PolygonEditor(canvas, {
+                colors: AOI_COLORS,
+                hintEl: document.getElementById('editor-hint'),
+                onChanged: function (polygons) {
+                    if (activeTab === 'aoi') {
+                        aoiPolygon = polygons.length ? {
+                            id: 1,
+                            name: 'AOI',
+                            active: true,
+                            polygon: polygons[0].polygon
+                        } : null;
+                        renderAoiSummary();
+                    } else {
+                        excludePolygons = polygons.map(function (item, index) {
+                            return {
+                                id: item.id || (index + 1),
+                                name: item.name || ('Exclude ' + (index + 1)),
+                                active: item.active !== false,
+                                polygon: item.polygon
+                            };
+                        });
+                        renderExcludeList();
+                    }
+                    editor.redraw(drawDetections);
+                },
+                onCommit: function (polygon) {
+                    if (activeTab === 'aoi') {
+                        aoiPolygon = { id: 1, name: 'AOI', active: true, polygon: polygon };
+                        renderAoiSummary();
+                    } else {
+                        const id = excludePolygons.length ? Math.max.apply(null, excludePolygons.map(function (item) { return item.id || 0; })) + 1 : 1;
+                        excludePolygons.push({ id: id, name: 'Exclude ' + id, active: true, polygon: polygon });
+                        renderExcludeList();
+                    }
+                    editor.cancelDraw();
+                    $('#draw-btn').show();
+                    $('#cancel-draw-btn').hide();
+                    syncEditorPolygons();
+                }
+            });
+
+            const storedAoi = Array.isArray(App.settings.aoi_polygon) ? App.settings.aoi_polygon : [];
+            if (storedAoi.length >= 3) {
+                aoiPolygon = {
+                    id: 1,
+                    name: 'AOI',
+                    active: true,
+                    polygon: toCanvasPolygon(storedAoi)
+                };
+            }
+
+            const storedExcludes = Array.isArray(App.settings.exclude_polygons) ? App.settings.exclude_polygons : [];
+            excludePolygons = storedExcludes.map(function (item, index) {
+                return {
+                    id: item.id || (index + 1),
+                    name: item.name || ('Exclude ' + (index + 1)),
+                    active: item.active !== false,
+                    polygon: toCanvasPolygon(item.polygon || [])
+                };
+            });
+
+            renderAoiSummary();
+            renderExcludeList();
+            switchTab('aoi');
+        }
+
+        function pollStatus() {
+            $.ajax({
+                type: 'GET',
+                url: 'status',
+                dataType: 'json',
+                cache: false,
+                success: function (status) {
+                    if (!status.model || !status.model.state) {
+                        $('#modal').show();
+                        return;
+                    }
+                    $('#modal').hide();
+                    $('#model-status-pill').text('Model: ' + (status.model.status || 'Running'));
+                    $('#time-pill').text('Inference: ' + ((status.model.averageTime != null) ? (status.model.averageTime + ' ms') : '-'));
+
+                    detectionList = (status.labels && Array.isArray(status.labels.detections)) ? status.labels.detections : [];
+                    if (editor)
+                        editor.redraw(drawDetections);
+
+                    $('#events-table').empty();
+                    const events = status.events || {};
+                    Object.keys(events).forEach(function (label) {
+                        if (events[label])
+                            $('#events-table').append('<tr><td>' + escapeHtml(label) + '</td></tr>');
+                    });
+                },
+                error: function () {
+                    $('#modal').show();
+                }
             });
         }
-    }
-    
-    // Update UI
-    var container = $('#error-alerts-container');
-    var card = $('#error-alerts-card');
-    
-    if (errors.length > 0) {
-        container.empty();
-        errors.forEach(function(err) {
-            var html = '<div class="alert alert-danger alert-dismissible fade show mb-2" role="alert">';
-            html += '<strong>' + err.title + '</strong><br/>';
-            html += err.message;
-            if (err.status) {
-                html += '<br/><small>Status: ' + err.status + '</small>';
+
+        function pollForAcapRestart() {
+            let attempts = 0;
+            function poll() {
+                attempts += 1;
+                $.ajax({
+                    type: 'GET',
+                    url: 'status',
+                    dataType: 'json',
+                    cache: false,
+                    timeout: 3000,
+                    success: function (status) {
+                        if (status && status.model && status.model.state) {
+                            showToast('ACAP restarted successfully. Refreshing page...', 'success');
+                            setTimeout(function () {
+                                location.reload();
+                            }, 1000);
+                        } else if (attempts < 30) {
+                            setTimeout(poll, 2000);
+                        } else {
+                            showToast('ACAP restart timeout. Please refresh manually.', 'warning');
+                        }
+                    },
+                    error: function () {
+                        if (attempts < 30) {
+                            setTimeout(poll, 2000);
+                        } else {
+                            showToast('ACAP restart timeout. Please refresh manually.', 'warning');
+                        }
+                    }
+                });
             }
-            if (err.time) {
-                html += '<br/><small class="text-muted">' + err.time + '</small>';
-            }
-            if (err.url) {
-                html += '<br/><small class="text-muted">URL: ' + err.url + '</small>';
-            }
-            html += '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
-            html += '</div>';
-            container.append(html);
+            setTimeout(poll, 3000);
+        }
+
+        $(function () {
+            $.ajax({
+                type: 'GET',
+                url: 'app',
+                dataType: 'json',
+                cache: false,
+                success: function (data) {
+                    App = data;
+                    document.title = App.manifest.acapPackageConf.setup.friendlyName;
+                    $('.acapName').text(App.manifest.acapPackageConf.setup.friendlyName);
+                    $('#settings_confidence').val(App.settings.confidence || 50);
+                    $('#settings_scaleMode').val(App.settings.scaleMode || 'balanced');
+                    previousScaleMode = App.settings.scaleMode || 'balanced';
+                    setupView();
+                    initEditor();
+                    pollStatus();
+                    setInterval(pollStatus, 1000);
+                },
+                error: function () {
+                    showToast('The application is not responding.', 'danger');
+                }
+            });
+
+            $('#tab-aoi').on('click', function () { switchTab('aoi'); });
+            $('#tab-exclude').on('click', function () { switchTab('exclude'); });
+
+            $('#draw-btn').on('click', function () {
+                if (editor)
+                    editor.startDraw();
+                $('#draw-btn').hide();
+                $('#cancel-draw-btn').show();
+            });
+
+            $('#cancel-draw-btn').on('click', function () {
+                if (editor)
+                    editor.cancelDraw();
+                $('#draw-btn').show();
+                $('#cancel-draw-btn').hide();
+                syncEditorPolygons();
+            });
+
+            $('#convert-rect-btn').on('click', function () {
+                var aoi = App && App.settings && App.settings.aoi;
+                if (!aoi) {
+                    showToast('No AOI rectangle configured.', 'warning');
+                    return;
+                }
+                var poly = [
+                    { x: aoi.x1, y: aoi.y1 },
+                    { x: aoi.x2, y: aoi.y1 },
+                    { x: aoi.x2, y: aoi.y2 },
+                    { x: aoi.x1, y: aoi.y2 }
+                ];
+                aoiPolygon = { id: 1, name: 'AOI', active: true, polygon: toCanvasPolygon(poly) };
+                renderAoiSummary();
+                syncEditorPolygons();
+                if (editor) {
+                    editor.selectedIndex = 0;
+                    editor.updateHint();
+                    editor.redraw(drawDetections);
+                }
+                showToast('Rectangle converted to polygon. Shift+click an edge to add vertices, then Save Zones.', 'info');
+            });
+
+            $('#save-zones-btn').on('click', saveZones);
+
+            $('#save-detection-settings-btn').on('click', function () {
+                const confidence = parseInt($('#settings_confidence').val(), 10) || 50;
+                App.settings.confidence = confidence;
+                saveSettings({ confidence: confidence }, function () {
+                    showToast('Detection settings saved.', 'success');
+                });
+            });
+
+            $('#settings_scaleMode').on('change', function () {
+                const scaleModeValue = $(this).val();
+                if (!confirm('This will restart the ACAP. Proceed?')) {
+                    $('#settings_scaleMode').val(previousScaleMode);
+                    return;
+                }
+                saveSettings({ scaleMode: scaleModeValue }, function () {
+                    previousScaleMode = scaleModeValue;
+                    $.ajax({
+                        type: 'GET',
+                        url: '/axis-cgi/applications/control.cgi?action=restart&package=detectx',
+                        success: function () {
+                            showToast('ACAP is restarting. Page will refresh when ready...', 'info');
+                            pollForAcapRestart();
+                        },
+                        error: function (xhr, status, error) {
+                            showToast('Failed to restart ACAP: ' + (error || status), 'danger');
+                            $('#settings_scaleMode').val(previousScaleMode);
+                        }
+                    });
+                });
+            });
         });
-        card.show();
-    } else {
-        card.hide();
-    }
-}
-
-function showToast(message, type = 'danger') {
-    const toastContainer = document.querySelector('.toast-container');
-    
-    // Determine text color class based on type
-    const textColorClass = type === 'warning' ? 'text-dark' : 'text-white';
-    
-    // Create the toast HTML structure
-    var toastHtml = '';
-    toastHtml += '<div class="toast align-items-center ' + textColorClass + ' bg-' + type + ' border-0" role="alert" aria-live="assertive" aria-atomic="true">';
-    toastHtml += '   <div class="d-flex">';
-    toastHtml += '     <div class="toast-body">' + message + '</div>';
-    toastHtml += '     <button type="button" class="btn-close' + (type === 'warning' ? '' : ' btn-close-white') + ' me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>';
-    toastHtml += '   </div>';
-    toastHtml += '</div>';
-    
-    // Rest of the function remains the same
-    toastContainer.insertAdjacentHTML('beforeend', toastHtml);
-    const toastElement = toastContainer.lastElementChild;
-    const toast = new bootstrap.Toast(toastElement, {
-        autohide: true,
-        delay: 4000
-    });
-    toast.show();
-    toastElement.addEventListener('hidden.bs.toast', function() {
-        this.remove();
-    });
-}
-
-// Poll for ACAP restart completion
-function pollForAcapRestart() {
-	var pollInterval = 2000; // Check every 2 seconds
-	var maxAttempts = 30; // Give up after 60 seconds
-	var attempts = 0;
-
-	var checkAcap = function() {
-		attempts++;
-		$.ajax({
-			type: "GET",
-			url: "status",
-			dataType: "json",
-			cache: false,
-			timeout: 3000,
-			success: function(status) {
-				// ACAP is back online
-				if (status && status.model && status.model.state) {
-					showToast('ACAP restarted successfully. Refreshing page...', 'success');
-					setTimeout(function() {
-						location.reload();
-					}, 1000);
-				} else if (attempts < maxAttempts) {
-					// Model not ready yet, keep polling
-					setTimeout(checkAcap, pollInterval);
-				} else {
-					showToast('ACAP restart timeout. Please refresh manually.', 'warning');
-				}
-			},
-			error: function() {
-				// ACAP not responding yet, keep polling
-				if (attempts < maxAttempts) {
-					setTimeout(checkAcap, pollInterval);
-				} else {
-					showToast('ACAP restart timeout. Please refresh manually.', 'warning');
-				}
-			}
-		});
-	};
-
-	// Start polling after a brief delay
-	setTimeout(checkAcap, 3000);
-}
-
-// Custom AOI Selection Implementation
-function initializeAOIOverlay() {
-	var overlay = document.getElementById('aoi-overlay');
-	var box = overlay.querySelector('.aoi-box');
-	var handles = overlay.querySelectorAll('.aoi-handle');
-
-	// Set initial AOI position from settings (pixel coordinates)
-	aoiState.x1 = App.settings.aoi.x1;
-	aoiState.y1 = App.settings.aoi.y1;
-	aoiState.x2 = App.settings.aoi.x2;
-	aoiState.y2 = App.settings.aoi.y2;
-
-	// Update box position
-	updateAOIBox();
-
-	// Mouse down on box (start dragging)
-	box.addEventListener('mousedown', function(e) {
-		if (e.target.classList.contains('aoi-handle')) return; // Let handles handle themselves
-		aoiState.dragging = true;
-		aoiState.startX = e.clientX;
-		aoiState.startY = e.clientY;
-		aoiState.dragStartX1 = aoiState.x1;
-		aoiState.dragStartY1 = aoiState.y1;
-		aoiState.dragStartX2 = aoiState.x2;
-		aoiState.dragStartY2 = aoiState.y2;
-		e.preventDefault();
-	});
-
-	// Mouse down on handles (start resizing)
-	handles.forEach(function(handle) {
-		handle.addEventListener('mousedown', function(e) {
-			aoiState.resizing = true;
-			aoiState.resizeHandle = handle.className.split(' ')[1]; // nw, ne, sw, se
-			aoiState.startX = e.clientX;
-			aoiState.startY = e.clientY;
-			aoiState.dragStartX1 = aoiState.x1;
-			aoiState.dragStartY1 = aoiState.y1;
-			aoiState.dragStartX2 = aoiState.x2;
-			aoiState.dragStartY2 = aoiState.y2;
-			e.preventDefault();
-			e.stopPropagation();
-		});
-	});
-
-	// Mouse move (drag or resize)
-	document.addEventListener('mousemove', function(e) {
-		if (!aoiState.active) return;
-
-		if (aoiState.dragging) {
-			var viewRect = document.getElementById('view').getBoundingClientRect();
-			// Convert pixel delta to model space
-			var deltaX = (e.clientX - aoiState.startX) / viewRect.width * App.model.modelWidth;
-			var deltaY = (e.clientY - aoiState.startY) / viewRect.height * App.model.modelHeight;
-
-			var width = aoiState.dragStartX2 - aoiState.dragStartX1;
-			var height = aoiState.dragStartY2 - aoiState.dragStartY1;
-
-			aoiState.x1 = Math.max(0, Math.min(App.model.modelWidth - width, aoiState.dragStartX1 + deltaX));
-			aoiState.y1 = Math.max(0, Math.min(App.model.modelHeight - height, aoiState.dragStartY1 + deltaY));
-			aoiState.x2 = aoiState.x1 + width;
-			aoiState.y2 = aoiState.y1 + height;
-
-			updateAOIBox();
-		} else if (aoiState.resizing) {
-			var viewRect = document.getElementById('view').getBoundingClientRect();
-			var deltaX = (e.clientX - aoiState.startX) / viewRect.width * App.model.modelWidth;
-			var deltaY = (e.clientY - aoiState.startY) / viewRect.height * App.model.modelHeight;
-
-			var x1 = aoiState.dragStartX1;
-			var y1 = aoiState.dragStartY1;
-			var x2 = aoiState.dragStartX2;
-			var y2 = aoiState.dragStartY2;
-
-			// Update based on which handle
-			switch(aoiState.resizeHandle) {
-				case 'nw':
-					x1 += deltaX;
-					y1 += deltaY;
-					break;
-				case 'ne':
-					x2 += deltaX;
-					y1 += deltaY;
-					break;
-				case 'sw':
-					x1 += deltaX;
-					y2 += deltaY;
-					break;
-				case 'se':
-					x2 += deltaX;
-					y2 += deltaY;
-					break;
-			}
-
-			// Clamp and ensure minimum size (6 pixels)
-			x1 = Math.max(0, Math.min(x1, App.model.modelWidth - 6));
-			y1 = Math.max(0, Math.min(y1, App.model.modelHeight - 6));
-			x2 = Math.max(6, Math.min(x2, App.model.modelWidth));
-			y2 = Math.max(6, Math.min(y2, App.model.modelHeight));
-
-			// Ensure x1 < x2 and y1 < y2
-			if (x1 < x2 && y1 < y2 && (x2 - x1) >= 6 && (y2 - y1) >= 6) {
-				aoiState.x1 = x1;
-				aoiState.y1 = y1;
-				aoiState.x2 = x2;
-				aoiState.y2 = y2;
-				updateAOIBox();
-			}
-		}
-	});
-
-	// Mouse up (stop dragging/resizing)
-	document.addEventListener('mouseup', function(e) {
-		if (aoiState.dragging || aoiState.resizing) {
-			// Save to backend (AOI or exclude depending on mode)
-			var coords = {
-				x1: Math.round(aoiState.x1),
-				y1: Math.round(aoiState.y1),
-				x2: Math.round(aoiState.x2),
-				y2: Math.round(aoiState.y2)
-			};
-
-			var settingName = aoiState.mode === 'aoi' ? 'aoi' : 'exclude';
-			var settingData = {};
-			settingData[settingName] = coords;
-
-			$.ajax({
-				type: "POST",
-				url: "settings",
-				contentType: 'application/json',
-				data: JSON.stringify(settingData),
-				success: function(response) {
-					if (aoiState.mode === 'aoi') {
-						App.settings.aoi = coords;
-						showToast("Area of Interest updated successfully", "success");
-					} else {
-						App.settings.exclude = coords;
-						showToast("Exclude Area updated successfully", "success");
-					}
-				},
-				error: function(response) {
-					showToast("Failed to update " + (aoiState.mode === 'aoi' ? "Area of Interest" : "Exclude Area") + ": " + response.statusText, "danger");
-				}
-			});
-
-			aoiState.dragging = false;
-			aoiState.resizing = false;
-		}
-	});
-}
-
-function updateAOIBox() {
-	var box = document.querySelector('.aoi-box');
-	if (!box) return;
-
-	// Convert from pixel coordinates to percentage of view
-	var scaleX = 100.0 / App.model.modelWidth;
-	var scaleY = 100.0 / App.model.modelHeight;
-
-	var left = aoiState.x1 * scaleX;
-	var top = aoiState.y1 * scaleY;
-	var width = (aoiState.x2 - aoiState.x1) * scaleX;
-	var height = (aoiState.y2 - aoiState.y1) * scaleY;
-
-	box.style.left = left + '%';
-	box.style.top = top + '%';
-	box.style.width = width + '%';
-	box.style.height = height + '%';
-
-	// Change color based on mode
-	if (aoiState.mode === 'exclude') {
-		box.style.borderColor = '#ff0000';
-		box.style.backgroundColor = 'rgba(255, 0, 0, 0.1)';
-		var handles = box.querySelectorAll('.aoi-handle');
-		handles.forEach(function(h) { h.style.backgroundColor = '#ff0000'; });
-	} else {
-		box.style.borderColor = '#00ff00';
-		box.style.backgroundColor = 'rgba(0, 255, 0, 0.1)';
-		var handles = box.querySelectorAll('.aoi-handle');
-		handles.forEach(function(h) { h.style.backgroundColor = '#00ff00'; });
-	}
-}
-
-function toggleAOISelection(active) {
-	var overlay = document.getElementById('aoi-overlay');
-	aoiState.active = active;
-
-	if (active) {
-		// Load coordinates based on mode
-		if (aoiState.mode === 'aoi') {
-			aoiState.x1 = App.settings.aoi.x1;
-			aoiState.y1 = App.settings.aoi.y1;
-			aoiState.x2 = App.settings.aoi.x2;
-			aoiState.y2 = App.settings.aoi.y2;
-		} else {
-			aoiState.x1 = App.settings.exclude.x1;
-			aoiState.y1 = App.settings.exclude.y1;
-			aoiState.x2 = App.settings.exclude.x2;
-			aoiState.y2 = App.settings.exclude.y2;
-		}
-		overlay.classList.add('active');
-		updateAOIBox();
-	} else {
-		overlay.classList.remove('active');
-	}
-}
-
-</script>
+    </script>
 </body>
-
-
 </html>

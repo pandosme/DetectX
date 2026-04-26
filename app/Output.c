@@ -38,6 +38,7 @@ static LabelEventState eventsCache[MAX_LABELS];
 static int eventsCache_len = 0;
 static int lastDetectionsWereEmpty = 0;
 static double last_output_time_ms = 0;
+static double last_sd_output_time_ms = 0;
 
 // Helper: manage per-label state
 static LabelEventState* find_or_create_label_state(const char* label) {
@@ -230,7 +231,7 @@ void Output(cJSON* detections, int modelWidth, int modelHeight) {
             if (evt->state == 1) evt->last_detect_time = now;
         }
 
-        // Cropping output path
+        // Cropping output path (MQTT / HTTP only — SD card uses full-frame export below)
         if (cropping_active) {
             int crop_x = 0, crop_y = 0, crop_w = 0, crop_h = 0, img_w = 0, img_h = 0;
             unsigned jpeg_size = 0;
@@ -251,29 +252,6 @@ void Output(cJSON* detections, int modelWidth, int modelHeight) {
             double now_ts = ACAP_DEVICE_Timestamp();
             if (imageDataBase64 && now_ts - last_output_time_ms > throttle) {
                 last_output_time_ms = now_ts;
-
-                if (sdcard_enable) {
-                    char safe_label[64];
-                    strncpy(safe_label, label, sizeof(safe_label) - 1);
-                    safe_label[sizeof(safe_label) - 1] = 0;
-                    replace_spaces(safe_label);
-
-                    char fname_img[256], fname_label[256];
-                    snprintf(fname_img, sizeof(fname_img), "%s/crop_%s_%.0f_%d.jpg",
-                            SD_FOLDER, safe_label, timestamp, idx);
-                    snprintf(fname_label, sizeof(fname_label), "%s/crop_%s_%.0f_%d.txt",
-                            SD_FOLDER, safe_label, timestamp, idx);
-
-                    if (save_jpeg_to_file(fname_img, jpeg_data, jpeg_size)) {
-                        if (save_label_to_file(fname_label, label, crop_x, crop_y, crop_w, crop_h)) {
-                            LOG_TRACE("Saved crop to SD: %s, %s\n", fname_img, fname_label);
-                        } else {
-                            LOG_WARN("%s: Failed to save crop label to SD: %s\n", __func__, fname_label);
-                        }
-                    } else {
-                        LOG_WARN("%s: Failed to save crop to SD: %s\n", __func__, fname_img);
-                    }
-                }
 
                 // MQTT and HTTP Export
                 if (mqtt_export || http_export) {
@@ -349,6 +327,33 @@ void Output(cJSON* detections, int modelWidth, int modelHeight) {
         }
     }
 
+    // SD card full-frame export: save one JPEG + YOLO labels file per inference cycle
+    if (sdcard_enable && n_frame_labels > 0) {
+        double now_ts = ACAP_DEVICE_Timestamp();
+        if (now_ts - last_sd_output_time_ms > throttle) {
+            last_sd_output_time_ms = now_ts;  // consume the window regardless of JPEG outcome
+            if (ensure_sd_images_directory() && ensure_sd_labels_directory()) {
+                unsigned full_jpeg_size = 0;
+                unsigned char* full_jpeg = Model_GetFullFrameJPEG(&full_jpeg_size);
+                if (full_jpeg && full_jpeg_size > 0) {
+                    char fname_img[320], fname_lbl[320];
+                    snprintf(fname_img, sizeof(fname_img), "%s/images/%.0f.jpg", SD_FOLDER, now_ts);
+                    snprintf(fname_lbl, sizeof(fname_lbl), "%s/labels/%.0f.txt", SD_FOLDER, now_ts);
+                    if (save_jpeg_to_file(fname_img, full_jpeg, full_jpeg_size)) {
+                        if (!save_yolo_labels_to_file(fname_lbl, detections, modelWidth, modelHeight)) {
+                            LOG_WARN("%s: Failed to save YOLO labels: %s\n", __func__, fname_lbl);
+                        }
+                    } else {
+                        LOG_WARN("%s: Failed to save full frame image: %s\n", __func__, fname_img);
+                    }
+                    free(full_jpeg);
+                } else {
+                    LOG_WARN("%s: Full frame JPEG unavailable for SD card export\n", __func__);
+                }
+            }
+        }
+    }
+
     LOG_TRACE("%s>\n", __func__);
 }
 
@@ -358,6 +363,7 @@ void Output_reset(void) {
     eventsCache_len = 0;
     lastDetectionsWereEmpty = 0;
     last_output_time_ms = 0;
+    last_sd_output_time_ms = 0;
     output_crop_cache_reset();
     LOG_TRACE("%s>\n", __func__);
 }

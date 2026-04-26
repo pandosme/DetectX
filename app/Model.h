@@ -94,6 +94,25 @@ const unsigned char* Model_GetImageData(
  */
 void Model_Reset(void);
 
+/**
+ * @brief Encode the full video frame (from the last Model_Inference call) as a JPEG.
+ *
+ * Requires that either cropping is active or sdcard export is active so that the HD
+ * preprocessing buffer is populated. Returns NULL if the buffer is unavailable.
+ *
+ * @param jpeg_size  Output: length of the returned JPEG in bytes, or 0 on failure.
+ * @return Newly malloc'd JPEG buffer that the caller MUST free(), or NULL on failure.
+ */
+unsigned char* Model_GetFullFrameJPEG(unsigned* jpeg_size);
+
+/**
+ * @brief Return the 0-based class index for a label string.
+ *
+ * @param label  Label name to look up.
+ * @return Index in the labels array, or 0 if not found.
+ */
+int Model_GetLabelIndex(const char* label);
+
 #ifdef __cplusplus
 }
 #endif

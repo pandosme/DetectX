@@ -20,7 +20,7 @@ extern "C" {
 #define ACAP_MAX_HTTP_NODES 32
 #define ACAP_MAX_PATH_LENGTH 128
 #define ACAP_MAX_PACKAGE_NAME 30
-#define ACAP_MAX_BUFFER_SIZE 4096
+#define ACAP_MAX_BUFFER_SIZE 67108864
 
 
 // Return types

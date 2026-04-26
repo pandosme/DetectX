@@ -10,6 +10,8 @@
 #include <sys/stat.h>
 #include <errno.h>
 #include "Output_helpers.h"
+#include "Model.h"
+#include "cJSON.h"
 
 #define SD_FOLDER "/var/spool/storage/SD_DISK/detectx"   ///< Directory for SD card crops
 
@@ -60,13 +62,51 @@ void replace_spaces(char *str)
 
 /**
  * @brief Ensure the SD_FOLDER path exists; create if not present.
+ * Returns 0 silently if the SD card is not mounted (base path absent).
+ * Returns 0 with a warning if the card is mounted but mkdir fails.
  */
 int ensure_sd_directory(void)
 {
+    // Check SD card mount point exists — if not, card is simply not inserted
+    struct stat sd_root = {0};
+    if (stat("/var/spool/storage/SD_DISK", &sd_root) == -1) {
+        return 0;  // SD card not mounted; no warning, caller silently disables
+    }
+
     struct stat st = {0};
     if (stat(SD_FOLDER, &st) == -1) {
         if (mkdir(SD_FOLDER, 0755) == -1) {
             syslog(LOG_WARNING, "Failed to create SD directory %s: %s\n", SD_FOLDER, strerror(errno));
+            return 0;
+        }
+    }
+    return 1;
+}
+
+int ensure_sd_images_directory(void)
+{
+    if (!ensure_sd_directory()) return 0;
+    char path[256];
+    snprintf(path, sizeof(path), "%s/images", SD_FOLDER);
+    struct stat st = {0};
+    if (stat(path, &st) == -1) {
+        if (mkdir(path, 0755) == -1) {
+            syslog(LOG_WARNING, "Failed to create SD images directory %s: %s\n", path, strerror(errno));
+            return 0;
+        }
+    }
+    return 1;
+}
+
+int ensure_sd_labels_directory(void)
+{
+    if (!ensure_sd_directory()) return 0;
+    char path[256];
+    snprintf(path, sizeof(path), "%s/labels", SD_FOLDER);
+    struct stat st = {0};
+    if (stat(path, &st) == -1) {
+        if (mkdir(path, 0755) == -1) {
+            syslog(LOG_WARNING, "Failed to create SD labels directory %s: %s\n", path, strerror(errno));
             return 0;
         }
     }
@@ -99,6 +139,43 @@ int save_label_to_file(const char* path, const char* label, int x, int y, int w,
         return 0;
     }
     fprintf(f, "%s %d %d %d %d\n", label, x, y, w, h);
+    fclose(f);
+    return 1;
+}
+
+int save_yolo_labels_to_file(const char* path, const cJSON* detections, int modelWidth, int modelHeight)
+{
+    if (!path || !detections || modelWidth <= 0 || modelHeight <= 0) return 0;
+    FILE* f = fopen(path, "w");
+    if (!f) {
+        syslog(LOG_WARNING, "Failed to open %s for writing YOLO labels: %s\n", path, strerror(errno));
+        return 0;
+    }
+    const cJSON* det = detections->child;
+    while (det) {
+        const cJSON* labelObj = cJSON_GetObjectItem(det, "label");
+        const cJSON* xObj    = cJSON_GetObjectItem(det, "x");
+        const cJSON* yObj    = cJSON_GetObjectItem(det, "y");
+        const cJSON* wObj    = cJSON_GetObjectItem(det, "w");
+        const cJSON* hObj    = cJSON_GetObjectItem(det, "h");
+        if (labelObj && cJSON_IsString(labelObj) &&
+            xObj && cJSON_IsNumber(xObj) &&
+            yObj && cJSON_IsNumber(yObj) &&
+            wObj && cJSON_IsNumber(wObj) &&
+            hObj && cJSON_IsNumber(hObj)) {
+            int class_id = Model_GetLabelIndex(labelObj->valuestring);
+            double x = xObj->valuedouble;
+            double y = yObj->valuedouble;
+            double w = wObj->valuedouble;
+            double h = hObj->valuedouble;
+            double cx = (x + w * 0.5) / modelWidth;
+            double cy = (y + h * 0.5) / modelHeight;
+            double nw = w / modelWidth;
+            double nh = h / modelHeight;
+            fprintf(f, "%d %.6f %.6f %.6f %.6f\n", class_id, cx, cy, nw, nh);
+        }
+        det = det->next;
+    }
     fclose(f);
     return 1;
 }

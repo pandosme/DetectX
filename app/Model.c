@@ -29,6 +29,8 @@ float iou(float x1, float y1, float w1, float h1, float x2, float y2, float w2, 
 void Model_Cleanup();
 cJSON* non_maximum_suppression(cJSON* list);
 static void clear_crop_cache(void);
+static int outputSigned = 0;
+static int modelOutputFloat = 0;
 
 // Model and video dimensions
 static unsigned int modelWidth = 640;
@@ -86,8 +88,12 @@ static cJSON* modelConfig = 0;
 static char** modelLabels = NULL;
 static char* labelBuffer = NULL;
 static size_t numLabels = 0;
-static const char* MODEL_PATH = "model/model.tflite";
-static const char* LABELS_PATH = "model/labels.txt";
+static const char* DEFAULT_MODEL_PATH = "model/model.tflite";
+static const char* DEFAULT_LABELS_PATH = "model/labels.txt";
+static const char* CUSTOM_MODEL_PATH = "localdata/model.tflite";
+static const char* CUSTOM_LABELS_PATH = "localdata/labels.txt";
+static const char* activeModelPath = NULL;
+static const char* activeLabelsPath = NULL;
 
 // Preprocessing scale mode
 static PreprocessScaleMode scaleMode = SCALE_MODE_STRETCH;  // Default: balanced
@@ -160,7 +166,8 @@ Model_Inference(VdoBuffer* image) {
 	}
     cJSON* cropping = cJSON_GetObjectItem(settings, "cropping");
     int cropping_active = cropping && cJSON_IsTrue(cJSON_GetObjectItem(cropping, "active"));
-	if( cropping_active ) {
+    int sdcard_active   = cropping && cJSON_IsTrue(cJSON_GetObjectItem(cropping, "sdcard"));
+	if( cropping_active || sdcard_active ) {
 		memcpy(ppInputAddrHD, nv12Data, yuyvBufferSize);    // For HD preprocessing (original res)
 
 		// Run HD preprocessing job
@@ -203,8 +210,9 @@ Model_Inference(VdoBuffer* image) {
         return 0;
     }
 
-    // Process inference results (uint8 quantized output)
-    uint8_t* output_tensor = (uint8_t*)larodOutput1Addr;
+    uint8_t* output_u8 = (uint8_t*)larodOutput1Addr;
+    int8_t* output_s8 = (int8_t*)larodOutput1Addr;
+    float* output_f32 = (float*)larodOutput1Addr;
     cJSON* list = cJSON_CreateArray();
     struct timeval tv;
     gettimeofday(&tv, NULL);
@@ -213,36 +221,27 @@ Model_Inference(VdoBuffer* image) {
     LOG_TRACE("%s: Processing %u boxes, quant=%.6f, quant_zero=%.1f, objectnessThreshold=%.2f, confidenceThreshold=%.2f\n",
               __func__, boxes, quant, quant_zero, objectnessThreshold, confidenceThreshold);
 
-    // Check first few raw values for debugging
-    LOG_TRACE("%s: First 10 raw output bytes: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
-              __func__, output_tensor[0], output_tensor[1], output_tensor[2], output_tensor[3], output_tensor[4],
-              output_tensor[5], output_tensor[6], output_tensor[7], output_tensor[8], output_tensor[9]);
-
     int candidates = 0;
     int detections = 0;
+
+#define DEQUANT(idx) (modelOutputFloat ? output_f32[idx] : (outputSigned ? (((float)output_s8[idx]) - quant_zero) * quant : (((float)output_u8[idx]) - quant_zero) * quant))
 
     for (int i = 0; i < boxes; i++) {
         int box = i * (5 + classes);
 
-        // Dequantize uint8 to float using quantization parameters
-        float objectness = (float)(output_tensor[box + 4] - quant_zero) * quant;
-
-        if (i < 3 && objectness > 0.01) {  // Log first few non-zero boxes
-            LOG_TRACE("%s: Box %d: raw_obj=%u objectness=%.4f (threshold=%.2f)\n",
-                      __func__, i, output_tensor[box + 4], objectness, objectnessThreshold);
-        }
+        float objectness = DEQUANT(box + 4);
 
         if (objectness >= objectnessThreshold) {
             candidates++;
 
-            float x = (float)(output_tensor[box + 0] - quant_zero) * quant;
-            float y = (float)(output_tensor[box + 1] - quant_zero) * quant;
-            float w = (float)(output_tensor[box + 2] - quant_zero) * quant;
-            float h = (float)(output_tensor[box + 3] - quant_zero) * quant;
+            float x = DEQUANT(box + 0);
+            float y = DEQUANT(box + 1);
+            float w = DEQUANT(box + 2);
+            float h = DEQUANT(box + 3);
             int classId = -1;
             float maxConfidence = 0;
             for (int c = 0; c < classes; c++) {
-                float confidence = (float)(output_tensor[box + 5 + c] - quant_zero) * quant * objectness;
+                float confidence = DEQUANT(box + 5 + c) * objectness;
                 if (confidence > maxConfidence) {
                     classId = c;
                     maxConfidence = confidence;
@@ -280,6 +279,8 @@ Model_Inference(VdoBuffer* image) {
 
     LOG_TRACE("%s: Found %d candidates, %d detections after confidence filtering\n",
               __func__, candidates, detections);
+
+#undef DEQUANT
 
     // Clear any previous errors on successful inference
     ACAP_STATUS_SetNull("model", "error");
@@ -449,6 +450,48 @@ void Model_Reset(void) {
     clear_crop_cache();
 }
 
+unsigned char* Model_GetFullFrameJPEG(unsigned* jpeg_size) {
+    if (jpeg_size) *jpeg_size = 0;
+    if (!original_rgb_buffer) {
+        LOG_WARN("%s: HD frame buffer unavailable (enable SD card or crop export)\n", __func__);
+        return NULL;
+    }
+
+    unsigned char* jpeg_buf = NULL;
+    unsigned long jpeglen = 0;
+    struct jpeg_compress_struct cinfo;
+    struct jpeg_error_mgr jerr;
+    cinfo.err = jpeg_std_error(&jerr);
+    jpeg_create_compress(&cinfo);
+    cinfo.image_width      = videoWidth;
+    cinfo.image_height     = videoHeight;
+    cinfo.input_components = 3;
+    cinfo.in_color_space   = JCS_RGB;
+    jpeg_set_defaults(&cinfo);
+    jpeg_set_quality(&cinfo, 85, TRUE);
+
+    buffer_to_jpeg(original_rgb_buffer, &cinfo, &jpeglen, &jpeg_buf);
+    jpeg_destroy_compress(&cinfo);
+
+    if (!jpeg_buf || jpeglen == 0) {
+        LOG_WARN("%s: JPEG encoding of full frame failed\n", __func__);
+        return NULL;
+    }
+
+    if (jpeg_size) *jpeg_size = (unsigned)jpeglen;
+    return jpeg_buf;
+}
+
+int Model_GetLabelIndex(const char* label) {
+    if (!label || !modelLabels || numLabels == 0)
+        return 0;
+    for (size_t i = 0; i < numLabels; i++) {
+        if (modelLabels[i] && strcmp(modelLabels[i], label) == 0)
+            return (int)i;
+    }
+    return 0;
+}
+
 float iou(float x1, float y1, float w1, float h1, float x2, float y2, float w2, float h2) {
     float xx1 = fmax(x1 - (w1 / 2), x2 - (w2 / 2));
     float yy1 = fmax(y1 - (h1 / 2), y2 - (h2 / 2));
@@ -596,10 +639,13 @@ cJSON* Model_Setup(void) {
         return 0;
     }
 
+    activeModelPath = ACAP_FILE_Exists(CUSTOM_MODEL_PATH) ? CUSTOM_MODEL_PATH : DEFAULT_MODEL_PATH;
+    activeLabelsPath = ACAP_FILE_Exists(CUSTOM_LABELS_PATH) ? CUSTOM_LABELS_PATH : DEFAULT_LABELS_PATH;
+
     // Step 2: Load model to introspect
-    larodModelFd = open(MODEL_PATH, O_RDONLY);
+    larodModelFd = open(activeModelPath, O_RDONLY);
     if (larodModelFd < 0) {
-        LOG_WARN("%s: Could not open model %s: %s\n", __func__, MODEL_PATH, strerror(errno));
+        LOG_WARN("%s: Could not open model %s: %s\n", __func__, activeModelPath, strerror(errno));
         Model_Cleanup();
         return 0;
     }
@@ -696,6 +742,8 @@ cJSON* Model_Setup(void) {
 
     // Get quantization parameters (extracted at build time from model)
     larodTensorDataType dataType = larodGetTensorDataType(tempOutputTensors[0], &error);
+    modelOutputFloat = (dataType == LAROD_TENSOR_DATA_TYPE_FLOAT32);
+    outputSigned = (dataType == LAROD_TENSOR_DATA_TYPE_INT8);
     if (dataType == LAROD_TENSOR_DATA_TYPE_INT8 || dataType == LAROD_TENSOR_DATA_TYPE_UINT8) {
         // Quantized model - use build-time extracted values
         quant = QUANTIZATION_SCALE;
@@ -788,11 +836,11 @@ cJSON* Model_Setup(void) {
     }
 
     // Step 6: Load labels
-    if (!labels_parse_file(LABELS_PATH, &modelLabels, &labelBuffer, &numLabels)) {
-        LOG_WARN("%s: Failed to load labels from %s, using defaults\n", __func__, LABELS_PATH);
+    if (!labels_parse_file(activeLabelsPath, &modelLabels, &labelBuffer, &numLabels)) {
+        LOG_WARN("%s: Failed to load labels from %s, using defaults\n", __func__, activeLabelsPath);
         numLabels = 0;
     } else {
-        LOG("Loaded %zu labels from %s\n", numLabels, LABELS_PATH);
+        LOG("Loaded %zu labels from %s\n", numLabels, activeLabelsPath);
     }
 
     // Step 7: Build model.json structure for frontend/API
@@ -819,7 +867,11 @@ cJSON* Model_Setup(void) {
     cJSON_AddNumberToObject(modelConfig, "zeroPoint", quant_zero);
     cJSON_AddNumberToObject(modelConfig, "objectness", objectnessThreshold);
     cJSON_AddNumberToObject(modelConfig, "nms", nms);
-    cJSON_AddStringToObject(modelConfig, "path", MODEL_PATH);
+    cJSON_AddStringToObject(modelConfig, "path", activeModelPath);
+    cJSON_AddStringToObject(modelConfig, "labelsPath", activeLabelsPath);
+    cJSON_AddBoolToObject(modelConfig, "customModel", strcmp(activeModelPath, CUSTOM_MODEL_PATH) == 0);
+    cJSON_AddBoolToObject(modelConfig, "customLabels", strcmp(activeLabelsPath, CUSTOM_LABELS_PATH) == 0);
+    cJSON_AddBoolToObject(modelConfig, "outputFloat", modelOutputFloat);
     cJSON_AddStringToObject(modelConfig, "chip", chipString);
 
     // Add labels array
