@@ -23,6 +23,10 @@
   "stabelizeTransition": 600,
   "minEventDuration": 3000,
   "prioritize": "accuracy",  
+  "sd_capture": {
+    "enabled": false,
+    "interval": 2
+  },
   "cropping": {
 	  "active": false,
 	  "throttle": 500,

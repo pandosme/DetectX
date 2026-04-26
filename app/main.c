@@ -18,6 +18,7 @@
 #include "Video.h"
 #include "cJSON.h"
 #include "Output.h"
+#include "Output_helpers.h"
 #include "MQTT.h"
 
 
@@ -565,6 +566,86 @@ void HTTP_ENDPOINT_eventsTransition(const ACAP_HTTP_Response response,const ACAP
 	ACAP_HTTP_Respond_JSON(  response, eventsTransition);
 }
 
+/* ------------------------------------------------------------------
+ * SD Capture: download zip and clear endpoints
+ * ------------------------------------------------------------------ */
+
+static void HTTP_ENDPOINT_sd_download(const ACAP_HTTP_Response response, const ACAP_HTTP_Request request) {
+    (void)request;
+    const char* tmp_path = "/tmp/detectx_export.zip";
+    const char* fallback  = "/tmp/detectx_export.tar.gz";
+
+    if (sd_is_busy()) {
+        ACAP_HTTP_Respond_Error(response, 503, "SD capture busy, try again later");
+        return;
+    }
+    sd_set_busy(1);
+
+    int ok = sd_create_zip(tmp_path);
+    const char* out_path = tmp_path;
+    const char* content_type = "application/zip";
+    const char* dl_filename  = "detectx_export.zip";
+
+    if (!ok) {
+        /* zip failed, try the tar.gz fallback path */
+        ok = sd_create_zip(fallback);  /* sd_create_zip tries tar.gz internally */
+        if (ok) {
+            out_path      = fallback;
+            content_type  = "application/gzip";
+            dl_filename   = "detectx_export.tar.gz";
+        }
+    }
+
+    if (!ok) {
+        sd_set_busy(0);
+        ACAP_HTTP_Respond_Error(response, 500, "Failed to create archive");
+        return;
+    }
+
+    /* Serve the file */
+    FILE* f = fopen(out_path, "rb");
+    if (!f) {
+        sd_set_busy(0);
+        ACAP_HTTP_Respond_Error(response, 500, "Archive not found");
+        return;
+    }
+    fseek(f, 0, SEEK_END);
+    long fsize = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    unsigned char* buf = malloc(fsize);
+    if (!buf) {
+        fclose(f);
+        sd_set_busy(0);
+        ACAP_HTTP_Respond_Error(response, 500, "Out of memory");
+        return;
+    }
+    long nread = (long)fread(buf, 1, fsize, f);
+    fclose(f);
+    remove(out_path);
+
+    ACAP_HTTP_Header_FILE(response, dl_filename, content_type, (int)nread);
+    ACAP_HTTP_Respond_Data(response, (int)nread, buf);
+    free(buf);
+    sd_set_busy(0);
+}
+
+static void HTTP_ENDPOINT_sd_clear(const ACAP_HTTP_Response response, const ACAP_HTTP_Request request) {
+    (void)request;
+    if (sd_is_busy()) {
+        ACAP_HTTP_Respond_Error(response, 503, "SD capture busy, try again later");
+        return;
+    }
+    sd_set_busy(1);
+    sd_clear_directories();
+    ACAP_STATUS_SetNumber("sd_capture", "count", 0);
+    sd_set_busy(0);
+    cJSON* ok = cJSON_CreateObject();
+    cJSON_AddBoolToObject(ok, "ok", 1);
+    ACAP_HTTP_Respond_JSON(response, ok);
+    cJSON_Delete(ok);
+}
+
 static GMainLoop *main_loop = NULL;
 
 static gboolean
@@ -716,6 +797,8 @@ int main(void) {
 	}
 	ACAP_Set_Config("model",model);
 	ACAP_HTTP_Node("model", HTTP_ENDPOINT_model);
+	ACAP_HTTP_Node("sd_download", HTTP_ENDPOINT_sd_download);
+	ACAP_HTTP_Node("sd_clear", HTTP_ENDPOINT_sd_clear);
 	Output_init();
 	MQTT_Init( Main_MQTT_Status, Main_MQTT_Subscription_Message  );	
 	ACAP_Set_Config("mqtt", MQTT_Settings() );

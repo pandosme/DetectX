@@ -523,16 +523,6 @@
                     </div>
                     <div class="card-body">
                         <p class="text-muted small">Choose where to save or send the cropped detection images.</p>
-                        <!-- SD Card Output -->
-                        <div class="form-check mb-3">
-                            <input class="form-check-input" type="checkbox" id="sdcard_output">
-                            <label class="form-check-label" for="sdcard_output">
-                                <span class="status-indicator" id="sdcard_status"></span>
-                                <strong>Save full frame to SD Card</strong>
-                            </label>
-                            <div class="form-text">Status: <span id="sdcard_status_text">Checking...</span></div>
-                            <div class="form-text">Full frame images saved to <code>images/</code> and YOLO labels to <code>labels/</code> on the SD card. Useful for building training datasets.</div>
-                        </div>
                         <!-- MQTT Output -->
                         <div class="form-check mb-3">
                             <input class="form-check-input" type="checkbox" id="mqtt_output">
@@ -843,7 +833,6 @@ function loadCroppingSettings() {
 
 function updateUI() {
     $('#cropping_active').prop('checked', croppingSettings.active);
-    $('#sdcard_output').prop('checked', croppingSettings.sdcard || false);
     $('#mqtt_output').prop('checked', croppingSettings.mqtt || false);
     $('#http_output').prop('checked', croppingSettings.http || false);
     $('#http_url').val(croppingSettings.http_url || '');
@@ -884,25 +873,12 @@ function updateStatus() {
         dataType: 'json',
         cache: false,
         success: function(status) {
-            // SD Card status (optional)
-            if (status.SDCARD && status.SDCARD.available !== undefined) {
-                if (status.SDCARD.available) {
-                    $('#sdcard_status').removeClass('status-unavailable').addClass('status-available');
-                    $('#sdcard_status_text').text('Available');
-                    $('#sdcard_output').prop('disabled', false);
-                } else {
-                    $('#sdcard_status').removeClass('status-available').addClass('status-unavailable');
-                    $('#sdcard_status_text').text('Not Available');
-                    $('#sdcard_output').prop('disabled', true).prop('checked', false);
-                }
-            }
         }
     });
 }
 
 function saveSettings() {
     croppingSettings.active = $('#cropping_active').is(':checked');
-    croppingSettings.sdcard = $('#sdcard_output').is(':checked');
     croppingSettings.mqtt = $('#mqtt_output').is(':checked');
     croppingSettings.http = $('#http_output').is(':checked');
     croppingSettings.http_url = $('#http_url').val();

@@ -8,6 +8,7 @@
 #include <string.h>
 #include <syslog.h>
 #include <sys/stat.h>
+#include <dirent.h>
 #include <errno.h>
 #include "Output_helpers.h"
 #include "Model.h"
@@ -178,4 +179,76 @@ int save_yolo_labels_to_file(const char* path, const cJSON* detections, int mode
     }
     fclose(f);
     return 1;
+}
+
+/* ---------------------------------------------------------------
+ * SD Capture helpers: count, clear, zip, busy flag
+ * --------------------------------------------------------------- */
+static volatile int sd_busy_flag = 0;
+
+void sd_set_busy(int busy) { sd_busy_flag = busy ? 1 : 0; }
+int  sd_is_busy(void)      { return sd_busy_flag; }
+
+int sd_count_images(void)
+{
+    char path[256];
+    snprintf(path, sizeof(path), "%s/images", SD_FOLDER);
+    DIR* d = opendir(path);
+    if (!d) return 0;
+    int count = 0;
+    struct dirent* entry;
+    while ((entry = readdir(d)) != NULL) {
+        if (entry->d_name[0] != '.')
+            count++;
+    }
+    closedir(d);
+    return count;
+}
+
+static int delete_dir_contents(const char* dirpath)
+{
+    DIR* d = opendir(dirpath);
+    if (!d) return 1;  /* not an error if dir doesn't exist */
+    struct dirent* entry;
+    char fpath[512];
+    while ((entry = readdir(d)) != NULL) {
+        if (entry->d_name[0] == '.') continue;
+        snprintf(fpath, sizeof(fpath), "%s/%s", dirpath, entry->d_name);
+        if (remove(fpath) != 0)
+            syslog(LOG_WARNING, "sd_clear: failed to remove %s: %s\n", fpath, strerror(errno));
+    }
+    closedir(d);
+    return 1;
+}
+
+int sd_clear_directories(void)
+{
+    char path[256];
+    snprintf(path, sizeof(path), "%s/images", SD_FOLDER);
+    delete_dir_contents(path);
+    snprintf(path, sizeof(path), "%s/labels", SD_FOLDER);
+    delete_dir_contents(path);
+    return 1;
+}
+
+int sd_create_zip(const char* output_path)
+{
+    if (!output_path) return 0;
+    remove(output_path);  /* Remove any stale file first */
+
+    /* Build command: cd into SD_FOLDER, then zip images/ and labels/ */
+    char cmd[1024];
+    snprintf(cmd, sizeof(cmd),
+        "cd \"%s\" && zip -q -r \"%s\" images labels 2>/dev/null",
+        SD_FOLDER, output_path);
+
+    int ret = system(cmd);
+    if (ret != 0) {
+        /* zip not available — fall back to tar+gzip */
+        snprintf(cmd, sizeof(cmd),
+            "cd \"%s\" && tar czf \"%s\" images labels 2>/dev/null",
+            SD_FOLDER, output_path);
+        ret = system(cmd);
+    }
+    return (ret == 0) ? 1 : 0;
 }

@@ -107,7 +107,10 @@
         #overlayCanvas,
         #polygonCanvas {
             position: absolute;
+            top: 0;
             left: 0;
+            width: 100%;
+            height: 100%;
         }
 
         #video media-stream-player {
@@ -228,9 +231,9 @@
                         </div>
                         <div id="view">
                             <div id="view-frame">
-                                <div id="video"></div>
-                                <canvas id="overlayCanvas"></canvas>
-                                <canvas id="polygonCanvas"></canvas>
+                                <div id="video" style="width:100%;height:100%;position:absolute;top:0;left:0;"></div>
+                                <canvas id="overlayCanvas" style="width:100%;height:100%;position:absolute;top:0;left:0;pointer-events:none;"></canvas>
+                                <canvas id="polygonCanvas" style="width:100%;height:100%;position:absolute;top:0;left:0;"></canvas>
                             </div>
                         </div>
                         <div class="hint-box mt-3" id="editor-hint">Select AOI or Exclusion, then draw polygons on top of the live video.</div>
@@ -413,31 +416,30 @@
             };
         }
 
-        function drawDetections(ctx) {
+        function drawDetections() {
+            const canvas = document.getElementById('overlayCanvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
             if (!detectionList.length)
                 return;
-            // Use the canvas's actual rendered CSS size so the overlay tracks
-            // the video even when the container is scaled by the browser.
-            var rect = ctx.canvas.getBoundingClientRect();
-            var renderScaleX = rect.width  > 0 ? rect.width  / ctx.canvas.width  : 1;
-            var renderScaleY = rect.height > 0 ? rect.height / ctx.canvas.height : 1;
-            ctx.save();
-            ctx.scale(renderScaleX, renderScaleY);
-            ctx.lineWidth = 3 / renderScaleX;
+            // canvasWidth/Height are sized to the actual video display area for each scale mode,
+            // so this ratio always maps model pixels → canvas buffer pixels correctly.
+            const scaleX = canvasWidth / modelWidth;
+            const scaleY = canvasHeight / modelHeight;
+            ctx.lineWidth = 3;
             ctx.strokeStyle = '#facc15';
             ctx.fillStyle = '#facc15';
-            ctx.font = 'bold ' + Math.round(20 / renderScaleX) + 'px Arial';
+            ctx.font = 'bold 20px Arial';
             ctx.beginPath();
             detectionList.forEach(function (detection) {
-                const x = detection.x * canvasWidth / modelWidth;
-                const y = detection.y * canvasHeight / modelHeight;
-                const w = detection.w * canvasWidth / modelWidth;
-                const h = detection.h * canvasHeight / modelHeight;
+                const x = detection.x * scaleX;
+                const y = detection.y * scaleY;
+                const w = detection.w * scaleX;
+                const h = detection.h * scaleY;
                 ctx.rect(x, y, w, h);
-                ctx.fillText((detection.label || 'Unknown') + ': ' + detection.c, x, y > 20 ? y - 8 : y + h + 20);
+                ctx.fillText((detection.label || 'Unknown') + ': ' + Math.min(detection.c, 100), x, y > 20 ? y - 8 : y + h + 20);
             });
             ctx.stroke();
-            ctx.restore();
         }
 
         function renderAoiSummary() {
@@ -492,12 +494,15 @@
                 return;
             if (activeTab === 'aoi') {
                 editor.colors = AOI_COLORS;
+                editor.invertFill = true;
                 editor.setPolygons(aoiPolygon ? [aoiPolygon] : []);
             } else {
                 editor.colors = EXCLUDE_COLORS;
+                editor.invertFill = false;
                 editor.setPolygons(excludePolygons);
             }
-            editor.redraw(drawDetections);
+            editor.redraw();
+            drawDetections();
         }
 
         function switchTab(tab) {
@@ -574,8 +579,8 @@
             videoWidth = App.model.videoWidth;
             videoHeight = App.model.videoHeight;
 
-            let canvasTop = 0;
             const scaleMode = App.settings.scaleMode || 'balanced';
+            let canvasTop = 0;
             if (scaleMode === 'letterbox') {
                 viewWidth = modelWidth;
                 viewHeight = modelWidth;
@@ -589,12 +594,20 @@
                 canvasHeight = viewHeight;
             }
 
-            $('#view').css({ width: viewWidth + 'px', height: viewHeight + 'px' });
-            $('#view-frame').css({ width: viewWidth + 'px', height: viewHeight + 'px' });
+            // Use aspect-ratio so height auto-scales when max-width kicks in on narrow screens.
+            // This prevents the player from adding black bars inside a wrongly-shaped container.
+            $('#view').css({ width: viewWidth + 'px', height: '', aspectRatio: viewWidth + ' / ' + viewHeight, maxWidth: '100%' });
+            $('#view-frame').css({ width: '100%', height: '100%' });
 
-            $('#overlayCanvas').attr({ width: canvasWidth, height: canvasHeight }).css({ width: canvasWidth + 'px', height: canvasHeight + 'px', top: canvasTop + 'px' });
-            $('#polygonCanvas').attr({ width: canvasWidth, height: canvasHeight }).css({ width: canvasWidth + 'px', height: canvasHeight + 'px', top: canvasTop + 'px' });
-            $('#video').css({ width: canvasWidth + 'px', height: canvasHeight + 'px', top: canvasTop + 'px' });
+            // Position canvases as % of view so they stay correct when view is scaled.
+            // In letterbox mode the canvas covers only the video area, offset from top.
+            var topPct    = (canvasTop    / viewHeight * 100).toFixed(4) + '%';
+            var heightPct = (canvasHeight / viewHeight * 100).toFixed(4) + '%';
+            $('#overlayCanvas').attr({ width: canvasWidth, height: canvasHeight })
+                .css({ top: topPct, height: heightPct, width: '100%' });
+            $('#polygonCanvas').attr({ width: canvasWidth, height: canvasHeight })
+                .css({ top: topPct, height: heightPct, width: '100%' });
+            $('#video').css({ top: '0', height: '100%', width: '100%' });
 
             const secureConnection = location.protocol === 'https:' ? 'secure=true' : '';
             const player = '<media-stream-player hostname="' + window.location.hostname + '" ' + secureConnection + ' format="RTP_H264" compression="40" audio="0" resolution="' + videoWidth + 'x' + videoHeight + '" variant="basic" autoplay></media-stream-player>';
@@ -629,7 +642,8 @@
                         });
                         renderExcludeList();
                     }
-                    editor.redraw(drawDetections);
+                    editor.redraw();
+                    drawDetections();
                 },
                 onCommit: function (polygon) {
                     if (activeTab === 'aoi') {
@@ -689,7 +703,8 @@
 
                     detectionList = (status.labels && Array.isArray(status.labels.detections)) ? status.labels.detections : [];
                     if (editor)
-                        editor.redraw(drawDetections);
+                        editor.redraw();
+                    drawDetections();
 
                     $('#events-table').empty();
                     const events = status.events || {};
@@ -797,7 +812,8 @@
                 if (editor) {
                     editor.selectedIndex = 0;
                     editor.updateHint();
-                    editor.redraw(drawDetections);
+                    editor.redraw();
+                    drawDetections();
                 }
                 showToast('Rectangle converted to polygon. Shift+click an edge to add vertices, then Save Zones.', 'info');
             });

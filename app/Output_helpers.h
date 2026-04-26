@@ -85,6 +85,31 @@ int ensure_sd_labels_directory(void);
  */
 int save_yolo_labels_to_file(const char* path, const cJSON* detections, int modelWidth, int modelHeight);
 
+/**
+ * @brief Count JPEG files in SD_FOLDER/images/.
+ * @return number of files, or -1 if directory not readable.
+ */
+int sd_count_images(void);
+
+/**
+ * @brief Delete all files in SD_FOLDER/images/ and SD_FOLDER/labels/.
+ * @return 1 on success, 0 on error.
+ */
+int sd_clear_directories(void);
+
+/**
+ * @brief Create a zip archive at output_path containing images/ and labels/ from SD_FOLDER.
+ * @param output_path  Full path for the output .zip file.
+ * @return 1 on success, 0 on error.
+ */
+int sd_create_zip(const char* output_path);
+
+/**
+ * @brief Prevent or allow SD card captures (used during download/clear).
+ */
+void sd_set_busy(int busy);
+int  sd_is_busy(void);
+
 #ifdef __cplusplus
 }
 #endif

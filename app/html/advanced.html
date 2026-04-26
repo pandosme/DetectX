@@ -244,6 +244,61 @@
                 <div class="row g-2" id="labelsGrid"></div>
             </div>
         </div>
+
+        <!-- SD Capture Card -->
+        <div class="card">
+            <div class="card-header">
+                SD Card Training Capture
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info py-2 px-3 mb-3 small">
+                    <strong>Dataset collection for model fine-tuning.</strong>
+                    While a detection event is active, full-frame JPEG images and matching YOLO-format label files are saved to the SD card. Download the archive and add the images to your training dataset to fine-tune the model for your specific environment.
+                </div>
+                <div class="row mb-3 align-items-center">
+                    <label for="sd_capture_enabled" class="col-sm-4 col-form-label setting-label">Enable</label>
+                    <div class="col-sm-6">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="sd_capture_enabled" role="switch">
+                        </div>
+                    </div>
+                </div>
+                <div class="row mb-3 align-items-center">
+                    <label for="sd_capture_interval" class="col-sm-4 col-form-label setting-label">Capture Interval</label>
+                    <div class="col-sm-6">
+                        <select class="form-select w-100" id="sd_capture_interval">
+                            <option value="1">1 second</option>
+                            <option value="2">2 seconds</option>
+                            <option value="3">3 seconds</option>
+                            <option value="5">5 seconds</option>
+                            <option value="10">10 seconds</option>
+                            <option value="30">30 seconds</option>
+                            <option value="60">60 seconds</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="row mb-3 align-items-center">
+                    <label class="col-sm-4 col-form-label setting-label">Images on SD Card</label>
+                    <div class="col-sm-6">
+                        <span id="sd_image_count" class="fw-semibold">—</span>
+                        <span id="sd_image_warning" class="text-warning ms-2 small" style="display:none">⚠ Approaching limit (max 2000)</span>
+                        <span id="sd_image_max" class="text-danger ms-2 small" style="display:none">✗ Max reached — capture stopped</span>
+                    </div>
+                </div>
+                <div class="row mb-1 align-items-center">
+                    <div class="col-sm-4"></div>
+                    <div class="col-sm-6 d-flex gap-2">
+                        <button class="btn btn-sm btn-primary" id="sd_download_btn">Download Archive</button>
+                        <button class="btn btn-sm btn-danger" id="sd_clear_btn">Clear All</button>
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-sm-10">
+                        <div id="sd_status_msg" class="small text-muted"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Error Modal -->
@@ -280,6 +335,12 @@ $(document).ready(function() {
             createLabelCheckboxes(App.model.labels, App.settings.ignore);
             $("#prioritize").val(App.settings.prioritize || "accuracy");
             $("#minEventDuration").val(App.settings.minEventDuration);
+
+            // SD Capture init
+            var sdc = App.settings.sd_capture || {};
+            $('#sd_capture_enabled').prop('checked', sdc.enabled || false);
+            $('#sd_capture_interval').val(sdc.interval || 2);
+            updateSdCount(App.status.sd_capture ? App.status.sd_capture.count : null);
         },
         error: function(response) {
             $('#errorModal').modal('show');
@@ -289,13 +350,63 @@ $(document).ready(function() {
         $.ajax({type: "GET",url: 'status',dataType: 'json',cache: false,
             success: function( data ) {
                 $("#model_status").text("Status: " + data.model.status);
+                updateSdCount(data.sd_capture ? data.sd_capture.count : null);
             },
             error(){
                 $("#model_status").text("Status: No response");
             }
         });
     },300);
+
+    $('#sd_capture_enabled').change(function() {
+        $.ajax({ type: "POST", url: "settings", contentType: 'application/json',
+            data: JSON.stringify({ sd_capture: { enabled: this.checked, interval: parseInt($('#sd_capture_interval').val()) } }) });
+    });
+    $('#sd_capture_interval').change(function() {
+        $.ajax({ type: "POST", url: "settings", contentType: 'application/json',
+            data: JSON.stringify({ sd_capture: { enabled: $('#sd_capture_enabled').is(':checked'), interval: parseInt($(this).val()) } }) });
+    });
+
+    $('#sd_download_btn').click(function() {
+        var btn = $(this);
+        btn.prop('disabled', true).text('Creating archive…');
+        $('#sd_status_msg').text('');
+        // Use a temporary anchor to trigger download
+        var a = document.createElement('a');
+        a.href = 'sd_download';
+        a.download = 'detectx_export.zip';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function() { btn.prop('disabled', false).text('Download Archive'); }, 3000);
+    });
+
+    $('#sd_clear_btn').click(function() {
+        if (!confirm('Delete all captured images and labels from the SD card?')) return;
+        var btn = $(this);
+        btn.prop('disabled', true).text('Clearing…');
+        $('#sd_status_msg').text('');
+        $.ajax({ type: "POST", url: "sd_clear", dataType: 'json',
+            success: function() {
+                updateSdCount(0);
+                $('#sd_status_msg').text('Cleared.');
+            },
+            error: function(xhr) {
+                $('#sd_status_msg').text('Error: ' + xhr.statusText);
+            },
+            complete: function() {
+                btn.prop('disabled', false).text('Clear All');
+            }
+        });
+    });
 });
+function updateSdCount(count) {
+    if (count === null || count === undefined) { $('#sd_image_count').text('—'); return; }
+    $('#sd_image_count').text(count);
+    $('#sd_image_warning').toggle(count >= 1800 && count < 2000);
+    $('#sd_image_max').toggle(count >= 2000);
+}
+
 function createLabelCheckboxes(labels, ignoreList) {
     const grid = $('#labelsGrid');
     grid.empty();
