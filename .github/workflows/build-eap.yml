@@ -23,6 +23,7 @@ jobs:
 
     outputs:
       artifact_name: ${{ steps.package.outputs.artifact_name }}
+      version: ${{ steps.package.outputs.version }}
 
     steps:
       - name: Check out repository
@@ -73,6 +74,37 @@ jobs:
         with:
           name: ${{ needs.build-eap.outputs.artifact_name }}
           path: release-assets
+
+      - name: Prepare release assets
+        shell: bash
+        run: |
+          expected_tag="v${{ needs.build-eap.outputs.version }}"
+          if [ "$GITHUB_REF_NAME" != "$expected_tag" ]; then
+            echo "Release tag $GITHUB_REF_NAME does not match manifest version ${{ needs.build-eap.outputs.version }}." >&2
+            exit 1
+          fi
+
+          versioned_eap=$(find release-assets -maxdepth 1 -type f -name '*.eap' | sort | head -n 1)
+          if [ -z "$versioned_eap" ]; then
+            echo 'No .eap package was downloaded from the build artifact.' >&2
+            exit 1
+          fi
+
+          cp "$versioned_eap" release-assets/DetectX_latest_aarch64.eap
+
+      - name: Remove stale EAP release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          assets=$(gh release view "$GITHUB_REF_NAME" --json assets --jq '.assets[] | select(.name | endswith(".eap")) | .name' 2>/dev/null || true)
+          if [ -z "$assets" ]; then
+            exit 0
+          fi
+
+          while IFS= read -r asset; do
+            gh release delete-asset "$GITHUB_REF_NAME" "$asset" --yes
+          done <<< "$assets"
 
       - name: Publish EAP on GitHub Release
         uses: softprops/action-gh-release@v2

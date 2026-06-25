@@ -7,9 +7,11 @@ Please read [Train-Build.md](https://github.com/pandosme/DetectX/blob/main/docs/
 
 ### Downloading a Pre-Compiled Package
 
-Pre-compiled `.eap` packages are published by GitHub Actions:
+Pre-compiled `.eap` packages are published by GitHub Actions. Download the latest pre-compiled package here:
 
-- For the latest tagged version, open the repository's **Releases** page and download the `.eap` file from the release assets.
+[Download DetectX EAP](https://github.com/pandosme/DetectX/releases/latest/download/DetectX_latest_aarch64.eap)
+
+- For the latest tagged version, open the repository's **Releases** page and download the versioned `.eap` file from the release assets.
 - For test builds, open the **Actions** tab, select the latest "Build EAP Package" run, and download the `detectx-<version>-eap` artifact.
 
 Maintainers can publish a new release package by pushing a version tag, for example `git tag v4.1.1 && git push origin v4.1.1`.
