@@ -1,0 +1,81 @@
+name: Build EAP Package
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-eap:
+    name: Build ACAP EAP
+    runs-on: ubuntu-latest
+
+    outputs:
+      artifact_name: ${{ steps.package.outputs.artifact_name }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build EAP package
+        run: ./build.sh
+
+      - name: Collect package metadata
+        id: package
+        shell: bash
+        run: |
+          mapfile -t eap_files < <(find . -maxdepth 1 -type f -name '*.eap' -printf '%P\n' | sort)
+          if [ "${#eap_files[@]}" -eq 0 ]; then
+            echo 'No .eap package was produced by the build.' >&2
+            exit 1
+          fi
+
+          version=$(python3 -c "import json; print(json.load(open('app/manifest.json', encoding='utf-8'))['acapPackageConf']['setup']['version'])")
+
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=detectx-${version}-eap" >> "$GITHUB_OUTPUT"
+
+      - name: Upload EAP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.artifact_name }}
+          path: |
+            *.eap
+          if-no-files-found: error
+          retention-days: 90
+
+  release-eap:
+    name: Publish GitHub Release Asset
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build-eap
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download EAP artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build-eap.outputs.artifact_name }}
+          path: release-assets
+
+      - name: Publish EAP on GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*.eap
+          generate_release_notes: true
