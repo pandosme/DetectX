@@ -53,7 +53,7 @@ scp DetectX_COCO_3_6_0_aarch64.eap root@<camera-ip>:/tmp/' >&2
 fi
 
 cd /tmp
-gunzip -c DetectX_COCO_3_6_0_aarch64.eap | tar -xf -
+tar -xzf DetectX_COCO_3_6_0_aarch64.eap
 
 # Find and run the install script
 INSTALL_SCRIPT=$(find . -maxdepth 1 -name 'detectx_*.sh' -print -quit 2>/dev/null)
