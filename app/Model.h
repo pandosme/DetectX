@@ -104,6 +104,9 @@ void Model_Reset(void);
  * @return Newly malloc'd JPEG buffer that the caller MUST free(), or NULL on failure.
  */
 unsigned char* Model_GetFullFrameJPEG(unsigned* jpeg_size);
+unsigned char* Model_GetModelInputJPEG(unsigned* jpeg_size, unsigned* width, unsigned* height);
+cJSON* Model_GetDebugStats(void);
+const void* Model_GetRawOutput(int which, size_t* size);
 
 /**
  * @brief Return the 0-based class index for a label string.

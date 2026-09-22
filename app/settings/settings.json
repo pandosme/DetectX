@@ -1,47 +1,45 @@
 {
-  "coordinateVersion": 2,
+  "coordinateVersion": 3,
+  "chip": "",
   "confidence": 50,
-  "scaleMode": "balanced",
-  "objectness": 0.25,
-  "nms": 0.05,
+  "nms": 0.45,
   "aoi": {
     "x1": 0,
     "y1": 0,
-    "x2": 640,
-    "y2": 640
+    "x2": 1000,
+    "y2": 1000
   },
   "aoi_polygon": [],
   "exclude_polygons": [],
   "size": {
     "x1": 0,
     "y1": 0,
-    "x2": 13,
-    "y2": 13
+    "x2": 20,
+    "y2": 20
   },
   "ignore": [],
   "modelDescription": "",
   "stabelizeTransition": 600,
   "minEventDuration": 3000,
-  "prioritize": "accuracy",  
+  "prioritize": "accuracy",
   "sd_capture": {
     "enabled": false,
     "interval": 2
   },
   "cropping": {
-	  "active": false,
-	  "throttle": 500,
-	  "sdcard": false,
-	  "mqtt": false,
-	  "http": false,
-	  "http_url": "",
-	  "http_auth": "none",
-	  "http_username": "",
-	  "http_password": "",
-	  "http_token": "",
-	  "leftborder": 0,
-	  "rightborder": 0,	  
-	  "topborder": 0,	  
-	  "bottomborder": 0
+    "active": false,
+    "throttle": 500,
+    "sdcard": false,
+    "mqtt": false,
+    "http": false,
+    "http_url": "",
+    "http_auth": "none",
+    "http_username": "",
+    "http_password": "",
+    "http_token": "",
+    "leftborder": 0,
+    "rightborder": 0,
+    "topborder": 0,
+    "bottomborder": 0
   }
 }
-

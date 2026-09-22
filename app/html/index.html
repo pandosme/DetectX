@@ -292,15 +292,6 @@
                             </select>
                         </div>
 
-                        <div class="mb-3 d-flex align-items-center">
-                            <label for="settings_scaleMode" class="form-label fw-bold mb-0" style="min-width: 180px;">Scale Mode</label>
-                            <select id="settings_scaleMode" class="form-select" style="flex: 1;">
-                                <option value="balanced">Balanced - Reduced area, good quality</option>
-                                <option value="crop">Center-Crop - Smallest area, best quality</option>
-                                <option value="letterbox">Letterbox - Full area, less quality</option>
-                            </select>
-                        </div>
-
                         <div class="mb-3">
                             <label class="form-label fw-bold">Video Information</label>
                             <div class="small text-muted">Capture Resolution: <strong id="captureResolution" class="text-dark">-</strong></div>
@@ -347,7 +338,6 @@
         let viewHeight = 640;
         let canvasWidth = 640;
         let canvasHeight = 640;
-        let previousScaleMode = 'balanced';
         const AOI_COLORS = ['#22c55e'];
         const EXCLUDE_COLORS = ['#ef4444', '#f97316', '#ec4899', '#dc2626', '#b91c1c'];
 
@@ -378,15 +368,15 @@
 
         function canvasPointFromModel(point) {
             return {
-                x: Math.round((point.x || 0) * canvasWidth / modelWidth),
-                y: Math.round((point.y || 0) * canvasHeight / modelHeight)
+                x: Math.round((point.x || 0) * canvasWidth / 1000),
+                y: Math.round((point.y || 0) * canvasHeight / 1000)
             };
         }
 
         function modelPointFromCanvas(point) {
             return {
-                x: Math.round((point.x || 0) * modelWidth / canvasWidth),
-                y: Math.round((point.y || 0) * modelHeight / canvasHeight)
+                x: Math.round((point.x || 0) * 1000 / canvasWidth),
+                y: Math.round((point.y || 0) * 1000 / canvasHeight)
             };
         }
 
@@ -404,15 +394,15 @@
 
         function polygonBounds(polygon) {
             if (!polygon || !polygon.length) {
-                return { x1: 0, y1: 0, x2: modelWidth, y2: modelHeight };
+                return { x1: 0, y1: 0, x2: 1000, y2: 1000 };
             }
             const xs = polygon.map(function (point) { return point.x; });
             const ys = polygon.map(function (point) { return point.y; });
             return {
                 x1: Math.max(0, Math.min.apply(null, xs)),
                 y1: Math.max(0, Math.min.apply(null, ys)),
-                x2: Math.min(modelWidth, Math.max.apply(null, xs)),
-                y2: Math.min(modelHeight, Math.max.apply(null, ys))
+                x2: Math.min(1000, Math.max.apply(null, xs)),
+                y2: Math.min(1000, Math.max.apply(null, ys))
             };
         }
 
@@ -422,10 +412,10 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             if (!detectionList.length)
                 return;
-            // canvasWidth/Height are sized to the actual video display area for each scale mode,
-            // so this ratio always maps model pixels → canvas buffer pixels correctly.
-            const scaleX = canvasWidth / modelWidth;
-            const scaleY = canvasHeight / modelHeight;
+            // Detections and settings use a 0..1000 normalized space, so the
+            // model's input resolution never enters the overlay math.
+            const scaleX = canvasWidth / 1000;
+            const scaleY = canvasHeight / 1000;
             ctx.lineWidth = 3;
             ctx.strokeStyle = '#facc15';
             ctx.fillStyle = '#facc15';
@@ -579,20 +569,11 @@
             videoWidth = App.model.videoWidth;
             videoHeight = App.model.videoHeight;
 
-            const scaleMode = App.settings.scaleMode || 'balanced';
-            let canvasTop = 0;
-            if (scaleMode === 'letterbox') {
-                viewWidth = modelWidth;
-                viewHeight = modelWidth;
-                canvasWidth = viewWidth;
-                canvasHeight = Math.round(viewWidth / (videoWidth / videoHeight));
-                canvasTop = Math.round((viewHeight - canvasHeight) / 2);
-            } else {
-                viewWidth = videoWidth;
-                viewHeight = videoHeight;
-                canvasWidth = viewWidth;
-                canvasHeight = viewHeight;
-            }
+            const canvasTop = 0;
+            viewWidth = videoWidth;
+            viewHeight = videoHeight;
+            canvasWidth = viewWidth;
+            canvasHeight = viewHeight;
 
             // Use aspect-ratio so height auto-scales when max-width kicks in on narrow screens.
             // This prevents the player from adding black bars inside a wrongly-shaped container.
@@ -600,7 +581,6 @@
             $('#view-frame').css({ width: '100%', height: '100%' });
 
             // Position canvases as % of view so they stay correct when view is scaled.
-            // In letterbox mode the canvas covers only the video area, offset from top.
             var topPct    = (canvasTop    / viewHeight * 100).toFixed(4) + '%';
             var heightPct = (canvasHeight / viewHeight * 100).toFixed(4) + '%';
             $('#overlayCanvas').attr({ width: canvasWidth, height: canvasHeight })
@@ -764,8 +744,6 @@
                     document.title = App.manifest.acapPackageConf.setup.friendlyName;
                     $('.acapName').text(App.manifest.acapPackageConf.setup.friendlyName);
                     $('#settings_confidence').val(App.settings.confidence || 50);
-                    $('#settings_scaleMode').val(App.settings.scaleMode || 'balanced');
-                    previousScaleMode = App.settings.scaleMode || 'balanced';
                     setupView();
                     initEditor();
                     pollStatus();
@@ -828,28 +806,6 @@
                 });
             });
 
-            $('#settings_scaleMode').on('change', function () {
-                const scaleModeValue = $(this).val();
-                if (!confirm('This will restart the ACAP. Proceed?')) {
-                    $('#settings_scaleMode').val(previousScaleMode);
-                    return;
-                }
-                saveSettings({ scaleMode: scaleModeValue }, function () {
-                    previousScaleMode = scaleModeValue;
-                    $.ajax({
-                        type: 'GET',
-                        url: '/axis-cgi/applications/control.cgi?action=restart&package=detectx',
-                        success: function () {
-                            showToast('ACAP is restarting. Page will refresh when ready...', 'info');
-                            pollForAcapRestart();
-                        },
-                        error: function (xhr, status, error) {
-                            showToast('Failed to restart ACAP: ' + (error || status), 'danger');
-                            $('#settings_scaleMode').val(previousScaleMode);
-                        }
-                    });
-                });
-            });
         });
     </script>
 </body>

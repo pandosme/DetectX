@@ -1,7 +1,18 @@
 # DetectX
 
-Run custom trained data models.  This package includes MobileNet SSD COCO model.  The idea is to replace this model with your own.
-Please read [Train-Build.md](https://github.com/pandosme/DetectX/blob/main/docs/Train-Build.md) to understand how to train and build the package.
+Run custom trained **YOLOv8** models on ARTPEC-8 and ARTPEC-9 cameras. This package
+includes a YOLOv8n COCO model at 1280x736. The idea is to replace this model with your own.
+Please read [Train-Build.md](https://github.com/pandosme/DetectX/blob/yolov8/docs/Train-Build.md)
+to understand how to train and build the package.
+
+> **This is the `yolov8` branch (DetectX 5.x).** The `main` branch remains YOLOv5
+> (4.x) and continues to be maintained. The two are not interchangeable: YOLOv8 is
+> anchor-free with a different output layout, so a 4.x model will not run here and a
+> 5.x model will not run on 4.x.
+>
+> **ARTPEC-9 requires Axis OS 13 or later.** Earlier firmware miscomputes YOLOv8 on
+> the A9 DLPU -- the model loads and runs at full speed but returns high-confidence
+> garbage, while the same package is correct on ARTPEC-8.
 
 ## Quick Start
 
@@ -14,7 +25,7 @@ Pre-compiled `.eap` packages are published by GitHub Actions. Download the lates
 - For the latest tagged version, open the repository's **Releases** page and download the versioned `.eap` file from the release assets.
 - For test builds, open the **Actions** tab, select the latest "Build EAP Package" run, and download the `detectx-<version>-eap` artifact.
 
-Maintainers can publish a new release package by pushing a version tag, for example `git tag v4.1.1 && git push origin v4.1.1`.
+Maintainers can publish a new release package by pushing a version tag, for example `git tag v5.0.0 && git push origin v5.0.0`.
 
 ### Building the Application
 
@@ -41,13 +52,21 @@ Maintainers can publish a new release package by pushing a version tag, for exam
 
 DetectX is a versatile ACAP (Axis Camera Application Platform) for on-camera, real-time object detection, supporting various detection tasks depending on the bundled model.  
 
+DetectX 5.x is **single-stage (1-tier) detection**: one YOLOv8 model per frame
+produces boxes and class labels directly.
+
 Below are model-specific details relevant to the generic "COCO" demo:
 
 | **Variant**    | **Dataset** | **Labels**                   | **ARTPEC-8** | **ARTPEC-9** |
 |----------------|-------------|------------------------------|------------------------|--------------------------|
-| DetectX COCO   | COCO        | person, bicycle, car, motorcycle, airplane, bus, train, truck, boat, traffic light, fire hydrant, stop sign, parking meter, bench, bird, cat, dog, horse, sheep, cow, elephant, bear, zebra, giraffe, backpack, umbrella, handbag, tie, suitcase, frisbee, skis, snowboard, sports ball, kite, baseball bat, baseball glove, skateboard, surfboard, tennis racket, bottle, wine glass, cup, fork, knife, spoon, bowl, banana, apple, sandwich, orange, broccoli, carrot, hot dog, pizza, donut, cake, chair, couch, potted plant, bed, dining table, toilet, TV, laptop, mouse, remote, keyboard, cell phone, microwave, oven, toaster, sink, refrigerator, book, clock, vase, scissors, teddy bear, hair drier, toothbrush | Model input: **640**<br>Model size: **Small** | Model input: **640**<br>Model size: **Small** |
+| DetectX COCO   | COCO        | person, bicycle, car, motorcycle, airplane, bus, train, truck, boat, traffic light, fire hydrant, stop sign, parking meter, bench, bird, cat, dog, horse, sheep, cow, elephant, bear, zebra, giraffe, backpack, umbrella, handbag, tie, suitcase, frisbee, skis, snowboard, sports ball, kite, baseball bat, baseball glove, skateboard, surfboard, tennis racket, bottle, wine glass, cup, fork, knife, spoon, bowl, banana, apple, sandwich, orange, broccoli, carrot, hot dog, pizza, donut, cake, chair, couch, potted plant, bed, dining table, toilet, TV, laptop, mouse, remote, keyboard, cell phone, microwave, oven, toaster, sink, refrigerator, book, clock, vase, scissors, teddy bear, hair drier, toothbrush | Model input: **1280x736**<br>Model: **YOLOv8n**<br>~75 ms | Model input: **1280x736**<br>Model: **YOLOv8n**<br>~25 ms |
 
 *Note: ARTPEC-8 and ARTPEC-9 are Axis camera chipset platforms, with ARTPEC-9 offering enhanced performance and the ability to process larger images for improved detection quality.*
+
+The default input is **1280x736** rather than square. A square input on a 16:9 scene
+spends about 44% of its pixels on padding; 1280x736 costs the same compute as 960x960
+while covering the full scene at 1280 pixels of horizontal resolution. Both dimensions
+must be multiples of 32, which is why the height is 736 and not 720.
 
 ***
 
@@ -256,6 +275,30 @@ DetectX delivers three primary payload types, all enrichable with the configured
 ***
 
 ## Version History
+
+## 5.0.0	September 22, 2026
+
+First YOLOv8 release, on the `yolov8` branch. `main` continues as YOLOv5 4.x.
+
+### Breaking changes
+- **YOLOv8 replaces YOLOv5.** Anchor-free head, two output tensors
+  (`[1,4,N]` coordinates + `[1,classes,N]` scores) instead of one fused
+  `[1,N,5+classes]`, and no objectness column. **4.x models will not run on 5.x.**
+- Models must be exported with `export_yolov8_artpec9.py`. Ultralytics' built-in
+  TFLite export produces float32 I/O and a single fused tensor, which cannot be
+  decoded by this application.
+- `app/preprocess.c` / `.h` removed; preprocessing now lives in `Model.c`.
+
+### New
+- Default model is **YOLOv8n COCO at 1280x736**, non-square to match the 16:9 scene.
+- Export tooling produces uint8 input and output with separate quantization scales
+  for coordinates and scores. Fusing them forces a shared scale in which every class
+  confidence quantizes to zero.
+- Rewritten [Train-Build.md](docs/Train-Build.md) covering YOLOv8 training, input-size
+  selection, calibration-set construction, and export for both ARTPEC-8 and ARTPEC-9.
+
+### Requirements
+- **ARTPEC-9 requires Axis OS 13 or later.**
 
 ## 4.1.0	April 26, 2026
 

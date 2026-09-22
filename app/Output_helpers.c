@@ -169,10 +169,12 @@ int save_yolo_labels_to_file(const char* path, const cJSON* detections, int mode
             double y = yObj->valuedouble;
             double w = wObj->valuedouble;
             double h = hObj->valuedouble;
-            double cx = (x + w * 0.5) / modelWidth;
-            double cy = (y + h * 0.5) / modelHeight;
-            double nw = w / modelWidth;
-            double nh = h / modelHeight;
+            // Detections arrive in the 0..1000 normalized space; YOLO labels
+            // want 0..1, so the model resolution does not enter into it.
+            double cx = (x + w * 0.5) / 1000.0;
+            double cy = (y + h * 0.5) / 1000.0;
+            double nw = w / 1000.0;
+            double nh = h / 1000.0;
             fprintf(f, "%d %.6f %.6f %.6f %.6f\n", class_id, cx, cy, nw, nh);
         }
         det = det->next;
