@@ -312,6 +312,17 @@
                     </div>
                 </div>
 
+                <div class="card" id="dlpu-analytics-card" style="display:none;">
+                    <div class="card-body">
+                        <h5 class="card-title">Camera DLPU Analytics</h5>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" role="switch" id="dlpu-analytics-toggle">
+                            <label class="form-check-label fw-bold" for="dlpu-analytics-toggle">On-camera Video Analytics (Object Analytics)</label>
+                        </div>
+                        <div class="small text-muted">The camera has a single DLPU. When on-camera Video Analytics is enabled it shares the DLPU with DetectX and roughly triples inference time. Turn it off to dedicate the DLPU to DetectX.</div>
+                    </div>
+                </div>
+
                 <div class="card">
                     <div class="card-body">
                         <h5 class="card-title">Active Event States</h5>
@@ -738,6 +749,63 @@
             });
         }
 
+        // Camera DLPU (on-camera Video Analytics) toggle. Device-level REST config,
+        // served same-origin from the camera, so an absolute /config path is used.
+        // The endpoint only exists on products with DLPU video analytics; if the
+        // GET fails we hide the card rather than show a control that cannot work.
+        var DLPU_ANALYTICS_URL = '/config/rest/video-analytics/v1/dlpu/enabled';
+
+        function loadDlpuAnalytics() {
+            $.ajax({
+                type: 'GET',
+                url: DLPU_ANALYTICS_URL,
+                dataType: 'json',
+                cache: false,
+                timeout: 4000,
+                success: function (res) {
+                    if (res && res.status === 'success' && typeof res.data === 'boolean') {
+                        $('#dlpu-analytics-toggle').prop('checked', res.data);
+                        $('#dlpu-analytics-card').show();
+                    } else {
+                        $('#dlpu-analytics-card').hide();
+                    }
+                },
+                error: function () {
+                    $('#dlpu-analytics-card').hide();
+                }
+            });
+        }
+
+        function setDlpuAnalytics(enabled) {
+            $('#dlpu-analytics-toggle').prop('disabled', true);
+            $.ajax({
+                type: 'PATCH',
+                url: DLPU_ANALYTICS_URL,
+                contentType: 'application/json',
+                data: JSON.stringify({ data: enabled }),
+                dataType: 'json',
+                timeout: 6000,
+                success: function (res) {
+                    if (res && res.status === 'success') {
+                        showToast(enabled
+                            ? 'On-camera Video Analytics enabled. DetectX inference will slow while it shares the DLPU.'
+                            : 'On-camera Video Analytics disabled. The DLPU is now dedicated to DetectX.',
+                            enabled ? 'warning' : 'success');
+                    } else {
+                        showToast('Could not change Video Analytics.', 'danger');
+                        loadDlpuAnalytics();
+                    }
+                },
+                error: function () {
+                    showToast('Could not change Video Analytics.', 'danger');
+                    loadDlpuAnalytics();
+                },
+                complete: function () {
+                    $('#dlpu-analytics-toggle').prop('disabled', false);
+                }
+            });
+        }
+
         function pollForAcapRestart() {
             let attempts = 0;
             function poll() {
@@ -787,6 +855,7 @@
                     initEditor();
                     pollStatus();
                     setInterval(pollStatus, 500);
+                    loadDlpuAnalytics();
                 },
                 error: function () {
                     showToast('The application is not responding.', 'danger');
@@ -795,6 +864,10 @@
 
             $('#tab-aoi').on('click', function () { switchTab('aoi'); });
             $('#tab-exclude').on('click', function () { switchTab('exclude'); });
+
+            $('#dlpu-analytics-toggle').on('change', function () {
+                setDlpuAnalytics($(this).is(':checked'));
+            });
 
             $('#draw-btn').on('click', function () {
                 if (editor)

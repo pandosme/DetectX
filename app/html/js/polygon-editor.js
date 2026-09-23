@@ -235,7 +235,7 @@ const PolygonEditor = (function () {
                 this.hintEl.textContent = 'Drag vertices to edit. Shift+click an edge to insert a point. Right-click a vertex to remove it.';
                 return;
             }
-            this.hintEl.textContent = 'Select AOI or Exclusion, then draw polygons on top of the live video.';
+            this.hintEl.textContent = 'Bounding boxes refresh twice per second (2 Hz) as inference completes.';
         }
 
         notifyChanged() {
