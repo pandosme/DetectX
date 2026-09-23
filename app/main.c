@@ -228,6 +228,23 @@ static void migrate_legacy_regions_to_polygons(cJSON* settingsObj) {
 	}
 }
 
+static void HTTP_ENDPOINT_modelinput(const ACAP_HTTP_Response response, const ACAP_HTTP_Request request) {
+	(void)request;
+	unsigned jpeg_size = 0;
+	unsigned width = 0;
+	unsigned height = 0;
+	unsigned char* jpeg = Model_GetModelInputJPEG(&jpeg_size, &width, &height);
+
+	if (!jpeg || jpeg_size == 0) {
+		ACAP_HTTP_Respond_Error(response, 503, "Model input frame unavailable");
+		return;
+	}
+
+	ACAP_HTTP_Header_FILE(response, "model_input.jpg", "image/jpeg", jpeg_size);
+	ACAP_HTTP_Respond_Data(response, jpeg_size, jpeg);
+	free(jpeg);
+}
+
 static void HTTP_ENDPOINT_model(const ACAP_HTTP_Response response, const ACAP_HTTP_Request request) {
 	const char* method = ACAP_HTTP_Get_Method(request);
 	if (!method) {
@@ -327,44 +344,67 @@ ConfigUpdate( const char *setting, cJSON* data) {
 	LOG_TRACE("%s>\n",__func__);
 }
 
+static void
+migrate_box_to_normalized(cJSON* box, int modelWidth, int modelHeight) {
+	if (!box)
+		return;
+	cJSON* x1 = cJSON_GetObjectItem(box, "x1");
+	cJSON* y1 = cJSON_GetObjectItem(box, "y1");
+	cJSON* x2 = cJSON_GetObjectItem(box, "x2");
+	cJSON* y2 = cJSON_GetObjectItem(box, "y2");
+
+	if (x1) x1->valueint = (int)(x1->valueint * 1000 / modelWidth);
+	if (y1) y1->valueint = (int)(y1->valueint * 1000 / modelHeight);
+	if (x2) x2->valueint = (int)(x2->valueint * 1000 / modelWidth);
+	if (y2) y2->valueint = (int)(y2->valueint * 1000 / modelHeight);
+}
+
+static void
+migrate_polygon_to_normalized(cJSON* polygon, int modelWidth, int modelHeight) {
+	if (!polygon || !cJSON_IsArray(polygon))
+		return;
+	cJSON* point = polygon->child;
+	while (point) {
+		cJSON* x = cJSON_GetObjectItem(point, "x");
+		cJSON* y = cJSON_GetObjectItem(point, "y");
+		if (x) x->valueint = (int)(x->valueint * 1000 / modelWidth);
+		if (y) y->valueint = (int)(y->valueint * 1000 / modelHeight);
+		point = point->next;
+	}
+}
+
 void
 migrate_settings_to_pixel_coordinates(cJSON* settings, int modelWidth, int modelHeight) {
 	cJSON* version = cJSON_GetObjectItem(settings, "coordinateVersion");
-	if (version && version->valueint >= 2) {
-		return;  // Already migrated
+	int current = version ? version->valueint : 0;
+
+	if (current >= 3)
+		return;  // Already in the 0..1000 normalized space
+
+	if (current == 2) {
+		// Version 2 stored AOI, size, exclude and polygons in model pixels.
+		// Everything is now expressed in a resolution-independent 0..1000
+		// space, so scale those settings back.
+		LOG("Migrating settings from pixel to 0..1000 coordinates...\n");
+		migrate_box_to_normalized(cJSON_GetObjectItem(settings, "aoi"), modelWidth, modelHeight);
+		migrate_box_to_normalized(cJSON_GetObjectItem(settings, "size"), modelWidth, modelHeight);
+		migrate_box_to_normalized(cJSON_GetObjectItem(settings, "exclude"), modelWidth, modelHeight);
+		migrate_polygon_to_normalized(cJSON_GetObjectItem(settings, "aoi_polygon"), modelWidth, modelHeight);
+		cJSON* excludePolygons = cJSON_GetObjectItem(settings, "exclude_polygons");
+		if (excludePolygons && cJSON_IsArray(excludePolygons)) {
+			cJSON* poly = excludePolygons->child;
+			while (poly) {
+				migrate_polygon_to_normalized(poly, modelWidth, modelHeight);
+				poly = poly->next;
+			}
+		}
 	}
+	// Versions below 2 were already stored in 0..1000; nothing to convert.
 
-	LOG("Migrating settings from normalized to pixel coordinates...\n");
-
-	// Migrate AOI
-	cJSON* aoi = cJSON_GetObjectItem(settings, "aoi");
-	if (aoi) {
-		cJSON* x1 = cJSON_GetObjectItem(aoi, "x1");
-		cJSON* y1 = cJSON_GetObjectItem(aoi, "y1");
-		cJSON* x2 = cJSON_GetObjectItem(aoi, "x2");
-		cJSON* y2 = cJSON_GetObjectItem(aoi, "y2");
-
-		if (x1) x1->valueint = (int)(x1->valueint * modelWidth / 1000);
-		if (y1) y1->valueint = (int)(y1->valueint * modelHeight / 1000);
-		if (x2) x2->valueint = (int)(x2->valueint * modelWidth / 1000);
-		if (y2) y2->valueint = (int)(y2->valueint * modelHeight / 1000);
-	}
-
-	// Migrate size filter
-	cJSON* size = cJSON_GetObjectItem(settings, "size");
-	if (size) {
-		cJSON* x1 = cJSON_GetObjectItem(size, "x1");
-		cJSON* y1 = cJSON_GetObjectItem(size, "y1");
-		cJSON* x2 = cJSON_GetObjectItem(size, "x2");
-		cJSON* y2 = cJSON_GetObjectItem(size, "y2");
-
-		if (x1) x1->valueint = (int)(x1->valueint * modelWidth / 1000);
-		if (y1) y1->valueint = (int)(y1->valueint * modelHeight / 1000);
-		if (x2) x2->valueint = (int)(x2->valueint * modelWidth / 1000);
-		if (y2) y2->valueint = (int)(y2->valueint * modelHeight / 1000);
-	}
-
-	cJSON_AddNumberToObject(settings, "coordinateVersion", 2);
+	if (version)
+		version->valueint = 3;
+	else
+		cJSON_AddNumberToObject(settings, "coordinateVersion", 3);
 	ACAP_Set_Config("settings", settings);
 	LOG("Settings migration complete.\n");
 }
@@ -375,6 +415,80 @@ VdoMap *capture_VDO_map = NULL;
 int inferenceCounter = 0;
 unsigned int inferenceAverage = 0;
 
+
+gboolean ImageProcess(gpointer data);
+static gboolean deferred_model_start(gpointer user_data);
+
+// Bring the model up and start feeding it frames. Returns false if the model
+// could not be loaded, which is recoverable -- see model_retry_timer.
+#define MODEL_RETRY_SECONDS 15
+
+static gboolean
+model_start(void) {
+	model = Model_Setup();
+	if( !model )
+		return FALSE;
+
+	const char* json = cJSON_PrintUnformatted(model);
+	if( json ) {
+		LOG("Model settings: %s\n",json);
+		free( (void*)json );
+	}
+
+	unsigned int videoWidth = cJSON_GetObjectItem(model,"videoWidth")?cJSON_GetObjectItem(model,"videoWidth")->valueint:800;
+	unsigned int videoHeight = cJSON_GetObjectItem(model,"videoHeight")?cJSON_GetObjectItem(model,"videoHeight")->valueint:600;
+	int modelWidth = cJSON_GetObjectItem(model,"modelWidth")?cJSON_GetObjectItem(model,"modelWidth")->valueint:640;
+	int modelHeight = cJSON_GetObjectItem(model,"modelHeight")?cJSON_GetObjectItem(model,"modelHeight")->valueint:640;
+
+	// Migrate settings if needed. Needs the real model dimensions, so it only
+	// runs once the model is actually up.
+	migrate_settings_to_pixel_coordinates(settings, modelWidth, modelHeight);
+	migrate_legacy_regions_to_polygons(settings);
+
+	ACAP_Set_Config("model", model );
+	if( Video_Start_YUV( videoWidth, videoHeight ) ) {
+		LOG("Video %ux%u started\n",videoWidth,videoHeight);
+	} else {
+		LOG_WARN("Video stream for image capture failed\n");
+	}
+	g_idle_add(ImageProcess, NULL);
+	return TRUE;
+}
+
+// The DLPU may be busy or still settling when we first try to claim it. Keep
+// retrying in the background so the app recovers on its own instead of needing
+// a manual restart.
+static gboolean
+model_retry_timer(gpointer user_data) {
+	(void)user_data;
+	LOG("Retrying model setup\n");
+	if( model_start() ) {
+		LOG("Model setup succeeded on retry\n");
+		return G_SOURCE_REMOVE;
+	}
+	return G_SOURCE_CONTINUE;
+}
+
+// Runs once, shortly after the main loop starts. Everything here used to happen
+// before g_main_loop_run(), which meant the application could not answer a single
+// HTTP request until the model was up.
+static gboolean
+deferred_model_start(gpointer user_data) {
+	(void)user_data;
+	LOG("Loading model (this takes 30-60 seconds on a cold start)\n");
+
+	if( !model_start() ) {
+		LOG_WARN("Model setup failed; retrying every %d seconds\n", MODEL_RETRY_SECONDS);
+		ACAP_STATUS_SetString("model","status","Model load failed - retrying");
+		ACAP_STATUS_SetBool("model","state", 0);
+		g_timeout_add_seconds( MODEL_RETRY_SECONDS, model_retry_timer, NULL );
+	}
+
+	// Output_init() reads the model config to declare one event per label, so it
+	// can only run once the model is up.
+	Output_init();
+	return G_SOURCE_REMOVE;
+}
 
 gboolean
 ImageProcess(gpointer data) {
@@ -469,24 +583,27 @@ ImageProcess(gpointer data) {
 				property->valuedouble = property->valueint;
 				c = property->valueint;
 			}
+			// Model_Inference emits 0..1; every interface (filters, MQTT,
+			// web UI, settings) uses a 0..1000 normalized space, independent
+			// of the model's input resolution.
 			if( strcmp("x",property->string) == 0 ) {
-				property->valueint = property->valuedouble * modelWidth;
+				property->valueint = property->valuedouble * 1000;
 				property->valuedouble = property->valueint;
 				cx += property->valueint;
 			}
 			if( strcmp("y",property->string) == 0 ) {
-				property->valueint = property->valuedouble * modelHeight;
+				property->valueint = property->valuedouble * 1000;
 				property->valuedouble = property->valueint;
 				cy += property->valueint;
 			}
 			if( strcmp("w",property->string) == 0 ) {
-				property->valueint = property->valuedouble * modelWidth;
+				property->valueint = property->valuedouble * 1000;
 				width = property->valueint;
 				property->valuedouble = property->valueint;
 				cx += property->valueint / 2;
 			}
 			if( strcmp("h",property->string) == 0 ) {
-				property->valueint = property->valuedouble * modelHeight;
+				property->valueint = property->valuedouble * 1000;
 				height = property->valueint;
 				property->valuedouble = property->valueint;
 				cy += property->valueint / 2;
@@ -498,8 +615,8 @@ ImageProcess(gpointer data) {
 		}
 		
 		//FILTER DETECTIONS
-		// Coordinates are now in pixel space relative to model input (e.g., 640x640)
-		// No transformation needed - filter directly in pixel coordinates
+		// Coordinates are in the 0..1000 normalized space, as are the AOI,
+		// size and exclude settings, so they compare directly.
 		unsigned int pixel_cx = cx;
 		unsigned int pixel_cy = cy;
 		unsigned int pixel_width = width;
@@ -530,8 +647,8 @@ ImageProcess(gpointer data) {
 				if( exclude ) {
 				unsigned int exclude_x1 = cJSON_GetObjectItem(exclude,"x1")?cJSON_GetObjectItem(exclude,"x1")->valueint:0;
 				unsigned int exclude_y1 = cJSON_GetObjectItem(exclude,"y1")?cJSON_GetObjectItem(exclude,"y1")->valueint:0;
-				unsigned int exclude_x2 = cJSON_GetObjectItem(exclude,"x2")?cJSON_GetObjectItem(exclude,"x2")->valueint:modelWidth;
-				unsigned int exclude_y2 = cJSON_GetObjectItem(exclude,"y2")?cJSON_GetObjectItem(exclude,"y2")->valueint:modelHeight;
+				unsigned int exclude_x2 = cJSON_GetObjectItem(exclude,"x2")?cJSON_GetObjectItem(exclude,"x2")->valueint:1000;
+				unsigned int exclude_y2 = cJSON_GetObjectItem(exclude,"y2")?cJSON_GetObjectItem(exclude,"y2")->valueint:1000;
 				
 				if( pixel_cx >= exclude_x1 && pixel_cx <= exclude_x2 && pixel_cy >= exclude_y1 && pixel_cy <= exclude_y2 )
 					insert = 0;
@@ -551,6 +668,50 @@ ImageProcess(gpointer data) {
 	}
 
 	cJSON_Delete( detections );
+
+	// Debug channel: every few seconds publish the frame the model actually
+	// received plus raw tensor statistics. Detections alone cannot tell a
+	// broken input path from a misbehaving DLPU; these can.
+	{
+		static gint64 lastDebugPublish = 0;
+		gint64 nowUs = g_get_monotonic_time();
+		if (nowUs - lastDebugPublish > 3 * G_USEC_PER_SEC) {
+			lastDebugPublish = nowUs;
+			char debugTopic[128];
+			const char* serial = ACAP_DEVICE_Prop("serial");
+
+			cJSON* stats = Model_GetDebugStats();
+			if (stats) {
+				snprintf(debugTopic, sizeof(debugTopic), "debug/%s/tensors", serial);
+				MQTT_Publish_JSON(debugTopic, stats, 0, 0);
+				cJSON_Delete(stats);
+			}
+
+			unsigned jpegSize = 0, jpegW = 0, jpegH = 0;
+			unsigned char* jpeg = Model_GetModelInputJPEG(&jpegSize, &jpegW, &jpegH);
+			if (jpeg) {
+				snprintf(debugTopic, sizeof(debugTopic), "debug/%s/input", serial);
+				MQTT_Publish_Binary(debugTopic, (int)jpegSize, jpeg, 0, 0);
+				free(jpeg);
+			}
+
+			// Raw output tensors for the same frame. Comparing these against a
+			// CPU run of the identical model on the identical input tells us
+			// whether the DLPU computed different values or merely wrote the
+			// right values in a different memory order.
+			size_t rawSize = 0;
+			const void* raw = Model_GetRawOutput(0, &rawSize);
+			if (raw && rawSize) {
+				snprintf(debugTopic, sizeof(debugTopic), "debug/%s/coords", serial);
+				MQTT_Publish_Binary(debugTopic, (int)rawSize, (void*)raw, 0, 0);
+			}
+			raw = Model_GetRawOutput(1, &rawSize);
+			if (raw && rawSize) {
+				snprintf(debugTopic, sizeof(debugTopic), "debug/%s/scores", serial);
+				MQTT_Publish_Binary(debugTopic, (int)rawSize, (void*)raw, 0, 0);
+			}
+		}
+	}
 
 	Output( processedDetections, modelWidth, modelHeight );
 	Model_Reset();
@@ -746,8 +907,6 @@ Setup_SD_Card() {
 
 int main(void) {
 	setbuf(stdout, NULL);
-	unsigned int videoWidth = 800;
-	unsigned int videoHeight = 600;
 
 	openlog(APP_PACKAGE, LOG_PID|LOG_CONS, LOG_USER);
 
@@ -767,39 +926,19 @@ int main(void) {
 
 	eventLabelCounter = cJSON_CreateObject();
 
-	model = Model_Setup();
-	const char* json = cJSON_PrintUnformatted(model);
-	if( json ) {
-		LOG("Model settings: %s\n",json);
-		free( (void*)json );
-	}
-	
-
-	videoWidth = cJSON_GetObjectItem(model,"videoWidth")?cJSON_GetObjectItem(model,"videoWidth")->valueint:800;
-	videoHeight = cJSON_GetObjectItem(model,"videoHeight")?cJSON_GetObjectItem(model,"videoHeight")->valueint:600;
-	int modelWidth = cJSON_GetObjectItem(model,"modelWidth")?cJSON_GetObjectItem(model,"modelWidth")->valueint:640;
-	int modelHeight = cJSON_GetObjectItem(model,"modelHeight")?cJSON_GetObjectItem(model,"modelHeight")->valueint:640;
-
-	// Migrate settings if needed
-	migrate_settings_to_pixel_coordinates(settings, modelWidth, modelHeight);
-	migrate_legacy_regions_to_polygons(settings);
-
-	if( model ) {
-		ACAP_Set_Config("model", model );
-		if( Video_Start_YUV( videoWidth, videoHeight ) ) {
-			LOG("Video %ux%u started\n",videoWidth,videoHeight);
-		} else {
-			LOG_WARN("Video stream for image capture failed\n");
-		}
-		g_idle_add(ImageProcess, NULL);
-	} else {
-		LOG_WARN("Model setup failed\n");
-	}
-	ACAP_Set_Config("model",model);
+	// Loading the model onto the DLPU takes 30-60 seconds on a cold start, and
+	// GLib's main loop is single-threaded, so nothing can be served while larod
+	// is working. Publish the loading state first, then let the main loop start
+	// and do the load from a short timeout -- otherwise the web UI's requests
+	// hang and the application looks crashed rather than busy.
+	ACAP_STATUS_SetString("model","status","Loading model");
+	ACAP_STATUS_SetString("model","error", NULL);
+	ACAP_STATUS_SetBool("model","state", 0);
+	g_timeout_add( 1500, deferred_model_start, NULL );
 	ACAP_HTTP_Node("model", HTTP_ENDPOINT_model);
+	ACAP_HTTP_Node("modelinput", HTTP_ENDPOINT_modelinput);
 	ACAP_HTTP_Node("sd_download", HTTP_ENDPOINT_sd_download);
 	ACAP_HTTP_Node("sd_clear", HTTP_ENDPOINT_sd_clear);
-	Output_init();
 	MQTT_Init( Main_MQTT_Status, Main_MQTT_Subscription_Message  );	
 	ACAP_Set_Config("mqtt", MQTT_Settings() );
 	

@@ -79,9 +79,3 @@ unsigned char* crop_interleaved(unsigned char* image_buffer,
                                 int crop_y,
                                 int crop_w,
                                 int crop_h);
-
-/**
- * @brief An example of how to use the supplied utility functions
- *
- */
-void test_buffer_to_jpeg_file(void);

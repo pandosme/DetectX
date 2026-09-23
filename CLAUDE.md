@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-DetectX is an ACAP (Axis Camera Application Platform) application that runs custom YOLOv5 object detection models directly on Axis network cameras with ARTPEC-8 and ARTPEC-9 chipsets. The application performs real-time inference on-camera and exports detections via MQTT, ONVIF, and HTTP.
+DetectX is an ACAP (Axis Camera Application Platform) application that runs custom YOLOv8 object detection models directly on Axis network cameras with ARTPEC-8 and ARTPEC-9 chipsets. The application performs real-time inference on-camera and exports detections via MQTT, ONVIF, and HTTP.
 
 This is a native C application that integrates with:
 - Axis ACAP SDK (version 12.x, native SDK)
@@ -101,10 +101,10 @@ Also links statically: `libjpeg`, `libturbojpeg` (in `app/lib/`)
 - ACAP package metadata: name, version, vendor
 - HTTP endpoint definitions (FastCGI nodes: app, settings, status, device, model, mqtt, certs, crops)
 
-**app/model/model.tflite**
-- TFLite model file with int8 quantization
-- Model parameters are automatically extracted at runtime by Model.c
-- Supported formats: YOLOv5 with per-tensor quantization
+**app/model/model-a8.tflite** / **app/model/model-a9.tflite**
+- Chip-specific uint8 TFLite models with split coordinate and score outputs
+- ARTPEC-8 uses per-tensor quantization; ARTPEC-9 uses per-channel quantization
+- The Docker build stages the selected variant as `model/model.tflite`
 
 **app/model/labels.txt**
 - Text file with one label per line
@@ -128,7 +128,7 @@ Also links statically: `libjpeg`, `libturbojpeg` (in `app/lib/`)
 ### Data Flow
 
 1. **Capture**: `Video_Capture_YUV()` gets a frame from camera
-2. **Inference**: `Model_Inference(buffer)` runs YOLOv5 model via larod, returns detections array
+2. **Inference**: `Model_Inference(buffer)` runs the YOLOv8 model via larod, returns detections array
 3. **Filtering**: main.c applies AOI, confidence, size filters to detections
 4. **Output**: `Output(processedDetections)` handles:
    - MQTT detection messages (bounding boxes)
@@ -156,13 +156,12 @@ Backend endpoints (FastCGI) are handled in ACAP.c callback functions that return
 
 ### Training Your Own Model
 
-Follow the YOLOv5 training process documented in [docs/Train-Build.md](docs/Train-Build.md):
+Follow the YOLOv8 training process documented in [Train-Build.md](Train-Build.md):
 
-1. Clone YOLOv5 and apply Axis patch for ARTPEC compatibility
-2. Train with desired dataset (use 640x640 or other multiple of 32)
-3. Export to TFLite with int8 quantization and per-tensor quantization
-4. Replace `app/model/model.tflite` and `app/model/labels.txt`
-5. Run `./build.sh` - model parameters are automatically extracted during build
+1. Train a YOLOv8 model with dimensions that are multiples of 32
+2. Export target-specific TFLite variants with `export_yolov8.py --target a8` and `--target a9`
+3. Replace `app/model/model-a8.tflite`, `app/model/model-a9.tflite`, and `app/model/labels.txt`
+4. Run `./build.sh` - model parameters are validated and extracted during build
 
 ### Customizing Detection Output
 
