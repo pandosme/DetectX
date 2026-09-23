@@ -211,12 +211,20 @@
     </nav>
 
     <div class="main-content">
-        <div id="modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.25); z-index:1000;">
-            <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:2rem; border-radius:12px; box-shadow:var(--shadow-lg); text-align:center; min-width:280px;">
-                <h2 style="font-size:1.4rem; margin-bottom:0.75rem;">Model Offline</h2>
-                <p style="margin:0; color:var(--text-muted);">The model is loading. Please wait.</p>
+        <!-- Shown by default: the application cannot answer HTTP while larod loads the
+             two models, so the page must state that itself rather than appear frozen. -->
+        <div id="modal" style="display:block; position:fixed; inset:0; background:rgba(0,0,0,0.25); z-index:1000;">
+            <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:2rem; border-radius:12px; box-shadow:var(--shadow-lg); text-align:center; min-width:320px;">
+                <div class="spinner-border text-primary mb-3" role="status" aria-hidden="true"></div>
+                <h2 id="modal-title" style="font-size:1.4rem; margin-bottom:0.75rem;">Loading model</h2>
+                <p id="modal-text" style="margin:0; color:var(--text-muted);">
+                    Loading the detection model onto the camera.<br>
+                    This takes 30-60 seconds after a restart.
+                </p>
+                <p id="modal-elapsed" style="margin:0.75rem 0 0; color:var(--text-muted); font-size:0.9rem;"></p>
             </div>
         </div>
+
 
         <div class="row g-4">
             <div class="col-lg-8">
@@ -236,7 +244,7 @@
                                 <canvas id="polygonCanvas" style="width:100%;height:100%;position:absolute;top:0;left:0;"></canvas>
                             </div>
                         </div>
-                        <div class="hint-box mt-3" id="editor-hint">Select AOI or Exclusion, then draw polygons on top of the live video.</div>
+                        <div class="hint-box mt-3" id="editor-hint">Bounding boxes refresh twice per second; new detections appear as inference completes.</div>
                     </div>
                 </div>
 
@@ -666,17 +674,45 @@
             switchTab('aoi');
         }
 
+        var pollInFlight = false;
+        var startedAt = Date.now();
+        var everReady = false;
+
+        // While the models load, the application cannot answer at all. Without a
+        // timeout each 1 s poll would hang, and after ~6 of them the browser's
+        // connection limit is reached and the whole page stops responding -- which
+        // is what made a loading model look like a crashed app.
+        function showLoading(title, text) {
+            $('#modal-title').text(title);
+            if (text) $('#modal-text').html(text);
+            var secs = Math.round((Date.now() - startedAt) / 1000);
+            $('#modal-elapsed').text(everReady ? '' : 'Waiting ' + secs + ' s');
+            $('#modal').show();
+        }
+
         function pollStatus() {
+            if (pollInFlight) return;
+            pollInFlight = true;
             $.ajax({
                 type: 'GET',
                 url: 'status',
                 dataType: 'json',
                 cache: false,
+                timeout: 4000,
+                complete: function () { pollInFlight = false; },
                 success: function (status) {
                     if (!status.model || !status.model.state) {
-                        $('#modal').show();
+                        var st = (status.model && status.model.status) || '';
+                        var err = status.model && status.model.error;
+                        if (err)
+                            showLoading('Model failed to load', escapeHtml(err));
+                        else
+                            showLoading(st || 'Loading model',
+                                'Loading the detection model onto the camera.<br>' +
+                                'This takes 30-60 seconds after a restart.');
                         return;
                     }
+                    everReady = true;
                     $('#modal').hide();
                     $('#model-status-pill').text('Model: ' + (status.model.status || 'Running'));
                     $('#time-pill').text('Inference: ' + ((status.model.averageTime != null) ? (status.model.averageTime + ' ms') : '-'));
@@ -694,7 +730,10 @@
                     });
                 },
                 error: function () {
-                    $('#modal').show();
+                    // No answer yet: either still loading, or restarting.
+                    showLoading('Loading model',
+                        'Loading the detection model onto the camera.<br>' +
+                        'This takes 30-60 seconds after a restart.');
                 }
             });
         }
@@ -747,7 +786,7 @@
                     setupView();
                     initEditor();
                     pollStatus();
-                    setInterval(pollStatus, 1000);
+                    setInterval(pollStatus, 500);
                 },
                 error: function () {
                     showToast('The application is not responding.', 'danger');

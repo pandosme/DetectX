@@ -39,9 +39,10 @@ jobs:
         id: package
         shell: bash
         run: |
-          mapfile -t eap_files < <(find . -maxdepth 1 -type f -name '*.eap' -printf '%P\n' | sort)
-          if [ "${#eap_files[@]}" -eq 0 ]; then
-            echo 'No .eap package was produced by the build.' >&2
+          mapfile -t a8_files < <(find . -maxdepth 1 -type f -name '*_artpec8.eap' -printf '%P\n' | sort)
+          mapfile -t a9_files < <(find . -maxdepth 1 -type f -name '*_artpec9.eap' -printf '%P\n' | sort)
+          if [ "${#a8_files[@]}" -ne 1 ] || [ "${#a9_files[@]}" -ne 1 ]; then
+            echo "Expected one ARTPEC-8 and one ARTPEC-9 EAP; found ${#a8_files[@]} and ${#a9_files[@]}." >&2
             exit 1
           fi
 
@@ -84,13 +85,15 @@ jobs:
             exit 1
           fi
 
-          versioned_eap=$(find release-assets -maxdepth 1 -type f -name '*.eap' | sort | head -n 1)
-          if [ -z "$versioned_eap" ]; then
-            echo 'No .eap package was downloaded from the build artifact.' >&2
+          mapfile -t a8_files < <(find release-assets -maxdepth 1 -type f -name '*_artpec8.eap' | sort)
+          mapfile -t a9_files < <(find release-assets -maxdepth 1 -type f -name '*_artpec9.eap' | sort)
+          if [ "${#a8_files[@]}" -ne 1 ] || [ "${#a9_files[@]}" -ne 1 ]; then
+            echo "Expected one ARTPEC-8 and one ARTPEC-9 release asset; found ${#a8_files[@]} and ${#a9_files[@]}." >&2
             exit 1
           fi
 
-          cp "$versioned_eap" release-assets/DetectX_latest_aarch64.eap
+          cp "${a8_files[0]}" release-assets/DetectX_latest_artpec8.eap
+          cp "${a9_files[0]}" release-assets/DetectX_latest_artpec9.eap
 
       - name: Remove stale EAP release assets
         env:

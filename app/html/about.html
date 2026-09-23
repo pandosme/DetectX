@@ -203,22 +203,6 @@
     <!-- Main Content -->
     <div class="main-content">
         <div class="row g-4">
-            <!-- Model Card -->
-            <div class="col-md-6">
-                <div class="card h-100">
-                    <div class="card-header bg-success text-white">
-                        <h5 class="mb-0">Model</h5>
-                    </div>
-                    <div class="card-body" style="font-size: 1.2rem;">
-                        <p><strong>Description:</strong> <span class="modelDescription">Loading...</span></p>
-                        <p><strong>Status:</strong> <span class="model_status">Loading...</span></p>
-                        <p><strong>Size:</strong> <span class="modelSize">-</span></p>
-                        <p><strong>Inference:</strong> <span class="averageInference">-</span> ms</p>
-                        <p><strong>DLPU:</strong> <span class="dlpu">-</span></p>
-                    </div>
-                </div>
-            </div>
-
             <!-- Device Card -->
             <div class="col-md-6">
                 <div class="card h-100">
@@ -281,6 +265,22 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Support -->
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Support</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-3">If you find this application useful, please consider supporting its development.</p>
+                        <a href="https://buymeacoffee.com/fredjuhlinl" target="_blank" class="d-inline-flex align-items-center gap-2 text-decoration-none" style="background:#FFDD00;color:#000;padding:8px 16px;border-radius:8px;font-weight:600;font-size:.9rem;transition:opacity .2s" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
+                            <img src="https://cdn.buymeacoffee.com/buttons/bmc-new-btn-logo.svg" alt="" width="20" height="28" style="vertical-align:middle">
+                            Buy me a coffee
+                        </a>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -296,20 +296,6 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="card h-100">
-                    <div class="card-header">
-                        <h5 class="mb-0">Support</h5>
-                    </div>
-                    <div class="card-body">
-                        <p class="text-muted mb-3">If you find this application useful, please consider supporting its development.</p>
-                        <a href="https://buymeacoffee.com/fredjuhlinl" target="_blank" class="d-inline-flex align-items-center gap-2 text-decoration-none" style="background:#FFDD00;color:#000;padding:8px 16px;border-radius:8px;font-weight:600;font-size:.9rem;transition:opacity .2s" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
-                            <img src="https://cdn.buymeacoffee.com/buttons/bmc-new-btn-logo.svg" alt="" width="20" height="28" style="vertical-align:middle">
-                            Buy me a coffee
-                        </a>
-                    </div>
                 </div>
             </div>
         </div>
@@ -353,21 +339,6 @@ $(document).ready(function() {
 				$('.bandwidth').text('-');
 			}
 
-			// Model
-			$('.modelDescription').text(data.model?.description || 'COCO YOLOv5');
-			$('.model_status').text(data.status?.model?.status || 'Loading...');
-			if (data.model?.modelWidth && data.model?.modelHeight) {
-				$('.modelSize').text(data.model.modelWidth + 'x' + data.model.modelHeight);
-			} else {
-				$('.modelSize').text('-');
-			}
-			if (data.status?.model?.averageTime !== undefined) {
-				$('.averageInference').text(data.status.model.averageTime.toString());
-			} else {
-				$('.averageInference').text('-');
-			}
-			$('.dlpu').text(data.model?.chip || '-');
-
 			// MQTT
 			$('.mqttStatus').text(data.status?.mqtt?.status || 'Unknown');
 			$('.mqttBroker').text(data.mqtt?.address || '-');
@@ -387,12 +358,6 @@ $(document).ready(function() {
 			dataType: 'json',
 			cache: false,
 			success: function(data) {
-				if (data.model?.status) {
-					$('.model_status').text(data.model.status);
-				}
-				if (data.model?.averageTime !== undefined) {
-					$('.averageInference').text(data.model.averageTime.toString());
-				}
 				if (data.mqtt?.status) {
 					$('.mqttStatus').text(data.mqtt.status);
 				}
@@ -409,7 +374,6 @@ $(document).ready(function() {
 				}
 			},
 			error() {
-				$('.model_status').text('No response');
 				$('.mqttStatus').text('No response');
 			}
 		});

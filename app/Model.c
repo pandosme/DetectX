@@ -15,7 +15,8 @@
 #include "Model.h"
 #include "imgutils.h"
 #include "labelparse.h"
-#include "model_params.h"  // Generated at build time by extract_model_params.py
+#include "model_params.h"
+#include "model_quant.h"  // Generated at build time by extract_model_params.py
 
 #define LOG(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args);}
 #define LOG_WARN(fmt, args...)    { syslog(LOG_WARNING, fmt, ## args); printf(fmt, ## args);}
@@ -872,6 +873,17 @@ Model_Cleanup() {
 	if( ppMap ) larodDestroyMap(&ppMap);
     if( ppModel ) larodDestroyModel(&ppModel);
     larodDestroyModel(&InfModel);
+    // Release everything that needs a live connection BEFORE disconnecting.
+    // larodDisconnect() nulls conn and tears down the session server-side; calling
+    // larodDestroyTensors(conn=NULL, ...) afterwards frees tensors the session has
+    // already released, which aborts the process with "double free or corruption"
+    // on every app stop.
+    larodDestroyJobRequest(&ppReq);
+    larodDestroyJobRequest(&infReq);
+    if (inputTensors)  larodDestroyTensors(conn, &inputTensors, inputs, &error);
+    if (outputTensors) larodDestroyTensors(conn, &outputTensors, outputs, &error);
+    if (error) larodClearError(&error);
+
     if (conn) larodDisconnect(&conn, NULL);
     // Reset every fd and mapping as it is released: Model_Setup can be retried
     // after a failed load, and a second cleanup closing a stale descriptor
@@ -912,10 +924,8 @@ Model_Cleanup() {
     hdFailed = 0;
     original_rgb_buffer = NULL;
 
-    larodDestroyJobRequest(&ppReq);
-    larodDestroyJobRequest(&infReq);
-    larodDestroyTensors(conn, &inputTensors, inputs, &error);
-    larodDestroyTensors(conn, &outputTensors, outputs, &error);
+    // Job requests and tensors are released before larodDisconnect() above --
+    // see the comment there. Nothing conn-dependent may be destroyed here.
     larodClearError(&error);
 	ACAP_STATUS_SetString("model","status","Model stopped");
 	ACAP_STATUS_SetBool("model","state", 0);	
@@ -1018,7 +1028,7 @@ cJSON* Model_Setup(void) {
         return 0;
     }
 
-    // Get input dimensions (YOLOv5 input is always NHWC: batch, height, width, channels)
+    // Get the YOLOv8 NHWC input dimensions: batch, height, width, channels.
     const larodTensorDims* inputDims = larodGetTensorDims(tempInputTensors[0], &error);
     if (!inputDims) {
         LOG_WARN("%s: Failed to get input tensor dimensions\n", __func__);
@@ -1068,10 +1078,29 @@ cJSON* Model_Setup(void) {
         classes = dimsA->dims[1];
     }
 
-    coordQuant = COORD_QUANTIZATION_SCALE;
-    coordZero  = COORD_QUANTIZATION_ZERO_POINT;
-    scoreQuant = SCORE_QUANTIZATION_SCALE;
-    scoreZero  = SCORE_QUANTIZATION_ZERO_POINT;
+    // Read quantization from the ACTUAL loaded model. larod does not expose it, and
+    // the model_params.h macros describe only the model built into the package -- a
+    // model uploaded at runtime via /model at a different resolution has a different
+    // coordinate scale, and decoding it with the build-time scale mis-places every
+    // box (a 960x544 model decoded with a 640x384 package's scale lands boxes at ~2/3
+    // position, offset up-left). The parser reads the truth from the loaded file; the
+    // macros remain a fallback if parsing ever fails.
+    {
+        float cS, sS; int cZ, sZ;
+        if (tflite_output_quant(activeModelPath, &cS, &cZ, &sS, &sZ,
+                                4, (int)classes)) {
+            coordQuant = cS; coordZero = (float)cZ;
+            scoreQuant = sS; scoreZero = (float)sZ;
+            LOG("Quantization from loaded model %s: coord scale=%.6g zero=%d | score scale=%.6g zero=%d\n",
+                activeModelPath, coordQuant, (int)coordZero, scoreQuant, (int)scoreZero);
+        } else {
+            coordQuant = COORD_QUANTIZATION_SCALE; coordZero = COORD_QUANTIZATION_ZERO_POINT;
+            scoreQuant = SCORE_QUANTIZATION_SCALE; scoreZero = SCORE_QUANTIZATION_ZERO_POINT;
+            LOG_WARN("%s: could not read quantization from %s; using build-time macros "
+                     "(correct only for the built-in model resolution)\n",
+                     __func__, activeModelPath);
+        }
+    }
 
     LOG("Model output: %u boxes, %u classes (coord tensor %d, score tensor %d)\n",
         boxes, classes, coordOutIdx, scoreOutIdx);
@@ -1101,13 +1130,15 @@ cJSON* Model_Setup(void) {
     }
 
     // Step 5: Capture resolution. The sensor is 16:9 and larod's convert step
-    // scales the captured frame to the model input WITHOUT letterboxing, so the
-    // capture is always 16:9: VDO then never crops away field of view, and the
-    // only reshaping is whatever the model's own aspect requires. Pick the
-    // smallest standard 16:9 resolution that covers the model input -- 720p is
-    // the floor so detection crops stay usable, and staying near the model size
-    // keeps it to one gentle downscale. Both are divisible by 8 (VDO).
-    if (modelWidth <= 1280 && modelHeight <= 736) {
+    // Ask VDO for exactly the model input size. VDO scales in the ISP, so the
+    // libyuv preprocessing step on the CPU then only has to convert NV12 to RGB
+    // -- no resize at all. Both dimensions must be divisible by 8 for VDO.
+    // Any aspect squash happens in hardware instead of on the CPU; the geometry
+    // the model sees is unchanged.
+    if ((modelWidth % 8) == 0 && (modelHeight % 8) == 0) {
+        videoWidth = modelWidth;
+        videoHeight = modelHeight;
+    } else if (modelWidth <= 1280 && modelHeight <= 736) {
         videoWidth = 1280;
         videoHeight = 720;
     } else {
@@ -1290,6 +1321,7 @@ cJSON* Model_Setup(void) {
     scoreRowStride = scorePitches->pitches[scorePitches->len - 1];
     LOG("Coord tensor: %zu bytes, stride %zu | Score tensor: %zu bytes, stride %zu\n",
         outputBufferSize, coordRowStride, output2BufferSize, scoreRowStride);
+
 
     // Allocate space for input tensors
     if (!createAndMapTmpFile(PP_SD_INPUT_FILE_PATTERN, yuyvBufferSize, &ppInputAddr, &ppInputFd)) {

@@ -70,3 +70,16 @@ artpec9-repro.tar.gz
 
 # personal test photo, stays local
 app/model/PXL_*.jpg
+
+# generated at build time from the chip-specific variant
+app/model/model.tflite
+app/model_params.h
+
+# local virtualenvs and model-export intermediates
+.venv/
+models/*.onnx
+models/*_saved_model/
+
+# ultralytics drops base weights in cwd
+yolov8?.pt
+exports/

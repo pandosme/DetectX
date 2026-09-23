@@ -7,7 +7,7 @@ as a working default; the intent is that you replace it with your own model.
 
 DetectX is a **base to build on**: the application introspects whatever model you give
 it -- input resolution, class count, quantization -- so you change behaviour by changing
-the model, not the code. See [docs/Train-Build.md](docs/Train-Build.md) to train and
+the model, not the code. See [Train-Build.md](Train-Build.md) to train and
 export your own.
 
 > **DetectX 5.x runs YOLOv8. It does not run YOLOv5.** The output layout is different
@@ -34,6 +34,10 @@ Two packages are published, one per chipset -- they are **not** interchangeable:
 Open the repository's **Releases** page and download the one matching your camera's
 chipset. ARTPEC-8 is quantized per-tensor; ARTPEC-9 per-channel. Installing the wrong
 one gives wrong detections.
+
+> **Axis OS 13 development installs:** To run an unsigned ACAP, first install the
+> [Dev-Mode ACAP](https://www.axis.com/es-es/for-developers/news/acap-developer-mode).
+> Downloading it requires signing in with a MyAxis account.
 
 ### Building the Application
 
@@ -406,5 +410,123 @@ First YOLOv8 release. The YOLOv5 line (4.x) is frozen at 4.1.1 and no longer mai
 
 ---
 
-Earlier releases (1.x-4.x) were YOLOv5-based. That line is frozen at **4.1.1**; see the
-Git history for its changelog.
+## Legacy YOLOv5 Releases
+
+DetectX 5.x does not support YOLOv5 models. For an existing YOLOv5 deployment or
+further work on that model format, use the frozen legacy line instead:
+
+- **Latest legacy release:** [v4.1.1](https://github.com/pandosme/DetectX/tree/v4.1.1)
+- **Legacy development branch:** [4.1.0](https://github.com/pandosme/DetectX/tree/4.1.0)
+
+```bash
+git checkout v4.1.1  # last YOLOv5 release
+# or
+git checkout 4.1.0   # legacy development branch
+```
+
+The 4.x line is not compatible with v5 models or packages, and receives no new
+features.
+
+## 4.1.1
+
+- Fixed EAP release-asset publishing.
+
+## 4.1.0
+
+- Added polygon AOI and exclusion zones, runtime model upload, SD-card training
+  capture, and bounding-box overlay fixes.
+
+## 4.0.0 - February 2, 2026
+
+- Moved from normalized coordinates to model-input pixel coordinates.
+- Added automatic migration for existing AOI and size-filter settings.
+- Redesigned the web UI with top navigation and card-based layouts.
+- Removed the old `prepare.py` dependency; model parameters were extracted during
+  the Docker build.
+
+## 3.5.3 - November 29, 2025
+
+- Fixed a memory leak.
+
+## 3.5.2 - August 29, 2025
+
+- Fixed black-box video on selected cameras.
+
+## 3.5.1 - August 29, 2025
+
+- Added Detection Export, GUI updates, and MQTT improvements.
+
+## 3.4.0 - May 14, 2025
+
+- Cleaned up MQTT handling and fixed GUI and MQTT connection issues.
+
+## 3.3.10 - March 4, 2025
+
+- Refactored MQTT support.
+
+## 3.3.8 - February 27, 2025
+
+- Fixed a detection-page crash and MQTT stability issues.
+- Added MQTT connect messages and more last-will properties.
+
+## 3.3.7 - February 22, 2025
+
+- Improved MQTT stability and UI feedback for unsupported platforms, model
+  loading, and unavailable applications.
+
+## 3.3.6 - February 7, 2025
+
+- Fixed a UI-related crash during extended use.
+
+## 3.3.5 - February 2025
+
+- Fixed a serious memory leak and expanded About-page information.
+
+## 3.3.0 - December 21, 2024
+
+- Added MQTT support.
+
+## 3.2.0 - December 20, 2024
+
+- Updated the ACAP wrapper to 3.2.0.
+
+## 3.1.5 - December 11, 2024
+
+- Fixed event handling.
+
+## 3.1.0 - November 27, 2024
+
+- Updated the ACAP SDK, refactored application files, and added per-label
+  events and visualization improvements.
+
+## 2.2.0 - October 19, 2024
+
+- Added the Label Counter event and fixed detection transitions.
+
+## 2.1.1 - October 13, 2024
+
+- Fixed event states and a potential memory leak.
+
+## 2.1.0 - October 11, 2024
+
+- Added detection transitions and removed SD-card detection-image storage.
+
+## 1.2.0 - October 7, 2024
+
+- Added minimum-size filtering and fixed multiple detections in one scene.
+
+## 1.0.3 - September 15, 2024
+
+- Restructured model and settings configuration.
+
+## 1.0.2 - September 7, 2024
+
+- Fixed detection and SD-card image-storage issues.
+
+## 1.0.1 - September 6, 2024
+
+- Restructured SD-card detection-image storage and fixed reset behavior.
+
+## 1.0.0 - September 5, 2024
+
+- Initial release.
