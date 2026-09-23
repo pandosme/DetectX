@@ -10,6 +10,12 @@ it -- input resolution, class count, quantization -- so you change behaviour by 
 the model, not the code. See [Train-Build.md](Train-Build.md) to train and
 export your own.
 
+## Acknowledgements
+
+Thanks to [Pavel Kotyza](https://github.com/kotyzap) for his work enabling
+YOLOv8 models on Axis cameras through
+[YOLOv8-on-AXIS-ACAP](https://github.com/kotyzap/YOLOv8-on-AXIS-ACAP).
+
 > **DetectX 5.x runs YOLOv8. It does not run YOLOv5.** The output layout is different
 > (anchor-free, two tensors, no objectness), so a 4.x model will not load here. The
 > YOLOv5 line is frozen at 4.1.1 and is no longer maintained.
