@@ -1,18 +1,22 @@
 # DetectX
 
-Run custom trained **YOLOv8** models on ARTPEC-8 and ARTPEC-9 cameras. This package
-includes a YOLOv8n COCO model at 1280x736. The idea is to replace this model with your own.
-Please read [Train-Build.md](https://github.com/pandosme/DetectX/blob/yolov8/docs/Train-Build.md)
-to understand how to train and build the package.
+Run custom-trained **YOLOv8** object-detection models directly on Axis cameras with
+ARTPEC-8 or ARTPEC-9 chipsets. Detections are published over MQTT, ONVIF events and
+HTTP for machine-to-machine use. The package ships a YOLOv8n COCO model at **640x384**
+as a working default; the intent is that you replace it with your own model.
 
-> **This is the `yolov8` branch (DetectX 5.x).** The `main` branch remains YOLOv5
-> (4.x) and continues to be maintained. The two are not interchangeable: YOLOv8 is
-> anchor-free with a different output layout, so a 4.x model will not run here and a
-> 5.x model will not run on 4.x.
+DetectX is a **base to build on**: the application introspects whatever model you give
+it -- input resolution, class count, quantization -- so you change behaviour by changing
+the model, not the code. See [docs/Train-Build.md](docs/Train-Build.md) to train and
+export your own.
+
+> **DetectX 5.x runs YOLOv8. It does not run YOLOv5.** The output layout is different
+> (anchor-free, two tensors, no objectness), so a 4.x model will not load here. The
+> YOLOv5 line is frozen at 4.1.1 and is no longer maintained.
 >
-> **ARTPEC-9 requires Axis OS 13 or later.** Earlier firmware miscomputes YOLOv8 on
-> the A9 DLPU -- the model loads and runs at full speed but returns high-confidence
-> garbage, while the same package is correct on ARTPEC-8.
+> **ARTPEC-9 requires Axis OS 13 or later.** Earlier firmware miscomputes YOLOv8 on the
+> A9 DLPU -- the model loads and runs at full speed but returns high-confidence garbage,
+> while the same package is correct on ARTPEC-8.
 
 ## Quick Start
 
@@ -20,26 +24,37 @@ to understand how to train and build the package.
 
 Pre-compiled `.eap` packages are published by GitHub Actions. Download the latest pre-compiled package here:
 
-[Download DetectX EAP](https://github.com/pandosme/DetectX/releases/latest/download/DetectX_latest_aarch64.eap)
+Two packages are published, one per chipset -- they are **not** interchangeable:
 
-- For the latest tagged version, open the repository's **Releases** page and download the versioned `.eap` file from the release assets.
-- For test builds, open the **Actions** tab, select the latest "Build EAP Package" run, and download the `detectx-<version>-eap` artifact.
+| Package | Chip |
+|---|---|
+| `DetectX_<version>_artpec8.eap` | ARTPEC-8 |
+| `DetectX_<version>_artpec9.eap` | ARTPEC-9 |
 
-Maintainers can publish a new release package by pushing a version tag, for example `git tag v5.0.0 && git push origin v5.0.0`.
+Open the repository's **Releases** page and download the one matching your camera's
+chipset. ARTPEC-8 is quantized per-tensor; ARTPEC-9 per-channel. Installing the wrong
+one gives wrong detections.
 
 ### Building the Application
 
-1. Clone the repository
-2. Replace the model and labels (if using your own):
-   - Place your TFLite model at `app/model/model.tflite`
-   - Place your labels file at `app/model/labels.txt`
-3. Run the build script:
-   ```bash
-   ./build.sh
-   ```
-4. Install the generated `.eap` file on your Axis camera
+```bash
+./build.sh                 # builds both ARTPEC-8 and ARTPEC-9 packages
+./build.sh --target a8     # one chip only
+```
 
-**Note:** As of version 4.0.0, the `prepare.py` script is no longer required. Model parameters are now automatically extracted during the build process.
+To use your own model, export it per chip and drop the files in before building:
+
+```bash
+./export_yolov8.py --target a8 --weights your.pt --width 640 --height 384 \
+    --calibration-dir /path/to/calibration/images --output app/model/model-a8.tflite
+./export_yolov8.py --target a9 --weights your.pt --width 640 --height 384 \
+    --calibration-dir /path/to/calibration/images --output app/model/model-a9.tflite
+cp your-labels.txt app/model/labels.txt
+./build.sh
+```
+
+Model parameters -- input size, tensor shapes, quantization scales -- are extracted
+from the TFLite files automatically at build time; nothing needs editing by hand.
 
 
 ***
@@ -59,14 +74,93 @@ Below are model-specific details relevant to the generic "COCO" demo:
 
 | **Variant**    | **Dataset** | **Labels**                   | **ARTPEC-8** | **ARTPEC-9** |
 |----------------|-------------|------------------------------|------------------------|--------------------------|
-| DetectX COCO   | COCO        | person, bicycle, car, motorcycle, airplane, bus, train, truck, boat, traffic light, fire hydrant, stop sign, parking meter, bench, bird, cat, dog, horse, sheep, cow, elephant, bear, zebra, giraffe, backpack, umbrella, handbag, tie, suitcase, frisbee, skis, snowboard, sports ball, kite, baseball bat, baseball glove, skateboard, surfboard, tennis racket, bottle, wine glass, cup, fork, knife, spoon, bowl, banana, apple, sandwich, orange, broccoli, carrot, hot dog, pizza, donut, cake, chair, couch, potted plant, bed, dining table, toilet, TV, laptop, mouse, remote, keyboard, cell phone, microwave, oven, toaster, sink, refrigerator, book, clock, vase, scissors, teddy bear, hair drier, toothbrush | Model input: **1280x736**<br>Model: **YOLOv8n**<br>~75 ms | Model input: **1280x736**<br>Model: **YOLOv8n**<br>~25 ms |
+| DetectX COCO   | COCO        | person, bicycle, car, motorcycle, airplane, bus, train, truck, boat, traffic light, fire hydrant, stop sign, parking meter, bench, bird, cat, dog, horse, sheep, cow, elephant, bear, zebra, giraffe, backpack, umbrella, handbag, tie, suitcase, frisbee, skis, snowboard, sports ball, kite, baseball bat, baseball glove, skateboard, surfboard, tennis racket, bottle, wine glass, cup, fork, knife, spoon, bowl, banana, apple, sandwich, orange, broccoli, carrot, hot dog, pizza, donut, cake, chair, couch, potted plant, bed, dining table, toilet, TV, laptop, mouse, remote, keyboard, cell phone, microwave, oven, toaster, sink, refrigerator, book, clock, vase, scissors, teddy bear, hair drier, toothbrush | YOLOv8n @ **640x384**<br>~50  ms / 20 fps | YOLOv8n @ **640x384**<br>(measured on OS 13) |
 
 *Note: ARTPEC-8 and ARTPEC-9 are Axis camera chipset platforms, with ARTPEC-9 offering enhanced performance and the ability to process larger images for improved detection quality.*
 
-The default input is **1280x736** rather than square. A square input on a 16:9 scene
-spends about 44% of its pixels on padding; 1280x736 costs the same compute as 960x960
-while covering the full scene at 1280 pixels of horizontal resolution. Both dimensions
-must be multiples of 32, which is why the height is 736 and not 720.
+The default input is **640x384** -- a 16:9 shape, not square. A square input on a 16:9
+scene wastes about 44% of its pixels on padding. 640x384 runs at ~20 fps on ARTPEC-8 and
+covers the full scene; it is a deliberately fast, general-purpose starting point. When to
+raise it, and what it costs, is covered in **Choosing a configuration** below. Both
+dimensions must be multiples of 32.
+
+***
+
+## Choosing a configuration: speed, quality and distance
+
+Detection is governed by three levers, and they trade against each other. There is no
+single best setting -- the right one depends on how far away your objects are and how
+fast you need answers.
+
+1. **Input resolution** -- the single biggest lever. It sets both latency and how far
+   away an object can still be detected. Baked into the model at export time.
+2. **Model size** (n / s / m) -- more capacity means better accuracy on hard or small
+   objects, at a proportional cost in latency.
+3. **Class count** -- every class you keep costs post-processing on every frame. A model
+   trained on the 10 classes you care about is meaningfully faster than the 80-class COCO
+   demo at the same resolution.
+
+### Measured performance -- ARTPEC-8, 80-class COCO
+
+End-to-end time (capture + preprocessing + inference + NMS), measured on a Q3536-LVE.
+This is what frame rate actually depends on.
+
+**YOLOv8n (nano)** -- the ARTPEC-8 workhorse:
+
+| Input | fps | latency | relative range |
+|---|---|---|---|
+| 416x256 | **43** | 23 ms | 0.7x |
+| **640x384** (default) | **20** | 50 ms | 1.0x |
+| 800x480 | 11 | 88 ms | 1.2x |
+| 960x544 | 9 | 106 ms | 1.4x |
+| 1280x736 | 5 | 200 ms | 1.9x |
+
+**YOLOv8s (small)** -- better accuracy, roughly 1.6x the latency of nano:
+
+| Input | fps | latency | relative range |
+|---|---|---|---|
+| 416x256 | 27 | 37 ms | 0.7x |
+| 640x384 | 12 | 81 ms | 1.0x |
+| 800x480 | 7 | 140 ms | 1.2x |
+| 960x544 | 6 | 172 ms | 1.4x |
+| 1280x736 | 3 | 315 ms | 1.9x |
+
+Latency scales **linearly with input pixels** and detection range scales with their
+**square root**: `latency (ms) ~ 213 x megapixels` for nano, `~ 334 x megapixels` for
+small. So four times the pixels buys twice the distance at four times the cost. You can
+read any point off these fits without measuring -- pick a latency budget, divide, and
+that is your pixel budget.
+
+Medium (yolov8m) is not recommended on ARTPEC-8 -- even 640x384 exceeds 300 ms. It is an
+ARTPEC-9 option.
+
+### Recommendations
+
+| Your priority | Configuration |
+|---|---|
+| **Speed** -- counting, presence, busy scenes | nano @ 416x256 or 640x384. 20-43 fps, ample headroom. |
+| **Balance** -- general perimeter / person & vehicle | **nano @ 640x384 (the default).** 20 fps, full field of view. |
+| **Distance** -- objects far from the camera | Raise resolution before model size. nano @ 960x544 or 1280x736 reaches ~1.4-1.9x the range at 9 / 5 fps. A narrower lens is also worth more than a bigger model -- it puts more pixels on a distant object for free. |
+| **Quality** -- small or visually similar objects up close | Step up to small at the same resolution before raising resolution further. |
+| **Any of the above** | **Cut the class list.** The tables are 80-class COCO; a 10-class model shifts every number down. Train on only what you act on. |
+
+**Why resolution beats model size for distance.** Detection range is set by how many
+pixels an object occupies at the network input, not by model capacity. A larger model
+cannot detect what the input resolution has already thrown away. At equal latency, a
+smaller model at higher resolution reaches further than a larger model at lower
+resolution. Reach for a bigger model when objects are *close but hard* (small, occluded,
+visually similar); reach for more pixels when objects are *far*.
+
+**Measure on your own hardware.** ARTPEC-9 is faster than ARTPEC-8 and these numbers
+will differ. Two scripts reproduce the tables:
+- `benchmark_resolutions.sh` -- uploads models through the app's own HTTP endpoint and
+  reads the reported end-to-end time. Needs only the camera web login. **These are the
+  real-world numbers above.**
+- `benchmark_larod.sh` -- times raw DLPU inference via `larod-client` over SSH, the way
+  [axis-model-zoo](https://github.com/AxisCommunications/axis-model-zoo) does. Faster to
+  run and good for *comparing* models, but it carries a fixed per-run overhead that a
+  running ACAP amortizes, so its absolute numbers are pessimistic below ~1 megapixel. Use
+  it for relative comparison, not for predicting frame rate.
 
 ***
 
@@ -276,196 +370,41 @@ DetectX delivers three primary payload types, all enrichable with the configured
 
 ## Version History
 
-## 5.0.0	September 22, 2026
+## 5.0.0
 
-First YOLOv8 release, on the `yolov8` branch. `main` continues as YOLOv5 4.x.
+First YOLOv8 release. The YOLOv5 line (4.x) is frozen at 4.1.1 and no longer maintained.
 
 ### Breaking changes
-- **YOLOv8 replaces YOLOv5.** Anchor-free head, two output tensors
-  (`[1,4,N]` coordinates + `[1,classes,N]` scores) instead of one fused
-  `[1,N,5+classes]`, and no objectness column. **4.x models will not run on 5.x.**
-- Models must be exported with `export_yolov8_artpec9.py`. Ultralytics' built-in
-  TFLite export produces float32 I/O and a single fused tensor, which cannot be
-  decoded by this application.
-- `app/preprocess.c` / `.h` removed; preprocessing now lives in `Model.c`.
+- **YOLOv8 replaces YOLOv5.** Anchor-free head with two output tensors
+  (`[1,4,N]` coordinates and `[1,classes,N]` scores) instead of one fused
+  `[1,N,5+classes]`, and no objectness column. 4.x models will not load on 5.x.
+- **Separate ARTPEC-8 and ARTPEC-9 packages.** The A8 DLPU requires per-tensor
+  weight quantization, the A9 uses per-channel; the two are not interchangeable.
+  Previously a single package served both.
+- Models must be exported with `export_yolov8.py`, which produces uint8 I/O and the
+  split coordinate/score tensors the runtime needs. Ultralytics' built-in TFLite
+  export (float32 I/O, one fused tensor) cannot be decoded by this application.
 
 ### New
-- Default model is **YOLOv8n COCO at 1280x736**, non-square to match the 16:9 scene.
-- Export tooling produces uint8 input and output with separate quantization scales
-  for coordinates and scores. Fusing them forces a shared scale in which every class
-  confidence quantizes to zero.
-- Rewritten [Train-Build.md](docs/Train-Build.md) covering YOLOv8 training, input-size
-  selection, calibration-set construction, and export for both ARTPEC-8 and ARTPEC-9.
+- Default model is **YOLOv8n COCO at 640x384** -- fast (~20 fps on ARTPEC-8) and
+  16:9 to match the scene. See **Choosing a configuration** for when to change it.
+- Built against the current Axis ACAP SDK (manifest schema 2.2.0), DLPU declared as
+  a required resource, `runMode: respawn`.
+- The application introspects the model at startup (input size, class count,
+  quantization), so any exported model drops in without code changes.
+- `export_resolutions.sh` / `benchmark_resolutions.sh` / `benchmark_larod.sh` for
+  exporting a model across resolutions and measuring latency on your own camera.
+- Model load is deferred past application start so the web UI stays responsive and
+  reports "Loading model" during the 30-60 s cold start instead of appearing hung.
+- PyTorch checkpoints for the shipped models are in `models/`.
+
+### Fixes
+- Corrected a double-free in larod teardown that aborted the process on every stop.
 
 ### Requirements
 - **ARTPEC-9 requires Axis OS 13 or later.**
 
-## 4.1.0	April 26, 2026
+---
 
-### New Features
-- **Polygon Area of Interest**: The AOI is now defined as a free-form polygon instead of a rectangle. Click on the AOI canvas to add vertices and drag them to any shape. The area *outside* the polygon is dimmed so the active zone is immediately visible.
-- **Polygon Exclude Zones**: Multiple exclude zones can be drawn as polygons. Each zone suppresses detections inside it, useful for masking persistent false-positive areas such as trees, reflections, or road signs.
-- **Upload Custom Model**: A new *Model* page lets you upload a replacement `.tflite` model file and `labels.txt` directly from the browser — no SSH or Docker rebuild required.
-- **SD Card Training Capture**: Configurable event-driven capture of full-frame JPEG images and YOLO-format label files to the SD card, designed for collecting site-specific training data for model fine-tuning. Includes a Download Archive button (zip of `images/` + `labels/`) and a Clear button. Capture triggers immediately when a detection event goes active, then repeats at a user-defined interval (1–60 s). Stops automatically at 2 000 images.
-- **Bounding-Box Overlay Accuracy**: Reworked canvas/video alignment for all scale modes (center-crop, balanced, letterbox) so detection overlays are pixel-accurate regardless of browser window size.
-
-### UI Improvements
-- Border preset buttons on the Detection Export page for common crop-margin adjustments.
-- Polygon vertices are clamped to the canvas boundary during drag.
-- Polygon drag operations complete correctly even when the mouse is released outside the canvas.
-
-## 4.0.0	February 2, 2026
-
-### Major Features
-- **Pixel-Based Coordinate System**: Complete redesign from normalized [0-1000] coordinates to native pixel coordinates matching model input dimensions
-- **1:1 Display Aspect Ratio**: All scale modes now display in model-sized 1:1 view (typically 640x640) for "what you see is what you get" visualization
-- **Enhanced Scale Mode Support**: True visual representation for each mode:
-  - **Center-Crop**: 640x640 1:1 video with no black bars
-  - **Balanced**: 856x640 (4:3 aspect) squeezed into 1:1 display
-  - **Letterbox**: 1136x640 (16:9 aspect) displayed in 1:1 with visible padding
-- **Modern UI Redesign**: Complete redesign with top navigation bar replacing sidebar, modern card-based layouts, and improved visual hierarchy
-- **Simplified Build Process**: Removed dependency on `prepare.py` - model parameters now automatically extracted during Docker build
-
-### Coordinate System Changes
-- **Pixel Coordinates Throughout**: All coordinates (detections, AOI, size filters) now use pixels relative to model input dimensions
-- **MQTT Metadata**: Detection payloads now include `metadata` object with `modelWidth`, `modelHeight`, and `coordinateSystem: "pixels"` for client compatibility
-- **Automatic Settings Migration**: Existing configurations automatically migrate from normalized to pixel coordinates via `coordinateVersion` flag
-- **Direct Model-to-Display Mapping**: Simplified coordinate transformation eliminates multi-stage conversions and aspect ratio calculations
-
-### Video Capture Optimization
-- **Optimized Resolutions**: Balanced mode uses 856x640 (4:3) to maximize 640px height while maintaining divisibility by 8
-- **Resolution Strategy**: Center-crop (640x640), Balanced (856x640), Letterbox (1136x640) - all optimized for model input size
-- **Improved Memory Efficiency**: Direct pixel scaling reduces processing overhead
-
-### UI Improvements
-- **Custom AOI Overlay**: Removed jQuery imgAreaSelect plugin (944 lines), implemented lightweight custom overlay with mouse drag handlers
-- **Canvas Alignment**: Perfect pixel-accurate alignment of detection overlays with video for all scale modes
-- **Gradient Navigation Bar**: Improved contrast and readability with modern design
-- **Responsive Design**: Optimized for mobile, tablet, and desktop viewing
-- **Improved Form Controls**: Better focus states and validation feedback
-
-### Technical Improvements
-- **Direct Pixel Conversion**: Model outputs converted directly to pixels instead of intermediate [0-1000] normalization
-- **Removed Display Space Transformations**: Eliminated videoAspect-based coordinate scaling simplifies codebase
-- **Enhanced Crop Generation**: Crops use pixel-based scaling from model space to video frame space
-- **Settings Migration**: Automatic one-time migration from coordinateVersion 1 to 2
-- **Improved MQTT Payload Handling**: Better error messages for oversized crops
-
-### Bug Fixes
-- Fixed coordinate misalignment in all scale modes with pixel-accurate canvas positioning
-- Resolved letterbox mode canvas stretching by using calculated pixel dimensions
-- Fixed canvas clearing to use actual dimensions instead of hardcoded values
-- Improved video and overlay synchronization with object-fit strategies
-
-### Breaking Changes
-- **MQTT Output Format**: Coordinates now in pixels with metadata (breaking for API consumers)
-- **Coordinate System**: Changed from normalized [0-1000] to pixels (coordinateVersion: 2)
-- **Display Aspect**: Changed from 16:9 to 1:1 aspect ratio for all visualizations
-- **Settings Format**: AOI and size filters now use pixel coordinates (automatic migration on first startup)
-- **API Clients**: MQTT consumers need to detect `metadata.coordinateSystem === "pixels"` and scale accordingly
-
-### Documentation
-- Updated `CLAUDE.md` with coordinate system architecture
-- Added comprehensive implementation plan documentation
-- Updated README with simplified build instructions
-
-## 3.5.3	Nov 29, 2025
-- Fixed a memory leak
-
-## 3.5.2       Aug 29, 2025
-- Fixed "black-box-video" shown on selected cameras
-
-### 3.5.1	Aug 29, 2025
-- Added Detection Export
-- Updated GUI
-- MQTT improvements
-
-
-### 3.4.0	May 14, 2025
-- MQTT Cleanup
-- GUI fixes
-- Fixed IP address in MQTT connect message.
-
-### 3.3.10	March 04, 2025
-- MQTT Refactoring
-
-### 3.3.8	February 27, 2025
-- Fixed a flaw in html that crashed the detections page
-  (stupid bug introduced in previous version)
-- Fixed MQTT stability (recurring disconnects)
-- Added MQTT connect message and more properties in LWT
-
-### 3.3.7	February 22, 2025
-- Fixed MQTT stability (recurring disconnects)
-- Improved behaviour in GUI
-	* Display error when not running on ARTPEC-8 (e.g. Ambarella CV25)
-	* Display info when model is loading
-	* Display info when application not responding
-
-### 3.3.6	February 7. 2025
-- Fixed a bug that could crash the application if the user interface is active for a longer period of time.  
-  (Credit to Fredrik Lax, Sundsvall-IT who found it)
-
-### 3.3.5	February 6, 2025
-- Fixed a serious memory leak
-
-### 3.3.5	December 22, 2024
-- Restructured and added more information on the About page
-
-### 3.3.0	December 21, 2024
-- Added support for MQTT
-
-### 3.2.0	December 20, 2024
-- Bumbed ACAP wrapper up to 3.2.0
-
-### 3.1.5	December 11, 2024
-- Fixed a flaw that impact events.
-
-### 3.1.0	November 27, 2024
-- Switched to latest ACAP SDK.  Please remove previous version if they are below 3.0.0.
-  * Refactoring on various files
-- Modified events to give all labels its own event
-- Updated visualization in user interface
-
-### 2.2.0	October 19, 2024
-- Added event "Label Counter" for use cases needing to know how many objects are detected
-- Fixed flaw for Detection transition
-
-### 2.1.1	October 13, 2024
-- Fixed flawed event states
-- Fixed potential memoryleak
-
-### 2.1.0 October 11, 2024
-- Added support for Detection transition
-- Removed ability to store detectection images on SD Card
-
-### 1.2.0	October 7, 2024
-- Added support fo filter minimum size
-- Fixed a flaw that preventet detecting mutliple detections in the same scene.
-
-### 1.0.3	September 15, 2024
-- Restructures the model.json and settings.json and code realted to those config files including prepare.py
-
-### 1.0.2	September 7, 2024
-- Fixed flaw that prevented detections
-- Fixed flaw that did not store images on SD Card when users enabled this feature
-
-### 1.0.1	Septeber 6, 2024
-- Restructured SD Card image store on detect images. Fix a flaw that could result in error "Too many files open...".
-- Fixed so Reset button cleared all bounding boxes and table
-
-### 1.0.0	September 5, 2024
-- Initial commit
-
-
-
-
-
-
-
-
-
-
-
-
-
+Earlier releases (1.x-4.x) were YOLOv5-based. That line is frozen at **4.1.1**; see the
+Git history for its changelog.
