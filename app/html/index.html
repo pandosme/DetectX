@@ -319,7 +319,7 @@
                             <input class="form-check-input" type="checkbox" role="switch" id="dlpu-analytics-toggle">
                             <label class="form-check-label fw-bold" for="dlpu-analytics-toggle">On-camera Video Analytics (Object Analytics)</label>
                         </div>
-                        <div class="small text-muted">The camera has a single DLPU. When on-camera Video Analytics is enabled it shares the DLPU with DetectX and roughly triples inference time. Turn it off to dedicate the DLPU to DetectX.</div>
+                        <div class="small text-muted">The camera has a single DLPU. It only matters when on-camera analytics that use the DLPU are actually running (e.g. AXIS Object Analytics): those compete with DetectX and can sharply increase its inference time. Disabling on-camera DLPU analytics frees the DLPU for DetectX; if none are running, this switch has no effect on speed.</div>
                     </div>
                 </div>
 
@@ -788,8 +788,8 @@
                 success: function (res) {
                     if (res && res.status === 'success') {
                         showToast(enabled
-                            ? 'On-camera Video Analytics enabled. DetectX inference will slow while it shares the DLPU.'
-                            : 'On-camera Video Analytics disabled. The DLPU is now dedicated to DetectX.',
+                            ? 'On-camera DLPU analytics enabled. Any analytics running alongside DetectX will now share the DLPU and can slow inference.'
+                            : 'On-camera DLPU analytics disabled. The DLPU is reserved for DetectX.',
                             enabled ? 'warning' : 'success');
                     } else {
                         showToast('Could not change Video Analytics.', 'danger');
