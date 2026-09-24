@@ -83,3 +83,10 @@ models/*_saved_model/
 # ultralytics drops base weights in cwd
 yolov8?.pt
 exports/
+
+# --- datasets & training artifacts (never commit) ---
+/dataset
+/datasets/
+*.pt
+*.onnx
+*_saved_model/
