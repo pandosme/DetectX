@@ -307,9 +307,16 @@ Model_Inference(VdoBuffer* image) {
 		return 0;
 	}
     cJSON* cropping = cJSON_GetObjectItem(settings, "cropping");
+    cJSON* sdCapture = cJSON_GetObjectItem(settings, "sd_capture");
     int cropping_active = cropping && cJSON_IsTrue(cJSON_GetObjectItem(cropping, "active"));
-    int sdcard_active   = cropping && cJSON_IsTrue(cJSON_GetObjectItem(cropping, "sdcard"));
-	if( (cropping_active || sdcard_active) && hd_preprocessing_setup() ) {
+    // Full-frame SD capture (sd_capture.enabled) needs the full frame too, not only crop export.
+    int sdcard_active   = (cropping && cJSON_IsTrue(cJSON_GetObjectItem(cropping, "sdcard"))) ||
+                          (sdCapture && cJSON_IsTrue(cJSON_GetObjectItem(sdCapture, "enabled")));
+    int fullframe_needed = cropping_active || sdcard_active;
+    // When VDO already delivers model-sized frames, the model input RGB is the full frame:
+    // reuse it after preprocessing instead of converting the frame a second time.
+    int capture_is_model_size = (videoWidth == modelWidth && videoHeight == modelHeight);
+	if( fullframe_needed && !capture_is_model_size && hd_preprocessing_setup() ) {
 		memcpy(ppInputAddrHD, nv12Data, yuyvBufferSize);    // For HD preprocessing (original res)
 
 		// Run HD preprocessing job
@@ -335,6 +342,8 @@ Model_Inference(VdoBuffer* image) {
         inferenceErrors--;
         return 0;
     }
+    if (fullframe_needed && capture_is_model_size)
+        original_rgb_buffer = (unsigned char*)larodInputAddr;
     
     if (lseek(larodOutput1Fd, 0, SEEK_SET) == -1) {
         LOG_WARN("%s: Unable to rewind output file position: %s\n", __func__, strerror(errno));
