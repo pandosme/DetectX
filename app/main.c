@@ -15,6 +15,7 @@
 
 #include "ACAP.h"
 #include "Model.h"
+extern int inferenceErrors;   // Model.c: error budget; 0 = model shut down
 #include "Video.h"
 #include "cJSON.h"
 #include "Output.h"
@@ -517,6 +518,22 @@ ImageProcess(gpointer data) {
 	cJSON* detections = Model_Inference(buffer);
     gettimeofday(&endTs, NULL);
 	LOG_TRACE("%s: Done\n",__func__);
+
+	// A failed inference returns no detections. Skip this frame instead of
+	// dereferencing NULL below (that segfaulted, and systemd respawned the app
+	// into the same failure). Once Model_Inference has used up its error budget
+	// it shuts the model down; stop the loop then, so the model is not torn
+	// down twice, and say why in the status shown on the web page.
+	if( !detections ) {
+		if( inferenceErrors <= 0 ) {
+			ACAP_STATUS_SetString("model","status","Model stopped");
+			ACAP_STATUS_SetString("model","error","Inference failed repeatedly on the inference hardware (DLPU). Try a smaller model input size, then restart the application.");
+			ACAP_STATUS_SetBool("model","state", 0);
+			LOG_WARN("Inference failed repeatedly; model stopped\n");
+			return G_SOURCE_REMOVE;
+		}
+		return G_SOURCE_CONTINUE;
+	}
 
 	unsigned int inferenceTime = (unsigned int)(((endTs.tv_sec - startTs.tv_sec) * 1000) + ((endTs.tv_usec - startTs.tv_usec) / 1000));
 	inferenceCounter++;
