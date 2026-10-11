@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <math.h>
+#include <stdint.h>
 #include <sys/mman.h>
 #include <sys/time.h>
 #include <errno.h>
@@ -437,6 +438,173 @@ Model_Inference(VdoBuffer* image) {
     return non_maximum_suppression(list);
 }
 
+// Full-resolution crop source. main.c hands over the newest frame of a second
+// NV12 stream at the sensor's largest 16:9 size before each inference, and
+// detection export (MQTT/HTTP) crops from it. The model input is the same scene
+// squashed to modelWidth x modelHeight without letterboxing, so normalized
+// boxes map onto it directly. SD card capture keeps the inference-size frame.
+static const uint8_t* hiresData = NULL;
+static unsigned int hiresWidth = 0;
+static unsigned int hiresHeight = 0;
+static unsigned int hiresPitch = 0;
+
+// NV12 -> RGB. The model input went through larod's cpu-proc conversion, whose
+// matrix is not documented, so the hi-res path picks whichever of these best
+// reproduces the model's RGB buffer (see hires_detect_matrix) instead of guessing.
+typedef struct {
+    const char* name;
+    float yOffset, yGain, rV, gU, gV, bU;
+} YuvMatrix;
+static const YuvMatrix yuvMatrices[] = {
+    {"bt601-limited", 16.0f, 1.164f, 1.596f, -0.391f, -0.813f, 2.018f},
+    {"bt601-full",     0.0f, 1.000f, 1.402f, -0.344f, -0.714f, 1.772f},
+    {"bt709-limited", 16.0f, 1.164f, 1.793f, -0.213f, -0.533f, 2.112f},
+    {"bt709-full",     0.0f, 1.000f, 1.575f, -0.187f, -0.468f, 1.856f},
+};
+#define NUM_YUV_MATRICES (sizeof(yuvMatrices) / sizeof(yuvMatrices[0]))
+static int hiresMatrix = -1;   // index into yuvMatrices, -1 until detected
+
+static inline uint8_t
+clamp_u8(float v) {
+    return (uint8_t)(v < 0.0f ? 0.0f : (v > 255.0f ? 255.0f : v + 0.5f));
+}
+
+static inline void
+yuv_to_rgb(const YuvMatrix* m, float y, float u, float v, float out[3]) {
+    float luma = (y - m->yOffset) * m->yGain;
+    u -= 128.0f;
+    v -= 128.0f;
+    out[0] = luma + m->rV * v;
+    out[1] = luma + m->gU * u + m->gV * v;
+    out[2] = luma + m->bU * u;
+}
+
+// Mean Y/U/V over a block of the hi-res frame, clamped to the frame.
+static void
+hires_block_yuv(int x0, int y0, int x1, int y1, float* y, float* u, float* v) {
+    const uint8_t* uvPlane = hiresData + (size_t)hiresPitch * hiresHeight;
+    if (x0 < 0) x0 = 0;
+    if (y0 < 0) y0 = 0;
+    if (x1 > (int)hiresWidth) x1 = hiresWidth;
+    if (y1 > (int)hiresHeight) y1 = hiresHeight;
+    unsigned long sy = 0, su = 0, sv = 0, n = 0;
+    for (int yy = y0; yy < y1; yy++) {
+        const uint8_t* row = hiresData + (size_t)yy * hiresPitch;
+        const uint8_t* uvRow = uvPlane + (size_t)(yy >> 1) * hiresPitch;
+        for (int xx = x0; xx < x1; xx++) {
+            sy += row[xx];
+            su += uvRow[xx & ~1];
+            sv += uvRow[(xx & ~1) + 1];
+            n++;
+        }
+    }
+    if (!n) n = 1;
+    *y = (float)sy / n;
+    *u = (float)su / n;
+    *v = (float)sv / n;
+}
+
+// Compare a grid of detector-input pixels against the matching hi-res blocks
+// under each candidate matrix and keep the closest. Runs once per model setup;
+// the two streams are captured back to back, so a static scene dominates.
+static void
+hires_detect_matrix(void) {
+    if (hiresMatrix >= 0 || !hiresData || larodInputAddr == MAP_FAILED)
+        return;
+    const uint8_t* rgb = (const uint8_t*)larodInputAddr;
+    const float sx = (float)hiresWidth / modelWidth;
+    const float sy = (float)hiresHeight / modelHeight;
+    double error[NUM_YUV_MATRICES] = {0};
+    unsigned long samples = 0;
+    for (unsigned int gy = 0; gy < 18; gy++) {
+        for (unsigned int gx = 0; gx < 32; gx++) {
+            unsigned int mx = (gx * 2 + 1) * modelWidth / 64;
+            unsigned int my = (gy * 2 + 1) * modelHeight / 36;
+            float y, u, v;
+            hires_block_yuv((int)(mx * sx), (int)(my * sy),
+                            (int)((mx + 1) * sx + 0.999f), (int)((my + 1) * sy + 0.999f),
+                            &y, &u, &v);
+            const uint8_t* ref = rgb + ((size_t)my * modelWidth + mx) * 3;
+            for (unsigned int m = 0; m < NUM_YUV_MATRICES; m++) {
+                float out[3];
+                yuv_to_rgb(&yuvMatrices[m], y, u, v, out);
+                for (int c = 0; c < 3; c++)
+                    error[m] += fabsf((float)clamp_u8(out[c]) - ref[c]);
+            }
+            samples++;
+        }
+    }
+    unsigned int best = 0;
+    for (unsigned int m = 1; m < NUM_YUV_MATRICES; m++)
+        if (error[m] < error[best])
+            best = m;
+    hiresMatrix = (int)best;
+    LOG("Full-resolution crop colour: %s (mean abs error/channel %.1f; %s %.1f, %s %.1f, %s %.1f, %s %.1f)\n",
+        yuvMatrices[best].name, error[best] / (samples * 3),
+        yuvMatrices[0].name, error[0] / (samples * 3), yuvMatrices[1].name, error[1] / (samples * 3),
+        yuvMatrices[2].name, error[2] / (samples * 3), yuvMatrices[3].name, error[3] / (samples * 3));
+}
+
+// Full-resolution RGB copy of a region of the hi-res frame, for detection
+// export. Caller frees.
+static unsigned char*
+hires_crop_rgb(int cropX, int cropY, int cropW, int cropH) {
+    hires_detect_matrix();
+    const YuvMatrix* matrix = &yuvMatrices[hiresMatrix >= 0 ? hiresMatrix : 0];
+    const uint8_t* uvPlane = hiresData + (size_t)hiresPitch * hiresHeight;
+    unsigned char* rgb = malloc((size_t)cropW * cropH * 3);
+    if (!rgb)
+        return NULL;
+    for (int y = 0; y < cropH; y++) {
+        const uint8_t* row = hiresData + (size_t)(cropY + y) * hiresPitch;
+        const uint8_t* uvRow = uvPlane + (size_t)((cropY + y) >> 1) * hiresPitch;
+        unsigned char* output = rgb + (size_t)y * cropW * 3;
+        for (int x = 0; x < cropW; x++) {
+            int sx = cropX + x;
+            float out[3];
+            yuv_to_rgb(matrix, row[sx], uvRow[sx & ~1], uvRow[(sx & ~1) + 1], out);
+            output[x * 3 + 0] = clamp_u8(out[0]);
+            output[x * 3 + 1] = clamp_u8(out[1]);
+            output[x * 3 + 2] = clamp_u8(out[2]);
+        }
+    }
+    return rgb;
+}
+
+void
+Model_SetCropFrame(VdoBuffer* buffer, unsigned int width, unsigned int height, unsigned int pitch) {
+    hiresData = NULL;
+    if (!buffer || width == 0 || height == 0 || pitch < width)
+        return;
+    VdoFrame* frame = vdo_buffer_get_frame(buffer);
+    size_t needed = (size_t)pitch * height * 3 / 2;
+    if (frame && vdo_frame_get_size(frame) > 0 && vdo_frame_get_size(frame) < needed) {
+        LOG_WARN("%s: Full-resolution frame is %zu bytes, NV12 %ux%u pitch %u needs %zu; cropping from the inference frame\n",
+                 __func__, (size_t)vdo_frame_get_size(frame), width, height, pitch, needed);
+        return;
+    }
+    hiresData = (const uint8_t*)vdo_buffer_get_data(buffer);
+    hiresWidth = width;
+    hiresHeight = height;
+    hiresPitch = pitch;
+}
+
+void
+Model_GetCropFrameSize(unsigned int* width, unsigned int* height) {
+    if (width) *width = hiresData ? hiresWidth : videoWidth;
+    if (height) *height = hiresData ? hiresHeight : videoHeight;
+}
+
+int
+Model_WantsCropFrame(void) {
+    cJSON* settings = ACAP_Get_Config("settings");
+    cJSON* cropping = settings ? cJSON_GetObjectItem(settings, "cropping") : NULL;
+    if (!cropping || !cJSON_IsTrue(cJSON_GetObjectItem(cropping, "active")))
+        return 0;
+    cJSON* fullResolution = cJSON_GetObjectItem(cropping, "fullResolution");
+    return !fullResolution || cJSON_IsTrue(fullResolution);
+}
+
 //The detection coordinates are in pixels relative to model input dimensions
 const unsigned char*
 Model_GetImageData(const cJSON* detection, unsigned* jpeg_size, int* out_x, int* out_y, int* out_w, int* out_h, int* img_w, int* img_h ) {
@@ -496,9 +664,14 @@ Model_GetImageData(const cJSON* detection, unsigned* jpeg_size, int* out_x, int*
         return NULL;
     }
 
-	// Coordinates are in the 0..1000 normalized space, scale to video frame pixels
-	double scale_x = (double)videoWidth / 1000.0;
-	double scale_y = (double)videoHeight / 1000.0;
+	// Coordinates are in the 0..1000 normalized space, scale to frame pixels.
+	// With the full-resolution stream running, crops (and their borders, in
+	// those pixels) are cut from it instead of the inference-size frame.
+	int useHires = hiresData != NULL;
+	int frameWidth = useHires ? (int)hiresWidth : (int)videoWidth;
+	int frameHeight = useHires ? (int)hiresHeight : (int)videoHeight;
+	double scale_x = (double)frameWidth / 1000.0;
+	double scale_y = (double)frameHeight / 1000.0;
 	int det_pixel_x = (int)round(xObj->valuedouble * scale_x);
 	int det_pixel_y = (int)round(yObj->valuedouble * scale_y);
 	int det_pixel_w = (int)round(wObj->valuedouble * scale_x);
@@ -511,8 +684,8 @@ Model_GetImageData(const cJSON* detection, unsigned* jpeg_size, int* out_x, int*
 
     if (crop_x < 0) { crop_w += crop_x; crop_x = 0; }
     if (crop_y < 0) { crop_h += crop_y; crop_y = 0; }
-    if (crop_x + crop_w > (int)videoWidth) crop_w = videoWidth - crop_x;
-    if (crop_y + crop_h > (int)videoHeight) crop_h = videoHeight - crop_y;
+    if (crop_x + crop_w > frameWidth) crop_w = frameWidth - crop_x;
+    if (crop_y + crop_h > frameHeight) crop_h = frameHeight - crop_y;
     if (crop_w < 1) crop_w = 1;
     if (crop_h < 1) crop_h = 1;
 
@@ -527,7 +700,10 @@ Model_GetImageData(const cJSON* detection, unsigned* jpeg_size, int* out_x, int*
     if (det_w < 1) det_w = 1;
     if (det_h < 1) det_h = 1;
 
-    if (!original_rgb_buffer) {
+    if (crop_x >= frameWidth || crop_y >= frameHeight)
+        return NULL;
+
+    if (!useHires && !original_rgb_buffer) {
         LOG_WARN("%s: Original RGB image buffer is NULL\n", __func__);
         ACAP_STATUS_SetString("output", "cropError", "Image buffer unavailable - cropping may be disabled");
         ACAP_STATUS_SetNumber("output", "cropErrorTime", ACAP_DEVICE_Timestamp());
@@ -535,7 +711,9 @@ Model_GetImageData(const cJSON* detection, unsigned* jpeg_size, int* out_x, int*
     }
 
 
-    unsigned char* crop_buf = crop_interleaved(original_rgb_buffer, videoWidth, videoHeight, 3, crop_x, crop_y, crop_w, crop_h);
+    unsigned char* crop_buf = useHires ?
+        hires_crop_rgb(crop_x, crop_y, crop_w, crop_h) :
+        crop_interleaved(original_rgb_buffer, videoWidth, videoHeight, 3, crop_x, crop_y, crop_w, crop_h);
     if (!crop_buf) {
         LOG_WARN("%s: failed to crop interleaved RGB buffer\n", __func__);
         return NULL;
@@ -628,6 +806,10 @@ cJSON* Model_GetDebugStats(void) {
     cJSON_AddNumberToObject(stats, "videoHeight", videoHeight);
     cJSON_AddNumberToObject(stats, "boxes", boxes);
     cJSON_AddNumberToObject(stats, "classes", classes);
+    cJSON_AddStringToObject(stats, "cropSource", hiresData ? "full-resolution" : "inference-frame");
+    cJSON_AddNumberToObject(stats, "cropFrameWidth", hiresData ? hiresWidth : videoWidth);
+    cJSON_AddNumberToObject(stats, "cropFrameHeight", hiresData ? hiresHeight : videoHeight);
+    cJSON_AddStringToObject(stats, "cropColour", hiresMatrix >= 0 ? yuvMatrices[hiresMatrix].name : "pending");
 
     if (larodInputAddr != MAP_FAILED) {
         const uint8_t* in = (const uint8_t*)larodInputAddr;
@@ -932,6 +1114,8 @@ Model_Cleanup() {
     hdReady = 0;
     hdFailed = 0;
     original_rgb_buffer = NULL;
+    hiresData = NULL;
+    hiresMatrix = -1;
 
     // Job requests and tensors are released before larodDisconnect() above --
     // see the comment there. Nothing conn-dependent may be destroyed here.

@@ -15,24 +15,45 @@
 #include "Output_crop_cache.h"
 #include "Output_helpers.h"
 #include "Output_http.h"
+#include "Storage.h"
 
 #define LOG(fmt, args...)      { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args);}
 #define LOG_WARN(fmt, args...) { syslog(LOG_WARNING, fmt, ## args); printf(fmt, ## args);}
 #define LOG_TRACE(fmt, args...) {}
 
 #define MAX_LABELS 32
-#define MAX_ROLLING 16
-
-#define SD_FOLDER "/var/spool/storage/SD_DISK/detectx"
+#define MAX_HISTORY 64   // frames with hands kept for the event vote
+#define ANY_DETECTION_EVENT_ID "event"
 
 typedef struct {
     char name[64];
     int state; // 0=LOW, 1=HIGH
-    int rolling[MAX_ROLLING];
-    int rolling_head;
-    int rolling_count;
     double last_detect_time;
 } LabelEventState;
+
+/* Event vote ("prioritize"). Every frame with at least one detection is recorded with
+ * the set of labels seen in it. In "balanced" and "accuracy" a label's event goes HIGH
+ * only when, over the last window_ms:
+ *   - it is in the current frame,
+ *   - it was seen in at least min_hits frames,
+ *   - it was seen in at least min_share of the frames with hands, and
+ *   - no other label was seen more often (a tie is allowed, so two hands showing
+ *     different gestures can both fire).
+ * A hand being raised often reads as no_gesture/one/fist for a frame or two before the
+ * real gesture settles; those transitional labels fail the share and lead tests.
+ * "speed" fires on the first frame. Defaults per mode below; settings "eventLogic"
+ * {window, frames, share} overrides them. The window is stretched when frames arrive
+ * too slowly to fit min_hits in it. */
+typedef struct {
+    double t;
+    unsigned int seen;   // bit i = eventsCache[i] seen in this frame
+} FrameRecord;
+
+static FrameRecord frameHistory[MAX_HISTORY];
+static int frameHistoryHead = 0;    // next write position
+static int frameHistoryCount = 0;
+static double lastFrameTime = 0;
+static double frameInterval = 0;    // smoothed time between processed frames, ms
 
 static LabelEventState eventsCache[MAX_LABELS];
 static int eventsCache_len = 0;
@@ -40,6 +61,17 @@ static int lastDetectionsWereEmpty = 0;
 static double last_output_time_ms = 0;
 static double last_sd_output_time_ms = 0;
 static int    sd_any_event_was_active = 0; /* tracks transition: no events → first event */
+
+static void update_any_detection_event(void) {
+    int any_event_active = 0;
+    for (int i = 0; i < eventsCache_len; ++i) {
+        if (eventsCache[i].state == 1) {
+            any_event_active = 1;
+            break;
+        }
+    }
+    ACAP_EVENTS_Fire_State(ANY_DETECTION_EVENT_ID, any_event_active);
+}
 
 // Helper: manage per-label state
 static LabelEventState* find_or_create_label_state(const char* label) {
@@ -50,9 +82,6 @@ static LabelEventState* find_or_create_label_state(const char* label) {
         strncpy(eventsCache[eventsCache_len].name, label, 63);
         eventsCache[eventsCache_len].name[63] = 0;
         eventsCache[eventsCache_len].state = 0;
-        eventsCache[eventsCache_len].rolling_head = 0;
-        eventsCache[eventsCache_len].rolling_count = 0;
-        memset(eventsCache[eventsCache_len].rolling, 0, sizeof(eventsCache[eventsCache_len].rolling));
         eventsCache[eventsCache_len].last_detect_time = 0;
         return &eventsCache[eventsCache_len++];
     }
@@ -84,10 +113,32 @@ static gboolean Output_DeactivateExpired(gpointer user_data) {
             }
         }
     }
+    update_any_detection_event();
     return TRUE;
 }
 
+static void fire_event_high(LabelEventState* evt, cJSON* detection, double now) {
+    char topic[256];
+    evt->state = 1;
+    evt->last_detect_time = now;
+    ACAP_EVENTS_Fire_State(evt->name, 1);
+    snprintf(topic, sizeof(topic), "event/%s/%s/true", ACAP_DEVICE_Prop("serial"), evt->name);
+    cJSON* eventPayload = cJSON_Duplicate(detection, 1);
+    cJSON_AddTrueToObject(eventPayload, "state");
+    MQTT_Publish_JSON(topic, eventPayload, 0, 0);
+    cJSON_Delete(eventPayload);
+}
+
 void Output(cJSON* detections, int modelWidth, int modelHeight) {
+    {   // frame rate, for stretching the vote window on slow cameras
+        double t = ACAP_DEVICE_Timestamp();
+        if (lastFrameTime > 0) {
+            double dt = t - lastFrameTime;
+            if (dt > 0 && dt < 5000)
+                frameInterval = frameInterval > 0 ? 0.8 * frameInterval + 0.2 * dt : dt;
+        }
+        lastFrameTime = t;
+    }
     if (!detections || cJSON_GetArraySize(detections) == 0) {
         cJSON* emptyArr = cJSON_CreateArray();
         ACAP_STATUS_SetObject("labels", "detections", emptyArr);
@@ -138,18 +189,24 @@ void Output(cJSON* detections, int modelWidth, int modelHeight) {
     // --- Adaptive event gating
     const char *prioritize = cJSON_GetObjectItem(settings, "prioritize")?cJSON_GetObjectItem(settings, "prioritize")->valuestring:"accuracy";
 
-    double averageInferenceTime = ACAP_STATUS_Double("mode", "averageTime");
-    int   desired_window_ms = 1000;
-    int   min_frames_in_window = 3;
-    int   window_size = (int)((desired_window_ms + averageInferenceTime - 1) / averageInferenceTime);
-    if (window_size < 2) window_size = 2;
-    if (window_size > MAX_ROLLING) window_size = MAX_ROLLING;
-
+    int speed_mode = strcmp(prioritize, "speed") == 0;
+    int balanced_mode = strcmp(prioritize, "balanced") == 0;
+    double window_ms = balanced_mode ? 300 : 500;
+    int min_hits = balanced_mode ? 2 : 3;
+    double min_share = balanced_mode ? 0.75 : 0.6;   // balanced: ~3 frames in a row at 9 fps
     cJSON* logic = cJSON_GetObjectItem(settings, "eventLogic");
     if (logic) {
-        if (cJSON_GetObjectItem(logic, "frames")) min_frames_in_window = cJSON_GetObjectItem(logic, "frames")->valueint;
-        if (cJSON_GetObjectItem(logic, "window")) desired_window_ms = cJSON_GetObjectItem(logic, "window")->valueint;
+        cJSON* item;
+        if ((item = cJSON_GetObjectItem(logic, "frames")) && cJSON_IsNumber(item)) min_hits = item->valueint;
+        if ((item = cJSON_GetObjectItem(logic, "window")) && cJSON_IsNumber(item)) window_ms = item->valuedouble;
+        if ((item = cJSON_GetObjectItem(logic, "share")) && cJSON_IsNumber(item)) min_share = item->valuedouble;
     }
+    if (min_hits < 1) min_hits = 1;
+    // Slow camera: make room for min_hits frames (plus some jitter) in the window.
+    if (frameInterval > 0 && window_ms < frameInterval * (min_hits - 0.5))
+        window_ms = frameInterval * (min_hits - 0.5);
+    unsigned int frame_seen = 0;
+    cJSON* frame_detection[MAX_LABELS] = {0};   // highest-confidence detection per label this frame
 
     // Cropping settings
     int leftborder_offset   = cropping && cJSON_GetObjectItem(cropping, "leftborder") ?
@@ -163,8 +220,6 @@ void Output(cJSON* detections, int modelWidth, int modelHeight) {
 
     int idx = 0;
     cJSON* detection = detections->child;
-    char frame_labels[MAX_LABELS][64];
-    int n_frame_labels = 0;
 
     while (detection) {
         const char* label = "Undefined";
@@ -180,55 +235,25 @@ void Output(cJSON* detections, int modelWidth, int modelHeight) {
         if ((timestampObj = cJSON_GetObjectItem(detection, "timestamp")))
             if (cJSON_IsNumber(timestampObj)) timestamp = timestampObj->valuedouble;
 
-        if (n_frame_labels < MAX_LABELS) {
-            strncpy(frame_labels[n_frame_labels++], label, 63);
-            frame_labels[n_frame_labels - 1][63] = 0;
-        }
-
         LabelEventState* evt = find_or_create_label_state(label);
         if (!evt) { idx++; detection = detection->next; continue; }
 
-        if (strcmp(prioritize, "speed") == 0) {
-            if (evt->state == 0) {
-                evt->state = 1;
-                evt->last_detect_time = now;
-                ACAP_EVENTS_Fire_State(label, 1);
-                snprintf(topic, sizeof(topic), "event/%s/%s/true", ACAP_DEVICE_Prop("serial"), label);
-
-                // Create temp object for event
-                cJSON* eventPayload = cJSON_Duplicate(detection, 1);
-                cJSON_AddTrueToObject(eventPayload, "state");
-                MQTT_Publish_JSON(topic, eventPayload, 0, 0);
-                cJSON_Delete(eventPayload);
-            } else {
-                evt->last_detect_time = now;
-            }
+        if (speed_mode) {
+            if (evt->state == 0)
+                fire_event_high(evt, detection, now);
         } else {
-            evt->rolling_head = (evt->rolling_head + 1) % window_size;
-            evt->rolling[evt->rolling_head] = 1;
-            if (evt->rolling_count < window_size) evt->rolling_count++;
-            evt->last_detect_time = now;
-
-            int sum = 0;
-            for (int i = 0; i < evt->rolling_count; ++i)
-                sum += evt->rolling[i];
-            if ((evt->state == 0) && (sum >= min_frames_in_window)) {
-                evt->state = 1;
-                evt->last_detect_time = now;
-                ACAP_EVENTS_Fire_State(label, 1);
-                snprintf(topic, sizeof(topic), "event/%s/%s/true", ACAP_DEVICE_Prop("serial"), label);
-
-                // Create temp object for event
-                cJSON* eventPayload = cJSON_Duplicate(detection, 1);
-                cJSON_AddTrueToObject(eventPayload, "state");
-                MQTT_Publish_JSON(topic, eventPayload, 0, 0);
-                cJSON_Delete(eventPayload);
-            }
-            if (evt->state == 1) evt->last_detect_time = now;
+            int li = (int)(evt - eventsCache);
+            frame_seen |= 1u << li;
+            if (!frame_detection[li] || conf > cJSON_GetObjectItem(frame_detection[li], "c")->valueint)
+                frame_detection[li] = detection;
         }
+        // An active event stays HIGH while its label keeps being seen.
+        evt->last_detect_time = now;
 
         // Cropping output path (MQTT / HTTP only — SD card uses full-frame export below)
-        if (cropping_active) {
+        // Cut a crop only when the throttle lets one out: at full resolution each
+        // crop is an NV12->RGB conversion plus a JPEG encode.
+        if (cropping_active && ACAP_DEVICE_Timestamp() - last_output_time_ms > throttle) {
             int crop_x = 0, crop_y = 0, crop_w = 0, crop_h = 0, img_w = 0, img_h = 0;
             unsigned jpeg_size = 0;
             const unsigned char* jpeg_data =
@@ -259,6 +284,12 @@ void Output(cJSON* detections, int modelWidth, int modelHeight) {
                     cJSON_AddNumberToObject(payload, "y", crop_y);
                     cJSON_AddNumberToObject(payload, "w", crop_w);
                     cJSON_AddNumberToObject(payload, "h", crop_h);
+                    // Frame the crop was cut from (full sensor resolution, or the
+                    // inference frame), so x/y/w/h can be read as sensor pixels.
+                    unsigned int frame_w = 0, frame_h = 0;
+                    Model_GetCropFrameSize(&frame_w, &frame_h);
+                    cJSON_AddNumberToObject(payload, "frame_w", frame_w);
+                    cJSON_AddNumberToObject(payload, "frame_h", frame_h);
                     cJSON_AddStringToObject(payload, "image", imageDataBase64);
                     if (mqtt_export) {
                         char crop_topic[64];
@@ -309,19 +340,35 @@ void Output(cJSON* detections, int modelWidth, int modelHeight) {
         detection = detection->next;
     }
 
-    // Mark 0 for non-detected labels for rolling buffer
-    if (strcmp(prioritize, "accuracy") == 0) {
+    // Event vote (balanced / accuracy), see FrameRecord above.
+    if (!speed_mode && frame_seen) {
+        frameHistory[frameHistoryHead].t = now;
+        frameHistory[frameHistoryHead].seen = frame_seen;
+        frameHistoryHead = (frameHistoryHead + 1) % MAX_HISTORY;
+        if (frameHistoryCount < MAX_HISTORY) frameHistoryCount++;
+
+        int frames = 0;
+        int hits[MAX_LABELS] = {0};
+        for (int k = 0; k < frameHistoryCount; ++k) {
+            const FrameRecord* r = &frameHistory[(frameHistoryHead - 1 - k + MAX_HISTORY) % MAX_HISTORY];
+            if (now - r->t > window_ms)
+                break;
+            frames++;
+            for (int i = 0; i < eventsCache_len; ++i)
+                if (r->seen & (1u << i)) hits[i]++;
+        }
         for (int i = 0; i < eventsCache_len; ++i) {
-            int seen = 0;
-            for (int j = 0; j < n_frame_labels; ++j)
-                if (strcmp(eventsCache[i].name, frame_labels[j]) == 0) seen = 1;
-            if (!seen) {
-                eventsCache[i].rolling_head = (eventsCache[i].rolling_head + 1) % window_size;
-                eventsCache[i].rolling[eventsCache[i].rolling_head] = 0;
-                if (eventsCache[i].rolling_count < window_size) eventsCache[i].rolling_count++;
-            }
+            if (!(frame_seen & (1u << i)) || eventsCache[i].state == 1 || !frame_detection[i])
+                continue;
+            int leads = 1;
+            for (int j = 0; j < eventsCache_len; ++j)
+                if (j != i && hits[j] > hits[i]) leads = 0;
+            if (hits[i] >= min_hits && hits[i] >= min_share * frames && leads)
+                fire_event_high(&eventsCache[i], frame_detection[i], now);
         }
     }
+
+    update_any_detection_event();
 
     // --- SD Capture: event-driven full-frame capture ---
     // Reads sd_capture settings; triggers on first active event, then at configured interval.
@@ -351,10 +398,11 @@ void Output(cJSON* detections, int modelWidth, int modelHeight) {
                 sd_any_event_was_active = 1;
                 unsigned full_jpeg_size = 0;
                 unsigned char* full_jpeg = Model_GetFullFrameJPEG(&full_jpeg_size);
-                if (full_jpeg && full_jpeg_size > 0) {
-                    char fname_img[320], fname_lbl[320];
-                    snprintf(fname_img, sizeof(fname_img), "%s/images/%.0f.jpg", SD_FOLDER, now_ts);
-                    snprintf(fname_lbl, sizeof(fname_lbl), "%s/labels/%.0f.txt", SD_FOLDER, now_ts);
+                const char* sd_base = Storage_GetPath();
+                if (full_jpeg && full_jpeg_size > 0 && sd_base) {
+                    char fname_img[512], fname_lbl[512];
+                    snprintf(fname_img, sizeof(fname_img), "%s/images/%.0f.jpg", sd_base, now_ts);
+                    snprintf(fname_lbl, sizeof(fname_lbl), "%s/labels/%.0f.txt", sd_base, now_ts);
                     if (save_jpeg_to_file(fname_img, full_jpeg, full_jpeg_size)) {
                         if (!save_yolo_labels_to_file(fname_lbl, detections, modelWidth, modelHeight))
                             LOG_WARN("%s: Failed to save YOLO labels: %s\n", __func__, fname_lbl);
@@ -406,6 +454,7 @@ void Output_init(void) {
         LOG_WARN("%s: Model has no labels\n", __func__);
         return;
     }
+    ACAP_EVENTS_Add_Event(ANY_DETECTION_EVENT_ID, "DetectX: Any detection", 1);
     cJSON* label = labels->child;
     while (label) {
         if (cJSON_IsString(label)) {

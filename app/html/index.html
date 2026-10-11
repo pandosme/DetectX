@@ -219,7 +219,7 @@
                 <h2 id="modal-title" style="font-size:1.4rem; margin-bottom:0.75rem;">Loading model</h2>
                 <p id="modal-text" style="margin:0; color:var(--text-muted);">
                     Loading the detection model onto the camera.<br>
-                    This takes 30-60 seconds after a restart.
+                    This takes 30-90 seconds after a restart.
                 </p>
                 <p id="modal-elapsed" style="margin:0.75rem 0 0; color:var(--text-muted); font-size:0.9rem;"></p>
             </div>
@@ -234,7 +234,7 @@
                             <h5 class="card-title mb-0 border-0 pb-0">Live Detection View</h5>
                             <div>
                                 <span class="status-pill" id="model-status-pill">Model: -</span>
-                                <span class="status-pill" id="time-pill">Inference: -</span>
+                                <span class="status-pill" id="time-pill">FPS: -</span>
                             </div>
                         </div>
                         <div id="view">
@@ -688,6 +688,25 @@
         var pollInFlight = false;
         var startedAt = Date.now();
         var everReady = false;
+        // The page is built from the "app" answer. Opened while the model was still
+        // loading, it lacks the model's size and labels, so once the model runs the
+        // page reloads itself instead of asking the user to refresh.
+        var needsReload = false;
+        var pollErrors = 0;
+
+        // At most 3 automatic reloads per minute, so a page that cannot get complete
+        // model data never ends up reloading in a loop.
+        function autoReloadAllowed() {
+            try {
+                var now = Date.now();
+                var times = JSON.parse(sessionStorage.getItem('autoReloads') || '[]')
+                    .filter(function (t) { return now - t < 60000; });
+                if (times.length >= 3) return false;
+                times.push(now);
+                sessionStorage.setItem('autoReloads', JSON.stringify(times));
+            } catch (e) { /* no storage: allow */ }
+            return true;
+        }
 
         // While the models load, the application cannot answer at all. Without a
         // timeout each 1 s poll would hang, and after ~6 of them the browser's
@@ -712,7 +731,9 @@
                 timeout: 4000,
                 complete: function () { pollInFlight = false; },
                 success: function (status) {
+                    pollErrors = 0;
                     if (!status.model || !status.model.state) {
+                        needsReload = true;
                         var st = (status.model && status.model.status) || '';
                         var err = status.model && status.model.error;
                         if (err)
@@ -720,13 +741,21 @@
                         else
                             showLoading(st || 'Loading model',
                                 'Loading the detection model onto the camera.<br>' +
-                                'This takes 30-60 seconds after a restart.');
+                                'This takes 30-90 seconds after a restart.');
+                        return;
+                    }
+                    if ((needsReload || !App || !App.model) && autoReloadAllowed()) {
+                        showLoading('Model running', 'Reloading the page...');
+                        location.reload();
                         return;
                     }
                     everReady = true;
                     $('#modal').hide();
                     $('#model-status-pill').text('Model: ' + (status.model.status || 'Running'));
-                    $('#time-pill').text('Inference: ' + ((status.model.averageTime != null) ? (status.model.averageTime + ' ms') : '-'));
+                    // Images processed per second; the per-frame inference time is in the tooltip
+                    // and on the About page.
+                    $('#time-pill').text('FPS: ' + ((status.model.fps != null) ? Number(status.model.fps).toFixed(1) : '-'))
+                        .attr('title', (status.model.averageTime != null) ? ('Inference ' + status.model.averageTime + ' ms per frame') : '');
 
                     detectionList = (status.labels && Array.isArray(status.labels.detections)) ? status.labels.detections : [];
                     if (editor)
@@ -741,10 +770,13 @@
                     });
                 },
                 error: function () {
-                    // No answer yet: either still loading, or restarting.
+                    // No answer: still loading, or restarting. A single slow poll while
+                    // running is not a restart, so wait for three in a row.
+                    if (++pollErrors < 3) return;
+                    needsReload = true;
                     showLoading('Loading model',
                         'Loading the detection model onto the camera.<br>' +
-                        'This takes 30-60 seconds after a restart.');
+                        'This takes 30-90 seconds after a restart.');
                 }
             });
         }
@@ -806,38 +838,23 @@
             });
         }
 
-        function pollForAcapRestart() {
-            let attempts = 0;
+        function pollForAcapResponse() {
             function poll() {
-                attempts += 1;
                 $.ajax({
                     type: 'GET',
-                    url: 'status',
+                    url: 'app',
                     dataType: 'json',
                     cache: false,
                     timeout: 3000,
-                    success: function (status) {
-                        if (status && status.model && status.model.state) {
-                            showToast('ACAP restarted successfully. Refreshing page...', 'success');
-                            setTimeout(function () {
-                                location.reload();
-                            }, 1000);
-                        } else if (attempts < 30) {
-                            setTimeout(poll, 2000);
-                        } else {
-                            showToast('ACAP restart timeout. Please refresh manually.', 'warning');
-                        }
+                    success: function () {
+                        location.reload();
                     },
                     error: function () {
-                        if (attempts < 30) {
-                            setTimeout(poll, 2000);
-                        } else {
-                            showToast('ACAP restart timeout. Please refresh manually.', 'warning');
-                        }
+                        setTimeout(poll, 1500);
                     }
                 });
             }
-            setTimeout(poll, 3000);
+            setTimeout(poll, 1500);
         }
 
         $(function () {
@@ -851,6 +868,14 @@
                     document.title = App.manifest.acapPackageConf.setup.friendlyName;
                     $('.acapName').text(App.manifest.acapPackageConf.setup.friendlyName);
                     $('#settings_confidence').val(App.settings.confidence || 50);
+                    if (!App.model) {
+                        // Model still loading: the view cannot be built without its size
+                        // and labels. Poll until it runs; pollStatus then reloads the page.
+                        needsReload = true;
+                        pollStatus();
+                        setInterval(pollStatus, 1000);
+                        return;
+                    }
                     setupView();
                     initEditor();
                     pollStatus();
@@ -858,7 +883,10 @@
                     loadDlpuAnalytics();
                 },
                 error: function () {
-                    showToast('The application is not responding.', 'danger');
+                    showLoading('Loading model',
+                        'Loading the detection model onto the camera.<br>' +
+                        'This takes 30-90 seconds after a restart.');
+                    pollForAcapResponse();
                 }
             });
 

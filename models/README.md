@@ -21,14 +21,14 @@ python export_yolov8.py \
   --target a8 \
   --weights models/detector_yolov8n_coco.pt \
   --calibration-dir /path/to/calibration/images \
-  --width 640 --height 384 \
+  --width 960 --height 544 \
   --output app/model/model-a8.tflite
 
 python export_yolov8.py \
   --target a9 \
   --weights models/detector_yolov8n_coco.pt \
   --calibration-dir /path/to/calibration/images \
-  --width 640 --height 384 \
+  --width 960 --height 544 \
   --output app/model/model-a9.tflite
 ```
 
@@ -44,8 +44,8 @@ Set `--width` and `--height` to the desired model input. Both values must be mul
 
 | Resolution | Aspect ratio | Use case |
 | --- | --- | --- |
-| `640x384` | 16:9 | Default, fast baseline |
-| `960x544` | 16:9 | More detail at a higher inference cost |
+| `640x384` | 5:3 | Faster alternative |
+| `960x544` | near 16:9 | Default; closest stride-32 shape at 960 pixels wide |
 | `1280x736` | near 16:9 | Highest detail; benchmark before deployment |
 
 Larger inputs improve small or distant-object detection but reduce throughput. Use the smallest resolution that meets the required detection distance, and re-export both target variants whenever the input resolution changes.

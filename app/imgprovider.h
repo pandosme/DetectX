@@ -43,6 +43,10 @@ typedef struct ImgProvider {
     /// Vdo stream and buffers handling.
     VdoStream* vdoStream;
     VdoBuffer* vdoBuffers[NUM_VDO_BUFFERS];
+    /// Buffers actually allocated (<= NUM_VDO_BUFFERS).
+    unsigned int numVdoBuffers;
+    /// Row stride of the Y and UV planes in bytes, as reported by VDO.
+    unsigned int pitch;
 
     /// Keeping track of frames' statuses.
     GQueue* deliveredFrames;
@@ -74,6 +78,32 @@ bool chooseStreamResolution(unsigned int reqWidth,
                             unsigned int reqHeight,
                             unsigned int* chosenWidth,
                             unsigned int* chosenHeight);
+
+/**
+ * brief Find the largest VDO resolution with a given aspect ratio.
+ *
+ * param aspect Aspect ratio string understood by VDO, e.g. "16:9".
+ * param maxWidth Ignore resolutions wider than this (0 = no limit).
+ * param chosenWidth Selected image width.
+ * param chosenHeight Selected image height.
+ * return False if VDO reports no resolution with that aspect ratio.
+ */
+bool chooseLargestResolution(const char* aspect,
+                             unsigned int maxWidth,
+                             unsigned int* chosenWidth,
+                             unsigned int* chosenHeight);
+
+/**
+ * brief Like createImgProvider() but with an explicit VDO buffer count.
+ *
+ * Large frames (e.g. 3840x2160 NV12 is 12 MB) make the default
+ * NUM_VDO_BUFFERS expensive; numBuffers is clamped to 2..NUM_VDO_BUFFERS.
+ */
+ImgProvider_t* createImgProviderWithBuffers(unsigned int w,
+                                            unsigned int h,
+                                            unsigned int numFrames,
+                                            VdoFormat vdoFormat,
+                                            unsigned int numBuffers);
 
 /**
  * brief Initializes and starts an ImgProvider.

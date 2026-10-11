@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Export a YOLOv8 detector for the HandGesture ARTPEC runtime.
+"""Export a YOLOv8 detector for the DetectX ARTPEC runtime.
 
 The application requires separate uint8 coordinate and class-score tensors.
 Keeping these values in separate tensors gives each a suitable quantization
@@ -39,8 +39,8 @@ def parse_args():
     parser.add_argument("--calibration-dir", type=Path, required=True)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--labels", type=Path, default=Path("app/model/labels.txt"))
-    parser.add_argument("--width", type=int, default=1280)
-    parser.add_argument("--height", type=int, default=736)
+    parser.add_argument("--width", type=int, default=960)
+    parser.add_argument("--height", type=int, default=544)
     parser.add_argument("--calibration-images", type=int, default=128)
     return parser.parse_args()
 

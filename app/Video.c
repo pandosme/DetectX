@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include "Video.h"
 #include "imgutils.h"
+#include "ACAP.h"
+#include "cJSON.h"
 
 
 #define LOG(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args);}
@@ -55,3 +57,78 @@ Video_Capture_YUV() {
 
 
 
+
+
+// A 3840x2160 NV12 frame is 12 MB, so keep the buffer count low. One frame is
+// held by the app, one waits in the delivered queue, the rest go back to VDO.
+#define HIRES_VDO_BUFFERS 4
+
+ImgProvider_t* hiresProvider = NULL;
+VdoBuffer* hiresBuffer = NULL;
+static unsigned int hiresWidth = 0;
+static unsigned int hiresHeight = 0;
+
+bool Video_Start_HiRes(void) {
+	unsigned int width = 0, height = 0;
+	if (hiresProvider)
+		return true;
+	// VDO lists 16:9 sizes from every capture mode, so a camera running a 1080p
+	// capture mode on a larger sensor still offers e.g. 2688x1512 -- upscaled,
+	// with no extra detail. VAPIX Properties.Image.Resolution follows the active
+	// capture mode: cap to its largest 16:9 entry.
+	unsigned int maxWidth = 0;
+	cJSON* resolutions = ACAP_DEVICE_JSON("resolutions");
+	cJSON* res169 = resolutions ? cJSON_GetObjectItem(resolutions, "16:9") : NULL;
+	cJSON* item = NULL;
+	cJSON_ArrayForEach(item, res169) {
+		unsigned int w = cJSON_IsString(item) ? (unsigned int)atoi(item->valuestring) : 0;
+		if (w > maxWidth)
+			maxWidth = w;
+	}
+	if (maxWidth)
+		LOG("Full-resolution crop: capture mode allows up to %u px wide (16:9)\n", maxWidth);
+	if (!chooseLargestResolution("16:9", maxWidth, &width, &height)) {
+		LOG_WARN("%s: No 16:9 resolution reported by VDO\n", __func__);
+		return false;
+	}
+	hiresProvider = createImgProviderWithBuffers(width, height, 1, VDO_FORMAT_YUV, HIRES_VDO_BUFFERS);
+	if (!hiresProvider) {
+		LOG_WARN("%s: Could not create %ux%u image provider\n", __func__, width, height);
+		return false;
+	}
+	if (!startFrameFetch(hiresProvider)) {
+		destroyImgProvider(hiresProvider);
+		hiresProvider = NULL;
+		LOG_WARN("%s: Unable to start frame fetch\n", __func__);
+		return false;
+	}
+	hiresWidth = width;
+	hiresHeight = height;
+	LOG("Full-resolution crop video %ux%u (pitch %u) started\n", width, height, hiresProvider->pitch);
+	return true;
+}
+
+void Video_Stop_HiRes(void) {
+	if (hiresProvider) {
+		stopFrameFetch(hiresProvider);
+		destroyImgProvider(hiresProvider);
+	}
+	hiresProvider = NULL;
+	hiresBuffer = NULL;
+	hiresWidth = hiresHeight = 0;
+}
+
+VdoBuffer* Video_Capture_HiRes(void) {
+	if (!hiresProvider)
+		return NULL;
+	if (hiresBuffer)
+		returnFrame(hiresProvider, hiresBuffer);
+	hiresBuffer = getLastFrameBlocking(hiresProvider);
+	return hiresBuffer;
+}
+
+void Video_HiRes_Geometry(unsigned int* width, unsigned int* height, unsigned int* pitch) {
+	if (width) *width = hiresWidth;
+	if (height) *height = hiresHeight;
+	if (pitch) *pitch = hiresProvider ? hiresProvider->pitch : 0;
+}

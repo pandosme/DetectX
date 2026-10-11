@@ -21,6 +21,7 @@ extern int inferenceErrors;   // Model.c: error budget; 0 = model shut down
 #include "Output.h"
 #include "Output_helpers.h"
 #include "MQTT.h"
+#include "Storage.h"
 
 
 #define LOG(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args);}
@@ -265,6 +266,41 @@ static void HTTP_ENDPOINT_model(const ACAP_HTTP_Response response, const ACAP_HT
 		return;
 	}
 
+	if (strcmp(method, "DELETE") == 0) {
+		int customModelExists = ACAP_FILE_Exists("localdata/model.tflite");
+		int customLabelsExist = ACAP_FILE_Exists("localdata/labels.txt");
+
+		if (!customModelExists && !customLabelsExist) {
+			ACAP_HTTP_Respond_Text(response, "Built-in COCO model is already active.");
+			return;
+		}
+
+		if ((customModelExists && !ACAP_FILE_Delete("localdata/model.tflite")) ||
+			(customLabelsExist && !ACAP_FILE_Delete("localdata/labels.txt"))) {
+			ACAP_HTTP_Respond_Error(response, 500, "Failed to remove uploaded model files");
+			return;
+		}
+
+		if (settings) {
+			cJSON* value = cJSON_CreateString("");
+			if (value) {
+				if (cJSON_GetObjectItem(settings, "modelDescription"))
+					cJSON_ReplaceItemInObject(settings, "modelDescription", value);
+				else
+					cJSON_AddItemToObject(settings, "modelDescription", value);
+				ACAP_FILE_Write("localdata/settings.json", settings);
+			}
+		}
+
+		if (!restartPending) {
+			restartPending = 1;
+			g_timeout_add(800, restart_acap_cb, NULL);
+		}
+
+		ACAP_HTTP_Respond_Text(response, "Uploaded model removed. Restarting with built-in COCO model.");
+		return;
+	}
+
 	if (strcmp(method, "POST") == 0) {
 		const char* contentType = ACAP_HTTP_Get_Content_Type(request);
 		if (!contentType || strstr(contentType, "application/json") == NULL) {
@@ -330,7 +366,7 @@ static void HTTP_ENDPOINT_model(const ACAP_HTTP_Response response, const ACAP_HT
 		return;
 	}
 
-	ACAP_HTTP_Respond_Error(response, 405, "Method Not Allowed - Use GET or POST");
+	ACAP_HTTP_Respond_Error(response, 405, "Method Not Allowed - Use GET, POST, or DELETE");
 }
 
 void
@@ -476,7 +512,7 @@ model_retry_timer(gpointer user_data) {
 static gboolean
 deferred_model_start(gpointer user_data) {
 	(void)user_data;
-	LOG("Loading model (this takes 30-60 seconds on a cold start)\n");
+	LOG("Loading model (this takes 30-90 seconds on a cold start)\n");
 
 	if( !model_start() ) {
 		LOG_WARN("Model setup failed; retrying every %d seconds\n", MODEL_RETRY_SECONDS);
@@ -490,6 +526,9 @@ deferred_model_start(gpointer user_data) {
 	Output_init();
 	return G_SOURCE_REMOVE;
 }
+
+static int hiresRunning = 0;
+static int hiresFailed = 0;
 
 gboolean
 ImageProcess(gpointer data) {
@@ -511,6 +550,32 @@ ImageProcess(gpointer data) {
 		ACAP_STATUS_SetBool("model","state", 0);
 		LOG_WARN("Image capture failed\n");
 		return G_SOURCE_REMOVE;
+	}
+
+	// Detection export crops from a second stream at the sensor's largest 16:9
+	// size. It is started when cropping is switched on and stopped when it is
+	// switched off, and grabbed right after the inference frame so the two are
+	// at most one frame interval apart.
+	if( Model_WantsCropFrame() ) {
+		if( !hiresFailed && !hiresRunning ) {
+			hiresRunning = Video_Start_HiRes();
+			if( !hiresRunning ) {
+				hiresFailed = 1;
+				LOG_WARN("Full-resolution crop stream failed; cropping from the inference frame\n");
+			}
+		}
+		unsigned int hiresW = 0, hiresH = 0, hiresPitch = 0;
+		VdoBuffer* hires = hiresRunning ? Video_Capture_HiRes() : NULL;
+		Video_HiRes_Geometry( &hiresW, &hiresH, &hiresPitch );
+		Model_SetCropFrame( hires, hiresW, hiresH, hiresPitch );
+	} else {
+		if( hiresRunning ) {
+			Model_SetCropFrame( NULL, 0, 0, 0 );
+			Video_Stop_HiRes();
+			hiresRunning = 0;
+			LOG("Full-resolution crop stream stopped\n");
+		}
+		hiresFailed = 0;
 	}
 
 	LOG_TRACE("%s: Image\n",__func__);
@@ -544,6 +609,23 @@ ImageProcess(gpointer data) {
 		inferenceAverage = 0;
 	}
 
+	// Frames actually processed per second: the whole loop (waiting for frames,
+	// both models, filtering, output), measured over windows of at least 2 s.
+	{
+		static double fpsWindowStart = 0;
+		static int fpsFrames = 0;
+		double nowMs = (double)endTs.tv_sec * 1000.0 + endTs.tv_usec / 1000.0;
+		if( fpsWindowStart <= 0 )
+			fpsWindowStart = nowMs;
+		fpsFrames++;
+		if( nowMs - fpsWindowStart >= 2000.0 ) {
+			double fps = fpsFrames * 1000.0 / (nowMs - fpsWindowStart);
+			ACAP_STATUS_SetNumber( "model", "fps", (int)(fps * 10.0 + 0.5) / 10.0 );
+			fpsWindowStart = nowMs;
+			fpsFrames = 0;
+		}
+	}
+
 	double timestamp = ACAP_DEVICE_Timestamp();
 
 	//Apply Transform detection data and apply user filters
@@ -567,21 +649,8 @@ ImageProcess(gpointer data) {
 	unsigned int x2 = cJSON_GetObjectItem(aoi,"x2")?cJSON_GetObjectItem(aoi,"x2")->valueint:900;
 	unsigned int y2 = cJSON_GetObjectItem(aoi,"y2")?cJSON_GetObjectItem(aoi,"y2")->valueint:900;
 
-	cJSON* size = cJSON_GetObjectItem(settings,"size");
-	if(!size) {
-		ACAP_STATUS_SetString("model","status","Configuration error");
-		ACAP_STATUS_SetString("model","error","Missing size filter settings");
-		ACAP_STATUS_SetBool("model","state", 0);
-		LOG_WARN("No size settings\n");
-		return G_SOURCE_REMOVE;
-	}
-	unsigned int minWidth = cJSON_GetObjectItem(size,"x2")->valueint - cJSON_GetObjectItem(size,"x1")->valueint;
-	unsigned int minHeight = cJSON_GetObjectItem(size,"y2")->valueint - cJSON_GetObjectItem(size,"y1")->valueint;
-
-	if ((int)minWidth < 0)
-		minWidth = (unsigned int)(-(int)minWidth);
-	if ((int)minHeight < 0)
-		minHeight = (unsigned int)(-(int)minHeight);
+	// No minimum-size filter: its UI was removed in 4.0.0, and the hidden 20/1000
+	// default kept dropping small, distant objects nobody could see were filtered.
 
 	int confidenceThreshold = cJSON_GetObjectItem(settings,"confidence")?cJSON_GetObjectItem(settings,"confidence")->valueint:50;
 		
@@ -632,18 +701,16 @@ ImageProcess(gpointer data) {
 		}
 		
 		//FILTER DETECTIONS
-		// Coordinates are in the 0..1000 normalized space, as are the AOI,
-		// size and exclude settings, so they compare directly.
+		// Coordinates are in the 0..1000 normalized space, as are the AOI and
+		// exclude settings, so they compare directly.
 		unsigned int pixel_cx = cx;
 		unsigned int pixel_cy = cy;
-		unsigned int pixel_width = width;
-		unsigned int pixel_height = height;
+		(void)width;
+		(void)height;
 
 		int insert = 0;
 		if( c >= confidenceThreshold )
 			insert = 1;
-		if( pixel_width < minWidth || pixel_height < minHeight )
-			insert = 0;
 
 		if (insert) {
 			cJSON* aoiPolygon = cJSON_GetObjectItem(settings, "aoi_polygon");
@@ -888,39 +955,9 @@ MAIN_STATUS_Timer() {
 }
 
 
-int
-Setup_SD_Card() {
-    const char* sd_mount = "/var/spool/storage/SD_DISK";
-    const char* detectx_dir = "/var/spool/storage/SD_DISK/detectx";
-
-    struct stat sb;
-
-    // Check if SD mount point exists and is a directory
-    if (stat(sd_mount, &sb) != 0 || !S_ISDIR(sb.st_mode)) {
-        ACAP_STATUS_SetBool("SDCARD", "available", 0);
-        LOG("SD Card not detected");
-        return 0;
-    }
-
-    // Check if DetectX directory exists
-    if (stat(detectx_dir, &sb) != 0) {
-        // Not found: try to create the directory with appropriate access rights
-        if (mkdir(detectx_dir, 0770) != 0) {
-            ACAP_STATUS_SetBool("SDCARD", "available", 0);
-	        LOG_WARN("SD Card detected but could not create directory %s: %s\n", detectx_dir, strerror(errno));
-            return 0;
-        }
-    } else if (!S_ISDIR(sb.st_mode)) {
-        // Exists but is not a directory
-        ACAP_STATUS_SetBool("SDCARD", "available", 0);
-        LOG_WARN("Error: SD Card structure propblem\n");
-        return 0;
-    }
-
-    ACAP_STATUS_SetBool("SDCARD", "available", 1);
-	LOG("SD Card is ready to be used\n");
-    return 1;
-}
+/* Setup_SD_Card() removed: SD access now goes through the AXStorage API
+   (Storage_Init / Storage_GetPath in Storage.c), which hands the app its own
+   sandboxed, writable area instead of a hardcoded shared path. */
 
 int main(void) {
 	setbuf(stdout, NULL);
@@ -939,11 +976,14 @@ int main(void) {
 		return 1;
 	}
 
-//	Setup_SD_Card();
+	// SD card is accessed through the AXStorage API (per-app sandboxed area),
+	// not a hardcoded path. Subscribe now; the writable path becomes available
+	// asynchronously once the main loop is running (see Storage_GetPath()).
+	Storage_Init();
 
 	eventLabelCounter = cJSON_CreateObject();
 
-	// Loading the model onto the DLPU takes 30-60 seconds on a cold start, and
+	// Loading the model onto the DLPU takes 30-90 seconds on a cold start, and
 	// GLib's main loop is single-threaded, so nothing can be served while larod
 	// is working. Publish the loading state first, then let the main loop start
 	// and do the load from a short timeout -- otherwise the web UI's requests
@@ -978,6 +1018,7 @@ int main(void) {
 
 	Main_MQTT_Status(MQTT_DISCONNECTING); //Send graceful disconnect message
 	MQTT_Cleanup();
+	Storage_Cleanup();
     ACAP_Cleanup();
 	Model_Cleanup();
     closelog();

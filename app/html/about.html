@@ -259,9 +259,9 @@
                         <h5 class="mb-0">MQTT Topics</h5>
                     </div>
                     <div class="card-body" style="font-size: 1.2rem;">
-                        <p><strong>detectx/detections/[serial] </strong></p><p>List of all detection bounding boxes, labels and confidence</p>
-                        <p><strong>detectx/events/[serial]/[label]/[true/false] </strong></p><p>Mimics events.  Only sent on state change if label is present or not</p>
-                        <p><strong>detectx/crops/[serial] </strong></p><p>An object with the a cropped detection image data(base64), bounding box,label and confidence</p>
+                        <p><strong><span class="topicPrefix">detectx/</span>detection/<span class="topicSerial">[serial]</span></strong></p><p>List of all detection bounding boxes, labels and confidence</p>
+                        <p><strong><span class="topicPrefix">detectx/</span>event/<span class="topicSerial">[serial]</span>/[label]/[true/false]</strong></p><p>Mimics events. Only sent on state change, when a label becomes present or absent</p>
+                        <p><strong><span class="topicPrefix">detectx/</span>crop/<span class="topicSerial">[serial]</span></strong></p><p>A cropped detection image (base64 JPEG) with bounding box, label and confidence (when Detection Export is enabled)</p>
                     </div>
                 </div>
             </div>
@@ -302,6 +302,28 @@
     </div>
 
 <script>
+// The application cannot answer while it loads its model (30-60 s after a start or
+// restart). Instead of reporting it as not running, say so, keep asking, and reload
+// this page once the application answers with a loaded model.
+var waitingForApp = false;
+function waitForApp() {
+    if (waitingForApp) return;
+    waitingForApp = true;
+    var msg = 'The application is starting (loading the model takes 30-60 seconds). This page reloads by itself when it is ready.';
+    if ($('#errorModal').length) {
+        $('#errorModal .modal-title').text('Starting');
+        $('#errorModal .modal-body').text(msg);
+        $('#errorModal').modal('show');
+    } else if (typeof showToast === 'function') {
+        showToast(msg, 'info');
+    }
+    (function poll() {
+        $.ajax({ type: 'GET', url: 'app', dataType: 'json', cache: false, timeout: 3000,
+            success: function (data) { if (data && data.model) location.reload(); else setTimeout(poll, 2000); },
+            error: function () { setTimeout(poll, 2000); } });
+    })();
+}
+
 $(document).ready(function() {
 	// Fetch application data
 	$.ajax({
@@ -344,9 +366,12 @@ $(document).ready(function() {
 			$('.mqttBroker').text(data.mqtt?.address || '-');
 			$('.mqttPort').text(data.mqtt?.port || '-');
 			$('.mqttPreTopic').text(data.mqtt?.preTopic || '-');
+			// Topics as published: [pre-topic/]<topic>/<serial>...
+			$('.topicPrefix').text(data.mqtt?.preTopic ? data.mqtt.preTopic + '/' : '');
+			if (data.device?.serial) $('.topicSerial').text(data.device.serial);
 		},
 		error: function(response) {
-			$('#errorModal').modal('show');
+			waitForApp();
 		}
 	});
 

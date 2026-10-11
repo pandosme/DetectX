@@ -37,10 +37,7 @@ RUN mkdir -p lib include
 # Select chip-specific models while preserving the runtime's canonical paths.
 ARG TARGET_CHIP
 RUN case "$TARGET_CHIP" in a8|a9) ;; *) echo 'TARGET_CHIP must be a8 or a9' >&2; exit 2 ;; esac \
-    && cp "model/model-${TARGET_CHIP}.tflite" model/model.tflite \
-    && if [ "$TARGET_CHIP" = a9 ]; then \
-        python3 -c "import json; p='manifest.json'; d=json.load(open(p)); d['acapPackageConf']['setup']['compatibleOsVersions'][0]['min']='13.0'; open(p, 'w').write(json.dumps(d, indent=4) + '\\n')"; \
-       fi
+    && cp "model/model-${TARGET_CHIP}.tflite" model/model.tflite
 
 # Validate both models and generate model_params.h for the selected package.
 RUN . /opt/venv/bin/activate \

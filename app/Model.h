@@ -106,6 +106,21 @@ void Model_Reset(void);
 unsigned char* Model_GetFullFrameJPEG(unsigned* jpeg_size);
 unsigned char* Model_GetModelInputJPEG(unsigned* jpeg_size, unsigned* width, unsigned* height);
 cJSON* Model_GetDebugStats(void);
+
+/**
+ * @brief Full-resolution source for detection export crops.
+ *
+ * Model_WantsCropFrame() is true while cropping is active and
+ * cropping.fullResolution is not false. main.c then passes the newest frame of
+ * a second NV12 stream at the sensor's largest 16:9 size before each
+ * inference; Model_GetImageData() cuts crops (borders in those pixels) from it.
+ * A NULL buffer falls back to the inference-size frame. SD card capture is
+ * unaffected.
+ */
+int Model_WantsCropFrame(void);
+void Model_SetCropFrame(VdoBuffer* buffer, unsigned int width, unsigned int height, unsigned int pitch);
+/** @brief Size of the frame the last crops were cut from (full-resolution or inference frame). */
+void Model_GetCropFrameSize(unsigned int* width, unsigned int* height);
 const void* Model_GetRawOutput(int which, size_t* size);
 
 /**

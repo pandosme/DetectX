@@ -216,9 +216,12 @@
 
                         <textarea id="labels-preview" class="form-control mb-3" rows="8" style="display:none;" placeholder="Labels preview"></textarea>
 
-                        <div class="d-flex justify-content-end gap-2">
+                        <div class="d-flex justify-content-between gap-2">
+                            <button id="use-default-btn" class="btn btn-outline-danger" disabled>Use Built-in COCO</button>
+                            <div class="d-flex gap-2">
                             <button id="save-description-btn" class="btn btn-outline-primary">Save Description</button>
                             <button id="save-model-btn" class="btn btn-primary">Save And Restart</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -308,11 +311,13 @@
 
         function renderModelInfo(info) {
             var isCustom = info.customModel;
+            var hasCustomFiles = info.customModel || info.customLabels;
             if (isCustom) {
                 $('#info-model-source').html('<span style="background:#dbeafe;color:#1d4ed8;padding:2px 10px;border-radius:999px;font-size:.85rem;font-weight:600">Custom Model</span>');
             } else {
                 $('#info-model-source').html('<span style="background:#d1fae5;color:#065f46;padding:2px 10px;border-radius:999px;font-size:.85rem;font-weight:600">Built-in COCO Model</span>');
             }
+            $('#use-default-btn').prop('disabled', !hasCustomFiles);
             $('#info-input').text((info.modelWidth || '?') + ' x ' + (info.modelHeight || '?'));
             $('#info-video').text((info.videoWidth || '?') + ' x ' + (info.videoHeight || '?'));
             $('#info-shape').text((info.boxes || '?') + ' / ' + (info.classes || '?'));
@@ -354,6 +359,8 @@
                             labelsPath: appData.model.labelsPath,
                             chip: appData.model.chip,
                             outputFloat: appData.model.outputFloat,
+                            customModel: appData.model.customModel,
+                            customLabels: appData.model.customLabels,
                             labels: appData.model.labels,
                             description: appData.settings ? appData.settings.modelDescription : ''
                         });
@@ -401,6 +408,28 @@
             }, 1500);
         }
 
+// The application cannot answer while it loads its model (30-60 s after a start or
+// restart). Instead of reporting it as not running, say so, keep asking, and reload
+// this page once the application answers with a loaded model.
+var waitingForApp = false;
+function waitForApp() {
+    if (waitingForApp) return;
+    waitingForApp = true;
+    var msg = 'The application is starting (loading the model takes 30-60 seconds). This page reloads by itself when it is ready.';
+    if ($('#errorModal').length) {
+        $('#errorModal .modal-title').text('Starting');
+        $('#errorModal .modal-body').text(msg);
+        $('#errorModal').modal('show');
+    } else if (typeof showToast === 'function') {
+        showToast(msg, 'info');
+    }
+    (function poll() {
+        $.ajax({ type: 'GET', url: 'app', dataType: 'json', cache: false, timeout: 3000,
+            success: function (data) { if (data && data.model) location.reload(); else setTimeout(poll, 2000); },
+            error: function () { setTimeout(poll, 2000); } });
+    })();
+}
+
         $(function () {
             setupDrop('tflite-zone', 'tflite-input', '.tflite', function (file) {
                 readAsBase64(file, function (data) {
@@ -444,6 +473,26 @@
                 saveModel(payload);
             });
 
+            $('#use-default-btn').on('click', function () {
+                if (!window.confirm('Remove the uploaded model and labels, then restart with the built-in COCO model?'))
+                    return;
+
+                const button = $(this);
+                button.prop('disabled', true);
+                $.ajax({
+                    type: 'DELETE',
+                    url: 'model',
+                    success: function (message) {
+                        showToast(String(message || 'Uploaded model removed.'), 'success');
+                        waitForRestart();
+                    },
+                    error: function (xhr) {
+                        button.prop('disabled', false);
+                        showToast('Reset failed: ' + (xhr.responseText || 'unknown error'), 'danger');
+                    }
+                });
+            });
+
             $.ajax({
                 type: 'GET',
                 url: 'app',
@@ -456,7 +505,7 @@
                     loadModel();
                 },
                 error: function () {
-                    showToast('The application is not responding.', 'danger');
+                    waitForApp();
                 }
             });
         });

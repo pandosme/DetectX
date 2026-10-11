@@ -14,8 +14,8 @@
   "size": {
     "x1": 0,
     "y1": 0,
-    "x2": 20,
-    "y2": 20
+    "x2": 0,
+    "y2": 0
   },
   "ignore": [],
   "modelDescription": "",
@@ -29,6 +29,7 @@
   "cropping": {
     "active": false,
     "throttle": 500,
+    "fullResolution": true,
     "sdcard": false,
     "mqtt": false,
     "http": false,

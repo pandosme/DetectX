@@ -2,7 +2,7 @@
 
 Run custom-trained **YOLOv8** object-detection models directly on Axis cameras with
 ARTPEC-8 or ARTPEC-9 chipsets. Detections are published over MQTT, ONVIF events and
-HTTP for machine-to-machine use. The package ships a YOLOv8n COCO model at **640x384**
+HTTP for machine-to-machine use. The package ships a YOLOv8n COCO model at **960x544**
 as a working default; the intent is that you replace it with your own model.
 
 DetectX is a **base to build on**: the application introspects whatever model you give
@@ -55,9 +55,9 @@ one gives wrong detections.
 To use your own model, export it per chip and drop the files in before building:
 
 ```bash
-./export_yolov8.py --target a8 --weights your.pt --width 640 --height 384 \
+./export_yolov8.py --target a8 --weights your.pt --width 960 --height 544 \
     --calibration-dir /path/to/calibration/images --output app/model/model-a8.tflite
-./export_yolov8.py --target a9 --weights your.pt --width 640 --height 384 \
+./export_yolov8.py --target a9 --weights your.pt --width 960 --height 544 \
     --calibration-dir /path/to/calibration/images --output app/model/model-a9.tflite
 cp your-labels.txt app/model/labels.txt
 ./build.sh
@@ -84,15 +84,14 @@ Below are model-specific details relevant to the generic "COCO" demo:
 
 | **Variant**    | **Dataset** | **Labels**                   | **ARTPEC-8** | **ARTPEC-9** |
 |----------------|-------------|------------------------------|------------------------|--------------------------|
-| DetectX COCO   | COCO        | person, bicycle, car, motorcycle, airplane, bus, train, truck, boat, traffic light, fire hydrant, stop sign, parking meter, bench, bird, cat, dog, horse, sheep, cow, elephant, bear, zebra, giraffe, backpack, umbrella, handbag, tie, suitcase, frisbee, skis, snowboard, sports ball, kite, baseball bat, baseball glove, skateboard, surfboard, tennis racket, bottle, wine glass, cup, fork, knife, spoon, bowl, banana, apple, sandwich, orange, broccoli, carrot, hot dog, pizza, donut, cake, chair, couch, potted plant, bed, dining table, toilet, TV, laptop, mouse, remote, keyboard, cell phone, microwave, oven, toaster, sink, refrigerator, book, clock, vase, scissors, teddy bear, hair drier, toothbrush | YOLOv8n @ **640x384**<br>~50  ms / 20 fps | YOLOv8n @ **640x384**<br>(measured on OS 13) |
+| DetectX COCO   | COCO        | person, bicycle, car, motorcycle, airplane, bus, train, truck, boat, traffic light, fire hydrant, stop sign, parking meter, bench, bird, cat, dog, horse, sheep, cow, elephant, bear, zebra, giraffe, backpack, umbrella, handbag, tie, suitcase, frisbee, skis, snowboard, sports ball, kite, baseball bat, baseball glove, skateboard, surfboard, tennis racket, bottle, wine glass, cup, fork, knife, spoon, bowl, banana, apple, sandwich, orange, broccoli, carrot, hot dog, pizza, donut, cake, chair, couch, potted plant, bed, dining table, toilet, TV, laptop, mouse, remote, keyboard, cell phone, microwave, oven, toaster, sink, refrigerator, book, clock, vase, scissors, teddy bear, hair drier, toothbrush | YOLOv8n @ **960x544**<br>~106 ms / 9 fps | YOLOv8n @ **960x544**<br>(Axis OS 13+) |
 
 *Note: ARTPEC-8 and ARTPEC-9 are Axis camera chipset platforms, with ARTPEC-9 offering enhanced performance and the ability to process larger images for improved detection quality.*
 
-The default input is **640x384** -- a 16:9 shape, not square. A square input on a 16:9
-scene wastes about 44% of its pixels on padding. 640x384 runs at ~20 fps on ARTPEC-8 and
-covers the full scene; it is a deliberately fast, general-purpose starting point. When to
-raise it, and what it costs, is covered in **Choosing a configuration** below. Both
-dimensions must be multiples of 32.
+The default input is **960x544**, the closest stride-32 shape to 16:9 at 960 pixels
+wide. A square input on a 16:9 scene wastes about 44% of its pixels on padding.
+960x544 runs at ~9 fps on ARTPEC-8 and provides about 1.4x the detection range of
+640x384. Both dimensions must be multiples of 32.
 
 ***
 
@@ -120,9 +119,9 @@ This is what frame rate actually depends on.
 | Input | fps | latency | relative range |
 |---|---|---|---|
 | 416x256 | **43** | 23 ms | 0.7x |
-| **640x384** (default) | **20** | 50 ms | 1.0x |
+| 640x384 | **20** | 50 ms | 1.0x |
 | 800x480 | 11 | 88 ms | 1.2x |
-| 960x544 | 9 | 106 ms | 1.4x |
+| **960x544** (default) | 9 | 106 ms | 1.4x |
 | 1280x736 | 5 | 200 ms | 1.9x |
 
 **YOLOv8s (small)** -- better accuracy, roughly 1.6x the latency of nano:
@@ -149,7 +148,7 @@ ARTPEC-9 option.
 | Your priority | Configuration |
 |---|---|
 | **Speed** -- counting, presence, busy scenes | nano @ 416x256 or 640x384. 20-43 fps, ample headroom. |
-| **Balance** -- general perimeter / person & vehicle | **nano @ 640x384 (the default).** 20 fps, full field of view. |
+| **Balance** -- general perimeter / person & vehicle | **nano @ 960x544 (the default).** About 9 fps with improved reach. |
 | **Distance** -- objects far from the camera | Raise resolution before model size. nano @ 960x544 or 1280x736 reaches ~1.4-1.9x the range at 9 / 5 fps. A narrower lens is also worth more than a bigger model -- it puts more pixels on a distant object for free. |
 | **Quality** -- small or visually similar objects up close | Step up to small at the same resolution before raising resolution further. |
 | **Any of the above** | **Cut the class list.** The tables are 80-class COCO; a 10-class model shifts every number down. Train on only what you act on. |
@@ -246,7 +245,10 @@ This section allows you to tailor detection and event signaling to your applicat
   When enabled, full-frame JPEG images and matching YOLO-format label files are saved to the SD card whenever a detection event is active. Images are captured at a configurable interval (1–60 s); the first image is captured immediately on the event going active. A **Download Archive** button packages all captured images and labels into a zip file ready for import into your training pipeline. A **Clear All** button removes all stored files. Capture stops automatically at 2 000 images to protect SD card space.
 
 **Note:**  
-Each label produces an independent event state. Tuning event parameters is crucial for noisy or high-traffic scenes.
+Each label produces an independent event state. DetectX also declares an
+**Any detection** event (`acap/detectx/event`), which is active while one or more
+selected label events are active and clears when all selected label events are
+inactive. Tuning event parameters is crucial for noisy or high-traffic scenes.
 
 ***
 
@@ -380,6 +382,25 @@ DetectX delivers three primary payload types, all enrichable with the configured
 
 ## Version History
 
+## 5.2.0
+
+- **Event trigger by time-based vote** ("Prioritize"), with a new **Balanced** option.
+  Speed fires on the first frame. Balanced fires when a label is in >= 75 % of the frames
+  with detections within 300 ms; Accuracy when it is in >= 3 frames and >= 60 % within
+  500 ms. Both also require that no other label was seen more often, so brief
+  misclassifications (or the shapes a hand passes through while raised) do not fire.
+  The window stretches on slow cameras. Settings `eventLogic` `{window, frames, share}`
+  overrides. Replaces the frame-count window, which read a wrong status key and always
+  used 16 frames.
+- **No hidden minimum-size filter.** Its UI was removed in 4.0.0, but a 20/1000 default
+  kept dropping small, distant objects.
+- 5.1.x (included): MQTT/HTTP crops cut from a second stream at the camera's largest 16:9
+  resolution, capped to the active capture mode (setting `cropping.fullResolution`,
+  default on); crop payload adds `frame_w`/`frame_h`; crops are only cut when the throttle
+  lets one out; border preview drawn to scale for 0-200 px. SD capture keeps the
+  inference-size frame.
+- 5.0.3 (included): a failed inference no longer crashes the application into a restart loop.
+
 ## 5.0.0
 
 First YOLOv8 release. The YOLOv5 line (4.x) is frozen at 4.1.1 and no longer maintained.
@@ -396,8 +417,8 @@ First YOLOv8 release. The YOLOv5 line (4.x) is frozen at 4.1.1 and no longer mai
   export (float32 I/O, one fused tensor) cannot be decoded by this application.
 
 ### New
-- Default model is **YOLOv8n COCO at 640x384** -- fast (~20 fps on ARTPEC-8) and
-  16:9 to match the scene. See **Choosing a configuration** for when to change it.
+- Default model is **YOLOv8n COCO at 960x544** -- about 9 fps on ARTPEC-8 and the
+  closest stride-32 shape to 16:9 at 960 pixels wide.
 - Built against the current Axis ACAP SDK (manifest schema 2.2.0), DLPU declared as
   a required resource, `runMode: respawn`.
 - The application introspects the model at startup (input size, class count,
@@ -405,7 +426,7 @@ First YOLOv8 release. The YOLOv5 line (4.x) is frozen at 4.1.1 and no longer mai
 - `export_resolutions.sh` / `benchmark_resolutions.sh` / `benchmark_larod.sh` for
   exporting a model across resolutions and measuring latency on your own camera.
 - Model load is deferred past application start so the web UI stays responsive and
-  reports "Loading model" during the 30-60 s cold start instead of appearing hung.
+  reports "Loading model" during the 30-90 s cold start instead of appearing hung.
 - PyTorch checkpoints for the shipped models are in `models/`.
 
 ### Fixes

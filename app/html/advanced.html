@@ -213,9 +213,11 @@
                         <label for="prioritize" class="col-sm-4 col-form-label setting-label">Prioritize</label>
                         <div class="col-sm-6">
                             <select class="form-select w-100" id="prioritize">
-                                <option value="accuracy">Accuracy (suppress false triggers)</option>
-                                <option value="speed">Speed (Trigger instantly)</option>
+                                <option value="speed">Speed (trigger on the first frame)</option>
+                                <option value="balanced">Balanced (label held ~0.3 s)</option>
+                                <option value="accuracy">Accuracy (label held ~0.5 s)</option>
                             </select>
+                            <div class="form-text">Balanced and Accuracy fire a label only when it is seen in most frames of the window and more often than any other label, so brief misclassifications do not fire.</div>
                         </div>
                     </div>
                     <div class="row mb-1 align-items-center">
@@ -321,6 +323,28 @@
 
 <script>
 var App = 0;
+// The application cannot answer while it loads its model (30-60 s after a start or
+// restart). Instead of reporting it as not running, say so, keep asking, and reload
+// this page once the application answers with a loaded model.
+var waitingForApp = false;
+function waitForApp() {
+    if (waitingForApp) return;
+    waitingForApp = true;
+    var msg = 'The application is starting (loading the model takes 30-60 seconds). This page reloads by itself when it is ready.';
+    if ($('#errorModal').length) {
+        $('#errorModal .modal-title').text('Starting');
+        $('#errorModal .modal-body').text(msg);
+        $('#errorModal').modal('show');
+    } else if (typeof showToast === 'function') {
+        showToast(msg, 'info');
+    }
+    (function poll() {
+        $.ajax({ type: 'GET', url: 'app', dataType: 'json', cache: false, timeout: 3000,
+            success: function (data) { if (data && data.model) location.reload(); else setTimeout(poll, 2000); },
+            error: function () { setTimeout(poll, 2000); } });
+    })();
+}
+
 $(document).ready(function() {
     $.ajax({
         type: "GET",
@@ -328,6 +352,7 @@ $(document).ready(function() {
         dataType: 'json',
         cache: false,
         success: function(data) {
+            if (!data || !data.model) { waitForApp(); return; }
             App = data;
             document.title = App.manifest.acapPackageConf.setup.friendlyName;
             $(".acapName").html(App.manifest.acapPackageConf.setup.friendlyName);
@@ -343,7 +368,7 @@ $(document).ready(function() {
             updateSdCount(App.status.sd_capture ? App.status.sd_capture.count : null);
         },
         error: function(response) {
-            $('#errorModal').modal('show');
+            waitForApp();
         }
     });
     setInterval( function(){

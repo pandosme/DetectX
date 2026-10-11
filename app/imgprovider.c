@@ -93,6 +93,15 @@ static void* threadEntry(void* data);
 
 ImgProvider_t*
 createImgProvider(unsigned int w, unsigned int h, unsigned int numFrames, VdoFormat format) {
+    return createImgProviderWithBuffers(w, h, numFrames, format, NUM_VDO_BUFFERS);
+}
+
+ImgProvider_t*
+createImgProviderWithBuffers(unsigned int w,
+                             unsigned int h,
+                             unsigned int numFrames,
+                             VdoFormat format,
+                             unsigned int numBuffers) {
     bool mtxInitialized  = false;
     bool condInitialized = false;
 
@@ -104,6 +113,12 @@ createImgProvider(unsigned int w, unsigned int h, unsigned int numFrames, VdoFor
 
     provider->vdoFormat    = format;
     provider->numAppFrames = numFrames;
+    if (numBuffers < 2)
+        numBuffers = 2;
+    if (numBuffers > NUM_VDO_BUFFERS)
+        numBuffers = NUM_VDO_BUFFERS;
+    provider->numVdoBuffers = numBuffers;
+    provider->pitch         = w;
 
     if (pthread_mutex_init(&provider->frameMutex, NULL)) {
         syslog(LOG_ERR, "%s: Unable to initialize mutex: %s", __func__, strerror(errno));
@@ -182,7 +197,7 @@ bool allocateVdoBuffers(ImgProvider_t* provider, VdoStream* vdoStream) {
     assert(provider);
     assert(vdoStream);
 
-    for (size_t i = 0; i < NUM_VDO_BUFFERS; i++) {
+    for (size_t i = 0; i < provider->numVdoBuffers; i++) {
         provider->vdoBuffers[i] = vdo_stream_buffer_alloc(vdoStream, NULL, &error);
         if (provider->vdoBuffers[i] == NULL) {
             syslog(LOG_ERR,
@@ -295,6 +310,65 @@ end:
     return ret;
 }
 
+bool chooseLargestResolution(const char* aspect,
+                             unsigned int maxWidth,
+                             unsigned int* chosenWidth,
+                             unsigned int* chosenHeight) {
+    VdoResolutionSet* set = NULL;
+    VdoChannel* channel   = NULL;
+    VdoMap* filter        = NULL;
+    GError* error         = NULL;
+    bool ret              = false;
+
+    assert(chosenWidth);
+    assert(chosenHeight);
+
+    channel = vdo_channel_get(VDO_CHANNEL, &error);
+    if (!channel) {
+        syslog(LOG_ERR,
+               "%s: Failed vdo_channel_get(): %s",
+               __func__,
+               (error != NULL) ? error->message : "N/A");
+        goto end;
+    }
+    filter = vdo_map_new();
+    vdo_map_set_string(filter, "aspect_ratio", aspect);
+    set = vdo_channel_get_resolutions(channel, filter, &error);
+    if (!set) {
+        syslog(LOG_ERR,
+               "%s: Failed vdo_channel_get_resolutions(): %s",
+               __func__,
+               (error != NULL) ? error->message : "N/A");
+        goto end;
+    }
+
+    unsigned int bestArea = 0;
+    for (gsize i = 0; i < set->count; ++i) {
+        VdoResolution* res = &set->resolutions[i];
+        unsigned int area  = res->width * res->height;
+        if (maxWidth && res->width > maxWidth)
+            continue;
+        if (area > bestArea) {
+            bestArea      = area;
+            *chosenWidth  = res->width;
+            *chosenHeight = res->height;
+        }
+    }
+    ret = bestArea > 0;
+    if (ret)
+        syslog(LOG_INFO, "%s: Largest %s resolution is %ux%u", __func__, aspect,
+               *chosenWidth, *chosenHeight);
+
+end:
+    if (filter)
+        g_object_unref(filter);
+    g_clear_object(&channel);
+    g_free(set);
+    g_clear_error(&error);
+
+    return ret;
+}
+
 bool createStream(ImgProvider_t* provider, unsigned int w, unsigned int h) {
     VdoMap* vdoMap = vdo_map_new();
     GError* error  = NULL;
@@ -339,6 +413,15 @@ bool createStream(ImgProvider_t* provider, unsigned int w, unsigned int h) {
     }
 
     provider->vdoStream = vdoStream;
+
+    // YUV rows may be padded; consumers that index the planes need the pitch.
+    VdoMap* info = vdo_stream_get_info(vdoStream, NULL);
+    if (info) {
+        guint32 pitch = vdo_map_get_uint32(info, "pitch", w);
+        if (pitch >= w)
+            provider->pitch = pitch;
+        g_object_unref(info);
+    }
 
     ret = true;
 

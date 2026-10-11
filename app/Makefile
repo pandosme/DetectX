@@ -1,10 +1,10 @@
 PROG1   = detectx
-OBJS1   = main.c model_quant.c ACAP.c cJSON.c Model.c Video.c Output.c Output_crop_cache.c Output_helpers.c Output_http.c imgprovider.c imgutils.c MQTT.c CERTS.c labelparse.c
+OBJS1   = main.c model_quant.c ACAP.c cJSON.c Model.c Video.c Output.c Output_crop_cache.c Output_helpers.c Output_http.c imgprovider.c imgutils.c MQTT.c CERTS.c labelparse.c Storage.c
 PROGS   = $(PROG1)
 LIBDIR  = lib
 INCDIR  = include
 
-PKGS = gio-2.0 gio-unix-2.0 liblarod vdostream fcgi axevent libcurl
+PKGS = gio-2.0 gio-unix-2.0 liblarod vdostream fcgi axevent libcurl axstorage
 
 CFLAGS += -I./$(INCDIR) -DLAROD_API_VERSION_3
 LDFLAGS += -L./$(LIBDIR) -Wl,-rpath,'$$ORIGIN/lib'

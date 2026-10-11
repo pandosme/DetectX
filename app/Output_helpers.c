@@ -13,8 +13,7 @@
 #include "Output_helpers.h"
 #include "Model.h"
 #include "cJSON.h"
-
-#define SD_FOLDER "/var/spool/storage/SD_DISK/detectx"   ///< Directory for SD card crops
+#include "Storage.h"   ///< per-app SD path via AXStorage (replaces hardcoded SD_FOLDER)
 
 // --- base64 encoder table ---
 static const char base64_table[] =
@@ -62,33 +61,20 @@ void replace_spaces(char *str)
 }
 
 /**
- * @brief Ensure the SD_FOLDER path exists; create if not present.
- * Returns 0 silently if the SD card is not mounted (base path absent).
- * Returns 0 with a warning if the card is mounted but mkdir fails.
+ * @brief Ready only when AXStorage has set up our own SD_DISK area.
+ * Returns 0 silently when the SD card is absent or not yet set up.
  */
 int ensure_sd_directory(void)
 {
-    // Check SD card mount point exists — if not, card is simply not inserted
-    struct stat sd_root = {0};
-    if (stat("/var/spool/storage/SD_DISK", &sd_root) == -1) {
-        return 0;  // SD card not mounted; no warning, caller silently disables
-    }
-
-    struct stat st = {0};
-    if (stat(SD_FOLDER, &st) == -1) {
-        if (mkdir(SD_FOLDER, 0755) == -1) {
-            syslog(LOG_WARNING, "Failed to create SD directory %s: %s\n", SD_FOLDER, strerror(errno));
-            return 0;
-        }
-    }
-    return 1;
+    return Storage_GetPath() != NULL;
 }
 
 int ensure_sd_images_directory(void)
 {
-    if (!ensure_sd_directory()) return 0;
-    char path[256];
-    snprintf(path, sizeof(path), "%s/images", SD_FOLDER);
+    const char* base = Storage_GetPath();
+    if (!base) return 0;
+    char path[512];
+    snprintf(path, sizeof(path), "%s/images", base);
     struct stat st = {0};
     if (stat(path, &st) == -1) {
         if (mkdir(path, 0755) == -1) {
@@ -101,9 +87,10 @@ int ensure_sd_images_directory(void)
 
 int ensure_sd_labels_directory(void)
 {
-    if (!ensure_sd_directory()) return 0;
-    char path[256];
-    snprintf(path, sizeof(path), "%s/labels", SD_FOLDER);
+    const char* base = Storage_GetPath();
+    if (!base) return 0;
+    char path[512];
+    snprintf(path, sizeof(path), "%s/labels", base);
     struct stat st = {0};
     if (stat(path, &st) == -1) {
         if (mkdir(path, 0755) == -1) {
@@ -193,8 +180,10 @@ int  sd_is_busy(void)      { return sd_busy_flag; }
 
 int sd_count_images(void)
 {
-    char path[256];
-    snprintf(path, sizeof(path), "%s/images", SD_FOLDER);
+    const char* base = Storage_GetPath();
+    if (!base) return 0;
+    char path[512];
+    snprintf(path, sizeof(path), "%s/images", base);
     DIR* d = opendir(path);
     if (!d) return 0;
     int count = 0;
@@ -225,10 +214,12 @@ static int delete_dir_contents(const char* dirpath)
 
 int sd_clear_directories(void)
 {
-    char path[256];
-    snprintf(path, sizeof(path), "%s/images", SD_FOLDER);
+    const char* base = Storage_GetPath();
+    if (!base) return 1;   /* nothing to clear if SD not set up */
+    char path[512];
+    snprintf(path, sizeof(path), "%s/images", base);
     delete_dir_contents(path);
-    snprintf(path, sizeof(path), "%s/labels", SD_FOLDER);
+    snprintf(path, sizeof(path), "%s/labels", base);
     delete_dir_contents(path);
     return 1;
 }
@@ -236,20 +227,22 @@ int sd_clear_directories(void)
 int sd_create_zip(const char* output_path)
 {
     if (!output_path) return 0;
+    const char* base = Storage_GetPath();
+    if (!base) return 0;
     remove(output_path);  /* Remove any stale file first */
 
-    /* Build command: cd into SD_FOLDER, then zip images/ and labels/ */
+    /* Build command: cd into our SD area, then zip images/ and labels/ */
     char cmd[1024];
     snprintf(cmd, sizeof(cmd),
         "cd \"%s\" && zip -q -r \"%s\" images labels 2>/dev/null",
-        SD_FOLDER, output_path);
+        base, output_path);
 
     int ret = system(cmd);
     if (ret != 0) {
         /* zip not available — fall back to tar+gzip */
         snprintf(cmd, sizeof(cmd),
             "cd \"%s\" && tar czf \"%s\" images labels 2>/dev/null",
-            SD_FOLDER, output_path);
+            base, output_path);
         ret = system(cmd);
     }
     return (ret == 0) ? 1 : 0;
