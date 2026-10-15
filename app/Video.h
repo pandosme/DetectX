@@ -12,6 +12,10 @@ VdoBuffer* Video_Capture_YUV();
 // Second NV12 stream at the sensor's largest 16:9 resolution. Detection
 // export (MQTT/HTTP crops) cuts from it so crops carry full sensor detail
 // instead of the detector's downscaled frame.
+// Video channel for all streams started afterwards (1 = main view, N = View Area
+// "camera" N) and, for a View Area, its width in sensor pixels (caps the full-
+// resolution stream; 0 = no cap beyond the capture mode).
+void Video_Set_Channel(unsigned int channel, unsigned int hiresChannel);
 bool Video_Start_HiRes(void);
 void Video_Stop_HiRes(void);
 VdoBuffer* Video_Capture_HiRes(void);

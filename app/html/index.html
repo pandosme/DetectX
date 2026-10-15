@@ -301,6 +301,15 @@
                         </div>
 
                         <div class="mb-3">
+                            <div class="d-flex align-items-center">
+                                <label for="settings_view_area" class="form-label fw-bold mb-0" style="min-width: 180px;">View</label>
+                                <select id="settings_view_area" class="form-select" style="width: 260px;"></select>
+                            </div>
+                            <div class="small text-muted">Run detection on a View Area (set up under the camera's Video settings) to give objects far away more pixels at the same speed. Only objects inside it are detected. Changing it restarts the application.</div>
+                            <div id="view-area-note" class="small text-warning-emphasis mt-1" style="display: none;"></div>
+                        </div>
+
+                        <div class="mb-3">
                             <label class="form-label fw-bold">Video Information</label>
                             <div class="small text-muted">Capture Resolution: <strong id="captureResolution" class="text-dark">-</strong></div>
                             <div class="small text-muted">Model Input: <strong id="modelResolution" class="text-dark">-</strong></div>
@@ -609,7 +618,7 @@
             $('#video').css({ top: '0', height: '100%', width: '100%' });
 
             const secureConnection = location.protocol === 'https:' ? 'secure=true' : '';
-            const player = '<media-stream-player hostname="' + window.location.hostname + '" ' + secureConnection + ' format="RTP_H264" compression="40" audio="0" resolution="' + videoWidth + 'x' + videoHeight + '" variant="basic" autoplay></media-stream-player>';
+            const player = '<media-stream-player hostname="' + window.location.hostname + '" ' + secureConnection + ' format="RTP_H264" compression="40" audio="0" camera="' + ((App.settings && App.settings.viewArea) || 1) + '" resolution="' + videoWidth + 'x' + videoHeight + '" variant="basic" autoplay></media-stream-player>';
             $('#video').html(player);
 
             $('#captureResolution').text(videoWidth + ' x ' + videoHeight);
@@ -868,6 +877,23 @@
                     document.title = App.manifest.acapPackageConf.setup.friendlyName;
                     $('.acapName').text(App.manifest.acapPackageConf.setup.friendlyName);
                     $('#settings_confidence').val(App.settings.confidence || 50);
+                    // View: the main view plus every enabled View Area, with its size on the sensor.
+                    (function () {
+                        const areas = Array.isArray(App.viewareas) ? App.viewareas : [];
+                        const sel = $('#settings_view_area').empty();
+                        let have = false;
+                        areas.filter(a => a.enabled || a.camera === 1).forEach(function (a) {
+                            const full = !a.width || (a.sensorWidth && a.width >= a.sensorWidth);
+                            const label = a.camera === 1 ? 'Full image' + (a.name && a.name !== 'Camera 1' ? ' (' + a.name + ')' : '')
+                                : a.name + (full ? ' (full image)' : ' (' + a.width + 'x' + a.height + ' of ' + a.sensorWidth + 'x' + a.sensorHeight + ')');
+                            sel.append($('<option>').attr('value', a.camera).text(label));
+                            have = true;
+                        });
+                        if (!have) sel.append($('<option>').attr('value', 1).text('Full image'));
+                        sel.val(String(App.settings.viewArea || 1));
+                        if (App.settings.viewAreaNote)
+                            $('#view-area-note').text(App.settings.viewAreaNote).show();
+                    })();
                     if (!App.model) {
                         // Model still loading: the view cannot be built without its size
                         // and labels. Poll until it runs; pollStatus then reloads the page.
@@ -941,8 +967,12 @@
             $('#save-detection-settings-btn').on('click', function () {
                 const confidence = parseInt($('#settings_confidence').val(), 10) || 50;
                 App.settings.confidence = confidence;
-                saveSettings({ confidence: confidence }, function () {
-                    showToast('Detection settings saved.', 'success');
+                const viewArea = parseInt($('#settings_view_area').val(), 10) || 1;
+                const viewChanged = viewArea !== (App.settings.viewArea || 1);
+                App.settings.viewArea = viewArea;
+                saveSettings({ confidence: confidence, viewArea: viewArea }, function () {
+                    showToast(viewChanged ? 'Saved. Restarting with the new view; the page reloads when it is ready.'
+                                          : 'Detection settings saved.', 'success');
                 });
             });
 

@@ -680,11 +680,10 @@ MQTT_Cleanup() {
         MQTT_libHandle = NULL;
     }
     
-    // Clean up settings
-    if (MQTTSettings) {
-        cJSON_Delete(MQTTSettings);
-        MQTTSettings = NULL;
-    }
+    // The settings object is registered in the ACAP config ("mqtt", see main.c) and
+    // freed by ACAP_Cleanup() with the rest of it. Deleting it here as well freed it
+    // twice and aborted the process on every stop ("double free detected").
+    MQTTSettings = NULL;
     
     pthread_mutex_unlock(&config_mutex);
     LOG_TRACE("%s: Exit\n", __func__);

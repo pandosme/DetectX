@@ -79,6 +79,9 @@ bool chooseStreamResolution(unsigned int reqWidth,
                             unsigned int* chosenWidth,
                             unsigned int* chosenHeight);
 
+/** brief Video channel for all streams created afterwards: 1 = main view, N = View Area. */
+void imgProviderSetChannel(unsigned int channel);
+
 /**
  * brief Find the largest VDO resolution with a given aspect ratio.
  *

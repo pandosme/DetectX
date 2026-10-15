@@ -63,6 +63,19 @@ Video_Capture_YUV() {
 // held by the app, one waits in the delivered queue, the rest go back to VDO.
 #define HIRES_VDO_BUFFERS 4
 
+// The detector stream uses the selected view (channel); the full-resolution stream
+// stays on the full sensor (hiresChannel 1) so a View Area's crops keep every sensor
+// pixel. Model maps the view's boxes onto it (Model_SetView).
+static unsigned int videoChannel = 1;
+static unsigned int hiresVideoChannel = 1;
+
+void Video_Set_Channel(unsigned int channel, unsigned int hiresChannel) {
+	videoChannel = channel ? channel : 1;
+	hiresVideoChannel = hiresChannel ? hiresChannel : 1;
+	imgProviderSetChannel(videoChannel);
+	LOG("Video channel %u, full-resolution channel %u\n", videoChannel, hiresVideoChannel);
+}
+
 ImgProvider_t* hiresProvider = NULL;
 VdoBuffer* hiresBuffer = NULL;
 static unsigned int hiresWidth = 0;
@@ -85,13 +98,16 @@ bool Video_Start_HiRes(void) {
 		if (w > maxWidth)
 			maxWidth = w;
 	}
+	imgProviderSetChannel(hiresVideoChannel);
 	if (maxWidth)
-		LOG("Full-resolution crop: capture mode allows up to %u px wide (16:9)\n", maxWidth);
+		LOG("Full-resolution crop: up to %u px wide (16:9)\n", maxWidth);
 	if (!chooseLargestResolution("16:9", maxWidth, &width, &height)) {
 		LOG_WARN("%s: No 16:9 resolution reported by VDO\n", __func__);
+		imgProviderSetChannel(videoChannel);
 		return false;
 	}
 	hiresProvider = createImgProviderWithBuffers(width, height, 1, VDO_FORMAT_YUV, HIRES_VDO_BUFFERS);
+	imgProviderSetChannel(videoChannel);
 	if (!hiresProvider) {
 		LOG_WARN("%s: Could not create %ux%u image provider\n", __func__, width, height);
 		return false;

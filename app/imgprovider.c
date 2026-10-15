@@ -28,7 +28,13 @@
 #include "vdo-map.h"
 #include <vdo-channel.h>
 
-#define VDO_CHANNEL (1)
+// Video channel: 1 = the camera's main view; 2.. = View Areas (VAPIX "camera" N =
+// param group Image.I<N-1>). Set before any stream is created.
+static unsigned int vdoChannel = 1;
+
+void imgProviderSetChannel(unsigned int channel) {
+    vdoChannel = channel ? channel : 1;
+}
 
 /**
  * brief Set up a stream through VDO.
@@ -249,7 +255,7 @@ bool chooseStreamResolution(unsigned int reqWidth,
     assert(chosenHeight);
 
     // Retrieve channel resolutions
-    channel = vdo_channel_get(VDO_CHANNEL, &error);
+    channel = vdo_channel_get(vdoChannel, &error);
     if (!channel) {
         syslog(LOG_ERR,
                "%s: Failed vdo_channel_get(): %s",
@@ -323,7 +329,7 @@ bool chooseLargestResolution(const char* aspect,
     assert(chosenWidth);
     assert(chosenHeight);
 
-    channel = vdo_channel_get(VDO_CHANNEL, &error);
+    channel = vdo_channel_get(vdoChannel, &error);
     if (!channel) {
         syslog(LOG_ERR,
                "%s: Failed vdo_channel_get(): %s",
@@ -379,7 +385,7 @@ bool createStream(ImgProvider_t* provider, unsigned int w, unsigned int h) {
         goto end;
     }
 
-    vdo_map_set_uint32(vdoMap, "channel", VDO_CHANNEL);
+    vdo_map_set_uint32(vdoMap, "channel", vdoChannel);
     vdo_map_set_uint32(vdoMap, "format", provider->vdoFormat);
     vdo_map_set_uint32(vdoMap, "width", w);
     vdo_map_set_uint32(vdoMap, "height", h);

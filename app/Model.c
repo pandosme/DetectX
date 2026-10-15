@@ -384,6 +384,16 @@ Model_Inference(VdoBuffer* image) {
     const float xScale = coordQuant / (float)modelWidth;
     const float yScale = coordQuant / (float)modelHeight;
 
+    // Read the thresholds every frame, so a change on the settings page applies at
+    // once (they used to be read only when the model was loaded).
+    {
+        cJSON* liveSettings = ACAP_Get_Config("settings");
+        cJSON* c = liveSettings ? cJSON_GetObjectItem(liveSettings, "confidence") : NULL;
+        cJSON* n = liveSettings ? cJSON_GetObjectItem(liveSettings, "nms") : NULL;
+        if (c && cJSON_IsNumber(c)) confidenceThreshold = c->valuedouble / 100.0;
+        if (n && cJSON_IsNumber(n)) nms = n->valuedouble;
+    }
+
     // Thresholding happens in raw uint8 space so the per-class scan stays
     // integer: this runs boxes*classes times per frame (403k for COCO).
     int rawThreshold = (int)(confidenceThreshold / scoreQuant + scoreZero);
@@ -447,6 +457,18 @@ static const uint8_t* hiresData = NULL;
 static unsigned int hiresWidth = 0;
 static unsigned int hiresHeight = 0;
 static unsigned int hiresPitch = 0;
+// The detector's view on the hi-res frame, normalized: the whole frame, or the
+// View Area's rectangle on the sensor (the hi-res stream stays on the full sensor).
+static float viewX = 0.0f, viewY = 0.0f, viewW = 1.0f, viewH = 1.0f;
+
+void
+Model_SetView(float x, float y, float w, float h) {
+    if (w <= 0.0f || h <= 0.0f || x < 0.0f || y < 0.0f || x + w > 1.001f || y + h > 1.001f) {
+        x = 0.0f; y = 0.0f; w = 1.0f; h = 1.0f;
+    }
+    viewX = x; viewY = y; viewW = w; viewH = h;
+}
+
 
 // NV12 -> RGB. The model input went through larod's cpu-proc conversion, whose
 // matrix is not documented, so the hi-res path picks whichever of these best
@@ -512,8 +534,10 @@ hires_detect_matrix(void) {
     if (hiresMatrix >= 0 || !hiresData || larodInputAddr == MAP_FAILED)
         return;
     const uint8_t* rgb = (const uint8_t*)larodInputAddr;
-    const float sx = (float)hiresWidth / modelWidth;
-    const float sy = (float)hiresHeight / modelHeight;
+    const float sx = viewW * hiresWidth / modelWidth;
+    const float sy = viewH * hiresHeight / modelHeight;
+    const float ox = viewX * hiresWidth;
+    const float oy = viewY * hiresHeight;
     double error[NUM_YUV_MATRICES] = {0};
     unsigned long samples = 0;
     for (unsigned int gy = 0; gy < 18; gy++) {
@@ -521,8 +545,8 @@ hires_detect_matrix(void) {
             unsigned int mx = (gx * 2 + 1) * modelWidth / 64;
             unsigned int my = (gy * 2 + 1) * modelHeight / 36;
             float y, u, v;
-            hires_block_yuv((int)(mx * sx), (int)(my * sy),
-                            (int)((mx + 1) * sx + 0.999f), (int)((my + 1) * sy + 0.999f),
+            hires_block_yuv((int)(ox + mx * sx), (int)(oy + my * sy),
+                            (int)(ox + (mx + 1) * sx + 0.999f), (int)(oy + (my + 1) * sy + 0.999f),
                             &y, &u, &v);
             const uint8_t* ref = rgb + ((size_t)my * modelWidth + mx) * 3;
             for (unsigned int m = 0; m < NUM_YUV_MATRICES; m++) {
@@ -670,10 +694,13 @@ Model_GetImageData(const cJSON* detection, unsigned* jpeg_size, int* out_x, int*
 	int useHires = hiresData != NULL;
 	int frameWidth = useHires ? (int)hiresWidth : (int)videoWidth;
 	int frameHeight = useHires ? (int)hiresHeight : (int)videoHeight;
-	double scale_x = (double)frameWidth / 1000.0;
-	double scale_y = (double)frameHeight / 1000.0;
-	int det_pixel_x = (int)round(xObj->valuedouble * scale_x);
-	int det_pixel_y = (int)round(yObj->valuedouble * scale_y);
+	// A View Area is a rectangle of the hi-res (full sensor) frame.
+	double offset_x = useHires ? (double)viewX * frameWidth : 0.0;
+	double offset_y = useHires ? (double)viewY * frameHeight : 0.0;
+	double scale_x = (double)frameWidth * (useHires ? viewW : 1.0f) / 1000.0;
+	double scale_y = (double)frameHeight * (useHires ? viewH : 1.0f) / 1000.0;
+	int det_pixel_x = (int)round(offset_x + xObj->valuedouble * scale_x);
+	int det_pixel_y = (int)round(offset_y + yObj->valuedouble * scale_y);
 	int det_pixel_w = (int)round(wObj->valuedouble * scale_x);
 	int det_pixel_h = (int)round(hObj->valuedouble * scale_y);
 

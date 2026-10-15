@@ -1,6 +1,8 @@
 {
   "coordinateVersion": 3,
   "chip": "",
+  "viewArea": 1,
+  "viewAreaNote": "",
   "confidence": 50,
   "nms": 0.45,
   "aoi": {

@@ -121,6 +121,8 @@ int Model_WantsCropFrame(void);
 void Model_SetCropFrame(VdoBuffer* buffer, unsigned int width, unsigned int height, unsigned int pitch);
 /** @brief Size of the frame the last crops were cut from (full-resolution or inference frame). */
 void Model_GetCropFrameSize(unsigned int* width, unsigned int* height);
+// Part of the hi-res frame the detector sees, normalized (whole frame = 0,0,1,1).
+void Model_SetView(float x, float y, float w, float h);
 const void* Model_GetRawOutput(int which, size_t* size);
 
 /**

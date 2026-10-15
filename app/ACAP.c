@@ -2493,7 +2493,19 @@ ACAP_VAPIX_Init() {
 void ACAP_Cleanup(void) {
     // Clean up other resources
     ACAP_HTTP_Cleanup();
-	
+
+    // The status and device containers are also registered inside `app`
+    // (ACAP_Set_Config("status"/"device")). Detach them before deleting `app`,
+    // or each is freed twice -- that aborted the process ("double free or
+    // corruption") on every stop and restart, leaving larod to clean up after a
+    // crashed client while the next instance was already loading its model.
+    if (app) {
+        if (status_container && cJSON_GetObjectItem(app, "status") == status_container)
+            cJSON_DetachItemFromObject(app, "status");
+        if (ACAP_DEVICE_Container && cJSON_GetObjectItem(app, "device") == ACAP_DEVICE_Container)
+            cJSON_DetachItemFromObject(app, "device");
+    }
+
     if (status_container) {
         cJSON_Delete(status_container);
         status_container = NULL;
@@ -2504,7 +2516,7 @@ void ACAP_Cleanup(void) {
         cJSON_Delete(app);
         app = NULL;
     }
-    
+
     if (ACAP_DEVICE_Container) {
         cJSON_Delete(ACAP_DEVICE_Container);
         ACAP_DEVICE_Container = NULL;
