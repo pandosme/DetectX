@@ -2,7 +2,7 @@
 #
 # Measure inference time for each exported resolution on a real camera.
 #
-#   AXIS_USER=u AXIS_PASS=p ./benchmark_resolutions.sh <camera-host> [exports-dir]
+#   AXIS_USER=u AXIS_PASS=p tools/benchmark_resolutions.sh <camera-host> [exports-dir]
 #
 # Uploads each model through the application's own /model endpoint (which stores
 # it as a custom model and restarts), waits for the model to come up, then reads

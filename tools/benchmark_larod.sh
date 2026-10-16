@@ -2,7 +2,7 @@
 #
 # Fast DLPU inference benchmark using larod-client over SSH.
 #
-#   SSH_USER=root SSH_PASS=... ./benchmark_larod.sh <camera> <chip> <dir-of-tflite>
+#   SSH_USER=root SSH_PASS=... tools/benchmark_larod.sh <camera> <chip> <dir-of-tflite>
 #
 # This times PURE DLPU inference (no capture, preprocessing or NMS) with random
 # input, the same way axis-model-zoo does. It is seconds per model instead of a

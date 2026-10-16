@@ -12,7 +12,7 @@ cameras with ARTPEC-8 or ARTPEC-9. It captures camera frames through VDO, runs
 inference through larod on the DLPU, filters detections, and publishes results
 through MQTT, ONVIF events, HTTP, and the built-in web UI.
 
-The application is currently version 5.0.1. DetectX 5.x accepts the repository's
+The application is currently version 5.1.0. DetectX 5.x accepts the repository's
 split-output YOLOv8 TFLite format; YOLOv5/DetectX 4.x models are incompatible.
 ARTPEC-9 requires Axis OS 13 or later.
 
@@ -68,9 +68,11 @@ for the copied container build context and removes `app/lib/` and
 Use checks proportional to the change:
 
 ```sh
-sh -n build.sh benchmark_larod.sh benchmark_resolutions.sh export_resolutions.sh
+sh -n build.sh tools/check-model.sh tools/benchmark_larod.sh tools/benchmark_resolutions.sh
+bash -n tools/install-model.sh tools/camera.sh
 PYTHONPYCACHEPREFIX=/tmp/detectx-pycache \
-  python3 -m py_compile export_yolov8.py app/extract_model_params.py
+  python3 -m py_compile app/extract_model_params.py
+tools/check-model.sh app/model/model-a8.tflite app/model/labels.txt --target a8
 python3 -m json.tool app/manifest.json >/dev/null
 ./build.sh --target a8     # definitive check for native C/build changes
 ```
@@ -79,29 +81,20 @@ The GitHub Actions workflow in `.github/workflows/build-eap.yml` builds both
 targets, verifies both packages, uploads artifacts, and publishes matching tag
 releases. It does not run a separate test suite.
 
-## Model export contract
+## Model contract
 
-Use `export_yolov8.py`; Ultralytics' stock TFLite export does not produce the
-format consumed by DetectX.
+This repository holds the application only; training and export live in
+[acap-model-pipeline](https://github.com/pandosme/acap-model-pipeline). The two meet
+at `docs/MODEL_CONTRACT.md`: uint8 input `[1,H,W,3]` (H, W multiples of 32), two uint8
+outputs -- coordinates `[1,4,N]` and class scores `[1,classes,N]`, no objectness --
+per-tensor weights for ARTPEC-8, per-channel for ARTPEC-9, and `labels.txt` with one
+label per class in model order.
 
-```sh
-python3 export_yolov8.py \
-  --target a8 \
-  --weights /path/to/best.pt \
-  --calibration-dir /path/to/images \
-  --width 960 --height 544 \
-  --output app/model/model-a8.tflite
-```
-
-Repeat with `--target a9` and the A9 output path. Both dimensions must be
-multiples of 32. The model must have uint8 input and two uint8 outputs:
-coordinates shaped `[1, 4, N]` and class scores shaped `[1, classes, N]`, with no
-separate objectness value. ARTPEC-8 requires per-tensor quantization; ARTPEC-9
-uses per-channel quantization. `app/model/labels.txt` must contain one label per
-output class in model order.
-
-See `Train-Build.md` for training, calibration, performance, and export details.
-Do not hand-edit generated model parameters.
+`app/extract_model_params.py` enforces the contract at build time;
+`tools/check-model.sh` runs the same check in the build's Docker image.
+`tools/install-model.sh` copies a model package into `app/model/` (checked) and
+records its source in `app/model/SOURCE.md`. Do not hand-edit generated model
+parameters, and keep training scripts, datasets and checkpoints out of this repository.
 
 ## Runtime architecture
 

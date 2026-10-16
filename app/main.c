@@ -1148,9 +1148,11 @@ int main(void) {
     g_main_loop_run(main_loop);
 	LOG("Terminating and cleaning up %s\n",APP_PACKAGE);
 
-	// Stop the VDO fetcher threads first: left running they keep writing frames
-	// while the model and the process are torn down. Each step is logged so a
-	// crash during shutdown shows where it happened.
+	// Stop the web server and the VDO fetcher threads first: left running, they serve
+	// requests from, or write frames into, memory that the steps below free. Each step
+	// is logged so a crash during shutdown shows where it happened.
+	LOG("Shutdown: web server\n");
+	ACAP_HTTP_Cleanup();   // no request handler may run while the rest is freed
 	LOG("Shutdown: video\n");
 	Video_Stop_HiRes();
 	Video_Stop_YUV();

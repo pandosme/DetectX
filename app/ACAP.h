@@ -66,6 +66,9 @@ void		ACAP_Cleanup(void);
 /*-----------------------------------------------------
  * HTTP Functions
  *-----------------------------------------------------*/
+// Stop serving HTTP requests (also done by ACAP_Cleanup). Call first when shutting
+// down, so no request handler runs while the model, video and settings are freed.
+void		ACAP_HTTP_Cleanup(void);
 int 		ACAP_HTTP_Node(const char* nodename, ACAP_HTTP_Callback callback);
 
 // HTTP Request helpers

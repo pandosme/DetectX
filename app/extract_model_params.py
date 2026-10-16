@@ -124,8 +124,8 @@ def main():
     print(f"Model parameters extracted to {args.output}")
     print(f"  - Input:  {input_detail['shape'][2]}x{input_detail['shape'][1]}"
           f"x{input_detail['shape'][3]} {input_detail['dtype'].__name__}")
-    print(f"  - Coords: {list(coord['shape'])} scale={coord_scale:.9g} zero={coord_zero}")
-    print(f"  - Scores: {list(score['shape'])} scale={score_scale:.9g} zero={score_zero}"
+    print(f"  - Coords: {[int(v) for v in coord['shape']]} scale={coord_scale:.9g} zero={coord_zero}")
+    print(f"  - Scores: {[int(v) for v in score['shape']]} scale={score_scale:.9g} zero={score_zero}"
           f"  ({score['shape'][1]} classes, {score['shape'][2]} boxes)")
 
 if __name__ == "__main__":

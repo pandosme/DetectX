@@ -7,8 +7,20 @@ as a working default; the intent is that you replace it with your own model.
 
 DetectX is a **base to build on**: the application introspects whatever model you give
 it -- input resolution, class count, quantization -- so you change behaviour by changing
-the model, not the code. See [Train-Build.md](Train-Build.md) to train and
-export your own.
+the model, not the code.
+
+### Choose your path
+
+| You want to... | Do this | You need |
+|---|---|---|
+| Run DetectX with the COCO model | Install a package from [Releases](https://github.com/pandosme/DetectX/releases) | an Axis camera |
+| Run your own model, without building | Install a package, then upload your `.tflite` + `labels.txt` on the **Model** page | a model that meets the [model contract](docs/MODEL_CONTRACT.md) |
+| Ship a package with your own model | `tools/install-model.sh` then `./build.sh` -- see [docs/BUILDING.md](docs/BUILDING.md) | Docker |
+| Train a model | [acap-model-pipeline](https://github.com/pandosme/acap-model-pipeline): dataset in, model package out | a GPU is recommended |
+| Change the application itself | [AGENTS.md](AGENTS.md) describes the code; build as above | Docker, C |
+
+This repository holds the application only. Training, datasets and export live in
+acap-model-pipeline; the two meet at the [model contract](docs/MODEL_CONTRACT.md).
 
 ## Acknowledgements
 
@@ -52,19 +64,17 @@ one gives wrong detections.
 ./build.sh --target a8     # one chip only
 ```
 
-To use your own model, export it per chip and drop the files in before building:
+To use your own model, install it before building:
 
 ```bash
-./export_yolov8.py --target a8 --weights your.pt --width 960 --height 544 \
-    --calibration-dir /path/to/calibration/images --output app/model/model-a8.tflite
-./export_yolov8.py --target a9 --weights your.pt --width 960 --height 544 \
-    --calibration-dir /path/to/calibration/images --output app/model/model-a9.tflite
-cp your-labels.txt app/model/labels.txt
+tools/install-model.sh <model-package-dir> --size 1120x640    # or --a8 x.tflite --a9 y.tflite --labels labels.txt
 ./build.sh
 ```
 
-Model parameters -- input size, tensor shapes, quantization scales -- are extracted
-from the TFLite files automatically at build time; nothing needs editing by hand.
+The installer checks each model against the [model contract](docs/MODEL_CONTRACT.md) and
+copies it to `app/model/`. Model parameters -- input size, tensor shapes, quantization
+scales -- are read from the TFLite files at build time; nothing needs editing by hand.
+See [docs/BUILDING.md](docs/BUILDING.md) for the details and the command-line camera tools.
 
 
 ***
@@ -162,10 +172,10 @@ visually similar); reach for more pixels when objects are *far*.
 
 **Measure on your own hardware.** ARTPEC-9 is faster than ARTPEC-8 and these numbers
 will differ. Two scripts reproduce the tables:
-- `benchmark_resolutions.sh` -- uploads models through the app's own HTTP endpoint and
+- `tools/benchmark_resolutions.sh` -- uploads models through the app's own HTTP endpoint and
   reads the reported end-to-end time. Needs only the camera web login. **These are the
   real-world numbers above.**
-- `benchmark_larod.sh` -- times raw DLPU inference via `larod-client` over SSH, the way
+- `tools/benchmark_larod.sh` -- times raw DLPU inference via `larod-client` over SSH, the way
   [axis-model-zoo](https://github.com/AxisCommunications/axis-model-zoo) does. Faster to
   run and good for *comparing* models, but it carries a fixed per-run overhead that a
   running ACAP amortizes, so its absolute numbers are pessimistic below ~1 megapixel. Use
@@ -382,24 +392,56 @@ DetectX delivers three primary payload types, all enrichable with the configured
 
 ## Version History
 
-## 5.2.0
+## 5.1.0
 
+Everything since 5.0.0 (the 5.0.1-5.0.3 development builds are included).
+
+### Detection and events
 - **Event trigger by time-based vote** ("Prioritize"), with a new **Balanced** option.
   Speed fires on the first frame. Balanced fires when a label is in >= 75 % of the frames
   with detections within 300 ms; Accuracy when it is in >= 3 frames and >= 60 % within
   500 ms. Both also require that no other label was seen more often, so brief
-  misclassifications (or the shapes a hand passes through while raised) do not fire.
-  The window stretches on slow cameras. Settings `eventLogic` `{window, frames, share}`
-  overrides. Replaces the frame-count window, which read a wrong status key and always
-  used 16 frames.
+  misclassifications do not fire. The window stretches on slow cameras. Settings
+  `eventLogic` `{window, frames, share}` override. Replaces the frame-count window, which
+  read a wrong status key and always used 16 frames.
+- **View Areas:** run detection on one of the camera's View Areas instead of the full
+  image (**View** on the live page). A View Area gives distant objects more pixels at the
+  same speed. Falls back to the main view if the View Area is removed or disabled;
+  changing it restarts the app.
 - **No hidden minimum-size filter.** Its UI was removed in 4.0.0, but a 20/1000 default
   kept dropping small, distant objects.
-- 5.1.x (included): MQTT/HTTP crops cut from a second stream at the camera's largest 16:9
-  resolution, capped to the active capture mode (setting `cropping.fullResolution`,
-  default on); crop payload adds `frame_w`/`frame_h`; crops are only cut when the throttle
-  lets one out; border preview drawn to scale for 0-200 px. SD capture keeps the
-  inference-size frame.
-- 5.0.3 (included): a failed inference no longer crashes the application into a restart loop.
+- Confidence and NMS changes apply immediately, without a restart.
+
+### Detection export
+- MQTT/HTTP crops are cut from a second stream at the camera's largest 16:9 resolution,
+  capped to the active capture mode (setting `cropping.fullResolution`, default on). With a
+  View Area the crops still come from the full sensor. The payload adds `frame_w`/`frame_h`.
+- Crops are only cut when the throttle lets one out; border preview drawn to scale (0-200 px).
+- SD card capture saves full frames even when crop export is off, at the inference size.
+
+### Web UI
+- Live view shows **FPS** (tooltip: inference time).
+- Pages opened while the app starts wait and reload when the model is ready, instead of
+  "The application is not running".
+- About page shows the MQTT topics that are actually published, with the camera serial.
+- Index page: DLPU analytics toggle with a clearer note on when it costs performance.
+
+### Fixes
+- No crash on stop or restart: double frees of the status, device and MQTT settings
+  objects, video threads and web requests running during shutdown. Before, a crashed stop
+  could leave the next start with "Model initialization failed" until a camera reboot.
+- A failed inference no longer crashes the application into a restart loop; the web UI
+  shows "Model stopped" with a hint to use a smaller input size.
+- Bounding-box offset on runtime-uploaded models of a different resolution.
+
+### Repository
+- The repository holds the application only. `tools/` adds `install-model.sh` (model package
+  -> `app/model/`, checked), `check-model.sh` (model contract check in Docker), `camera.sh`
+  (install, start/stop, status, log, upload-model) and the benchmarks.
+- [docs/MODEL_CONTRACT.md](docs/MODEL_CONTRACT.md) and [docs/BUILDING.md](docs/BUILDING.md).
+- Training and export moved to [acap-model-pipeline](https://github.com/pandosme/acap-model-pipeline)
+  (`export_yolov8.py`, `export_resolutions.sh`, `Train-Build.md`); the COCO checkpoints are
+  downloaded by its `tools/get_base_weights.sh` instead of being stored here.
 
 ## 5.0.0
 

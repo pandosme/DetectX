@@ -429,6 +429,11 @@ void ACAP_HTTP_Process() {
         FCGX_Free(&request, 1);
         return;
     }
+    // ACAP_HTTP_Cleanup() cancels this thread. Allow that only while waiting for a
+    // request: cancelled inside a handler, the thread could leave a mutex (status,
+    // nodes) locked and hang the rest of the shutdown.
+    int cancelState;
+    pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancelState);
 
     // Setup request data structure
     requestData.request = &request;
@@ -484,6 +489,7 @@ cleanup:
         free((void*)requestData.postData);
     }
     FCGX_Finish_r(&request);
+    pthread_setcancelstate(cancelState, NULL);
     return;
 }
 
