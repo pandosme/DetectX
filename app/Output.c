@@ -36,11 +36,11 @@ typedef struct {
  * only when, over the last window_ms:
  *   - it is in the current frame,
  *   - it was seen in at least min_hits frames,
- *   - it was seen in at least min_share of the frames with hands, and
- *   - no other label was seen more often (a tie is allowed, so two hands showing
- *     different gestures can both fire).
- * A hand being raised often reads as no_gesture/one/fist for a frame or two before the
- * real gesture settles; those transitional labels fail the share and lead tests.
+ *   - it was seen in at least min_share of the frames with detections, and
+ *   - no other label was seen more often (a tie is allowed, so two objects with
+ *     different labels can both fire).
+ * An object entering the scene or changing pose is often misclassified for a frame or
+ * two before its label settles; those transitional labels fail the share and lead tests.
  * "speed" fires on the first frame. Defaults per mode below; settings "eventLogic"
  * {window, frames, share} overrides them. The window is stretched when frames arrive
  * too slowly to fit min_hits in it. */

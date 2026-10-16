@@ -42,8 +42,9 @@ Use an exporter that cuts the graph before the final concat -- the training repo
 
 - One label per line, in the model's class order (line 1 = class 0).
 - The number of lines must equal the model's class count.
-- Labels are shown in the web UI and used as event names and MQTT topic parts:
-  short, lowercase, no spaces (`no_gesture`, not `No gesture`).
+- Labels are shown in the web UI and used in event names and MQTT topics. Spaces work
+  (the bundled COCO labels have `traffic light`), but short lowercase labels without
+  spaces are easier to use in integrations.
 
 ## Multi-class models: clamp the class logits
 
@@ -71,7 +72,7 @@ The build expects, in `app/model/`:
 | `labels.txt` | labels for both |
 
 `tools/install-model.sh` puts them there from a trained model package (the folder
-training produces, e.g. `hagrid15-a8-1120x640.tflite`, `hagrid15-a9-1120x640.tflite`,
+training produces, e.g. `mymodel-a8-960x544.tflite`, `mymodel-a9-960x544.tflite`,
 `labels.txt`) and records the source in `app/model/SOURCE.md`.
 
 Without building, upload the `.tflite` for the camera's chip and `labels.txt` on the

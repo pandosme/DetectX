@@ -9,7 +9,7 @@ No Axis SDK installation is needed; the build runs in the SDK's Docker image.
 From a model package (the folder training produces):
 
 ```bash
-tools/install-model.sh ~/datasets/hagrid/models --size 1120x640
+tools/install-model.sh ~/datasets/mymodel/models --size 960x544
 ```
 
 or from individual files:

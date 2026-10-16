@@ -7,7 +7,7 @@
 #
 # A model package is the folder training produces (see docs/MODEL_CONTRACT.md):
 # labels.txt plus one .tflite per chip and input size, named with the chip and size,
-# e.g. hagrid15-a8-1120x640.tflite / hagrid15-a9-1120x640.tflite. With several sizes
+# e.g. mymodel-a8-960x544.tflite / mymodel-a9-960x544.tflite. With several sizes
 # in the package, choose one with --size.
 #
 # The files are copied to the names the build uses -- app/model/model-a8.tflite,
