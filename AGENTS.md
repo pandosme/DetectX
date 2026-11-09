@@ -83,9 +83,9 @@ releases. It does not run a separate test suite.
 
 ## Model contract
 
-This repository holds the application only; training and export live in
-[acap-model-pipeline](https://github.com/pandosme/acap-model-pipeline). The two meet
-at `docs/MODEL_CONTRACT.md`: uint8 input `[1,H,W,3]` (H, W multiples of 32), two uint8
+`tools/export_yolov8.py` exports trained YOLOv8 weights to both chip files
+(`docs/TRAINING.md`); [acap-model-pipeline](https://github.com/pandosme/acap-model-pipeline)
+produces the same package format. Both meet at `docs/MODEL_CONTRACT.md`: uint8 input `[1,H,W,3]` (H, W multiples of 32), two uint8
 outputs -- coordinates `[1,4,N]` and class scores `[1,classes,N]`, no objectness --
 per-tensor weights for ARTPEC-8, per-channel for ARTPEC-9, and `labels.txt` with one
 label per class in model order.
@@ -94,7 +94,8 @@ label per class in model order.
 `tools/check-model.sh` runs the same check in the build's Docker image.
 `tools/install-model.sh` copies a model package into `app/model/` (checked) and
 records its source in `app/model/SOURCE.md`. Do not hand-edit generated model
-parameters, and keep training scripts, datasets and checkpoints out of this repository.
+parameters, and keep datasets, checkpoints and export output (`exports/`) out of this
+repository.
 
 ## Runtime architecture
 

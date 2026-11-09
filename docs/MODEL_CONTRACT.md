@@ -26,8 +26,8 @@ here also fails `./build.sh`.
 Why two outputs: Ultralytics' own TFLite export produces one fused `[1, 4+classes, N]`
 float tensor. Fused, coordinates (0 to the input width) and scores (0-1) share one int8
 scale, and every score quantizes to zero. Separate tensors each get their own scale.
-Use an exporter that cuts the graph before the final concat -- the training repository
-[acap-model-pipeline](https://github.com/pandosme/acap-model-pipeline) does this.
+`tools/export_yolov8.py` cuts the graph before the final concat and writes both chip
+files; see [TRAINING.md](TRAINING.md).
 
 ## Input size
 
@@ -52,7 +52,7 @@ A model with many classes can push the score logits of the classes a box is *not
 extreme values (seen: -133). After int8 quantization the ARTPEC-9 DLPU then returned
 false 100 % scores at random positions while the same file was correct on the CPU.
 Clamping the logits to +-16 before the sigmoid (`Hardtanh(-16, 16)` after each class
-branch) prevents it without changing any prediction. acap-model-pipeline adds the clamp
+branch) prevents it without changing any prediction. `tools/export_yolov8.py` adds the clamp
 automatically for models with more than one class.
 
 ## Calibration

@@ -16,11 +16,13 @@ the model, not the code.
 | Run DetectX with the COCO model | Install a package from [Releases](https://github.com/pandosme/DetectX/releases) | an Axis camera |
 | Run your own model, without building | Install a package, then upload your `.tflite` + `labels.txt` on the **Model** page | a model that meets the [model contract](docs/MODEL_CONTRACT.md) |
 | Ship a package with your own model | `tools/install-model.sh` then `./build.sh` -- see [docs/BUILDING.md](docs/BUILDING.md) | Docker |
-| Train a model | [acap-model-pipeline](https://github.com/pandosme/acap-model-pipeline): dataset in, model package out | a GPU is recommended |
+| Train and export a model | [docs/TRAINING.md](docs/TRAINING.md): train YOLOv8, then `tools/export_yolov8.py` writes the ARTPEC-8 and ARTPEC-9 models | Python; a GPU is recommended for training |
 | Change the application itself | [AGENTS.md](AGENTS.md) describes the code; build as above | Docker, C |
 
-This repository holds the application only. Training, datasets and export live in
-acap-model-pipeline; the two meet at the [model contract](docs/MODEL_CONTRACT.md).
+Everything from trained weights to installed package is in this repository. For larger
+training projects (dataset tooling, two-stage models), see
+[acap-model-pipeline](https://github.com/pandosme/acap-model-pipeline); both produce
+models that meet the [model contract](docs/MODEL_CONTRACT.md).
 
 ## Acknowledgements
 
@@ -392,6 +394,18 @@ DetectX delivers three primary payload types, all enrichable with the configured
 
 ## Version History
 
+## 5.1.1
+
+### Repository
+- **Export is back in this repository.** `tools/export_yolov8.py` exports trained YOLOv8
+  weights to the ARTPEC-8 (int8 per-tensor) and ARTPEC-9 (int8 per-channel) models in one
+  run, with split coordinate and score outputs, the class-logit clamp for multi-class
+  models, and a check of each file. It writes a model package for
+  `tools/install-model.sh`; `--size` takes several sizes (replaces `export_resolutions.sh`).
+- [docs/TRAINING.md](docs/TRAINING.md): training, export, calibration and int8 checks
+  (replaces `Train-Build.md`). acap-model-pipeline remains an option for larger
+  projects.
+
 ## 5.1.0
 
 Everything since 5.0.0 (the 5.0.1-5.0.3 development builds are included).
@@ -441,7 +455,8 @@ Everything since 5.0.0 (the 5.0.1-5.0.3 development builds are included).
 - [docs/MODEL_CONTRACT.md](docs/MODEL_CONTRACT.md) and [docs/BUILDING.md](docs/BUILDING.md).
 - Training and export moved to [acap-model-pipeline](https://github.com/pandosme/acap-model-pipeline)
   (`export_yolov8.py`, `export_resolutions.sh`, `Train-Build.md`); the COCO checkpoints are
-  downloaded by its `tools/get_base_weights.sh` instead of being stored here.
+  downloaded by its `tools/get_base_weights.sh` instead of being stored here. (Export
+  returned in 5.1.1.)
 
 ## 5.0.0
 
